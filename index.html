@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تطبيق الخريطة المحسن</title>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.css" type="text/css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #map { height: 500px; width: 100%; }
+        #controls { margin: 10px; padding: 10px; background-color: rgba(255, 255, 255, 0.8); border-radius: 5px; display: inline-block; }
+        #weatherInfo, #workerInfo { margin-top: 10px; font-size: 16px; display: none; }
+        .controlButton { margin: 5px; padding: 10px; background-color: #f0f0f0; border: none; border-radius: 5px; cursor: pointer; }
+        .controlButton:hover { background-color: #ddd; }
+        #infoBox { margin-top: 10px; padding: 10px; background-color: rgba(255, 255, 255, 0.8); border-radius: 5px; display: inline-block; }
+        .popupInfo { font-size: 14px; color: black; }
+    </style>
+</head>
+<body>
+    <h1 id="title">تطبيق الخريطة المحسن</h1>
+    <div id="controls">
+        <input id="searchBar" type="text" placeholder="ابحث عن مكان..." />
+        <button id="searchButton" class="controlButton">ابحث</button>
+        <button id="locateButton" class="controlButton">تحديد موقعي</button>
+        <select id="styleSelector" class="controlButton">
+            <option value="streets">شوارع</option>
+            <option value="satellite">الأقمار الصناعية</option>
+            <option value="outdoors">خارجية</option>
+            <option value="hybrid" selected>هايبرد</option>
+        </select>
+        <button id="toggle3D" class="controlButton">عرض 3D</button>
+        <button id="toggleWeather" class="controlButton">عرض الطقس</button>
+        <button id="toggleWorkerTracking" class="controlButton">تتبع العمال</button>
+        <button id="requestWater" class="controlButton">طلب ماء</button>
+        <div id="weatherInfo"></div>
+        <div id="workerInfo"></div>
+    </div>
+    <div id="map"></div>
+
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.js"></script>
+    <script src="https://unpkg.com/@turf/turf"></script>
+    <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script>
+        // إعداد Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyAQ2FQL0DvbPx4YnJrrAmal2o-yaH_KP_s",
+            authDomain: "adlo-44d1b.firebaseapp.com",
+            databaseURL: "https://adlo-44d1b.firebaseio.com",
+            projectId: "adlo-44d1b",
+            storageBucket: "adlo-44d1b.appspot.com",
+            messagingSenderId: "96260637269",
+            appId: "1:96260637269:web:e3bc37ab2b41038c254adc"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        const mapboxToken = 'pk.eyJ1IjoiY2hvb3NlbWUiLCJhIjoiY20wZnVpemI2MHpreTJqcjR4ZThuam9pYyJ9.F1CjHrnJ7m-VwM_LHt0Q9Q';
+        const openWeatherApiKey = 'ce6cae3c0977e051e1924a4ac1ece1aa';
+        const libyaCoords = [13.1897, 32.8872];
+
+        mapboxgl.accessToken = mapboxToken;
+
+        // إعداد أنماط النهار والليل
+        const styles = {
+            streets: 'mapbox://styles/mapbox/streets-v11',
+            satellite: 'mapbox://styles/mapbox/satellite-v9',
+            outdoors: 'mapbox://styles/mapbox/outdoors-v11',
+            hybrid: 'mapbox://styles/mapbox/satellite-streets-v11'
+        };
+
+        // إعداد الخريطة
+        var map = new mapboxgl.Map({
+            container: 'map',
+            style: styles.hybrid,
+            center: libyaCoords,
+            zoom: 9
+        });
+
+        // إعداد التوجيهات
+        var directions = new MapboxDirections({
+            accessToken: mapboxgl.accessToken,
+            unit: 'metric',
+            profile: 'mapbox/driving',
+            interactive: false,
+        });
+        map.addControl(directions, 'top-left');
+
+        // خيارات الأسلوب
+        const styleSelector = document.getElementById('styleSelector');
+        styleSelector.addEventListener('change', (event) => {
+            map.setStyle(styles[event.target.value]);
+        });
+
+        // إضافة زري التكبير والتصغير
+        map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+        // تبديل العرض ثلاثي الأبعاد
+        const toggle3D = document.getElementById('toggle3D');
+        toggle3D.addEventListener('click', () => {
+            const pitch = map.getPitch();
+            if (pitch === 0) {
+                map.easeTo({ pitch: 45 });
+            } else {
+                map.easeTo({ pitch: 0 });
+            }
+        });
+
+        // عرض الطقس
+        const weatherInfo = document.getElementById('weatherInfo');
+        const toggleWeather = document.getElementById('toggleWeather');
+        toggleWeather.addEventListener('click', () => {
+            if (weatherInfo.style.display === 'none') {
+                const weatherUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${libyaCoords[1]}&lon=${libyaCoords[0]}&appid=${openWeatherApiKey}&units=metric&lang=ar`;
+                fetch(weatherUrl)
+                    .then(response => response.json())
+                    .then(data => {
+                        weatherInfo.style.display = 'block';
+                        weatherInfo.innerHTML = `درجة الحرارة: ${data.main.temp} °C، الرطوبة: ${data.main.humidity} %، الحالة: ${data.weather[0].description}`;
+                    });
+            } else {
+                weatherInfo.style.display = 'none';
+            }
+        });
+
+        // عرض وتتبع العمال
+        const workerInfo = document.getElementById('workerInfo');
+        const toggleWorkerTracking = document.getElementById('toggleWorkerTracking');
+        toggleWorkerTracking.addEventListener('click', () => {
+            if (workerInfo.style.display === 'none') {
+                const workersRef = firebase.database().ref('workers');
+                workersRef.on('value', (snapshot) => {
+                    const workers = snapshot.val();
+                    workerInfo.style.display = 'block';
+                    workerInfo.innerHTML = JSON.stringify(workers);
+                });
+            } else {
+                workerInfo.style.display = 'none';
+            }
+        });
+
+        // طلب ماء
+        const requestWaterButton = document.getElementById('requestWater');
+        requestWaterButton.addEventListener('click', () => {
+            const userLocation = map.getCenter();
+            const waterRequestsRef = firebase.database().ref('waterRequests');
+            waterRequestsRef.push({
+                location: {
+                    lat: userLocation.lat,
+                    lng: userLocation.lng
+                },
+                timestamp: new Date().toISOString()
+            });
+            alert("تم إرسال طلب الماء!");
+        });
+
+        // البحث عن مكان
+        const searchButton = document.getElementById('searchButton');
+        searchButton.addEventListener('click', () => {
+            const query = document.getElementById('searchBar').value;
+            if (query) {
+                mapboxgl.accessToken = mapboxToken;
+                fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${query}.json?access_token=${mapboxToken}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        const coordinates = data.features[0].center;
+                        map.flyTo({
+                            center: coordinates,
+                            zoom: 14
+                        });
+                    });
+            }
+        });
+
+        // تحديد موقعي
+        const locateButton = document.getElementById('locateButton');
+        locateButton.addEventListener('click', () => {
+            navigator.geolocation.getCurrentPosition((position) => {
+                const userLocation = [position.coords.longitude, position.coords.latitude];
+                map.flyTo({
+                    center: userLocation,
+                    zoom: 14
+                });
+                new mapboxgl.Marker()
+                    .setLngLat(userLocation)
+                    .addTo(map);
+            });
+        });
+    </script>
+</body>
+</html>
