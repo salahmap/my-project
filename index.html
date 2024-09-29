@@ -23,6 +23,7 @@
         #infoBox { margin-top: 10px; padding: 10px; background-color: rgba(255, 255, 255, 0.8); border-radius: 5px; display: inline-block; }
         .popupInfo { font-size: 14px; color: black; }
     </style>
+    <script src="script.js"></script> <!-- تأكد من أن هذا الملف موجود -->
 </head>
 <body>
     <h1 id="title">تطبيق الخريطة المحسن</h1>
@@ -169,31 +170,34 @@
             const query = document.getElementById('searchBar').value;
             if (query) {
                 mapboxgl.accessToken = mapboxToken;
-                fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${query}.json?access_token=${mapboxToken}`)
+                fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${mapboxToken}`)
                     .then(response => response.json())
                     .then(data => {
-                        const coordinates = data.features[0].center;
-                        map.flyTo({
-                            center: coordinates,
-                            zoom: 14
-                        });
+                        const place = data.features[0];
+                        if (place) {
+                            map.flyTo({ center: place.geometry.coordinates, zoom: 12 });
+                            new mapboxgl.Marker().setLngLat(place.geometry.coordinates).addTo(map);
+                        } else {
+                            alert("لم يتم العثور على أي مكان.");
+                        }
                     });
             }
         });
 
-        // تحديد موقعي
+        // تحديد الموقع الحالي
         const locateButton = document.getElementById('locateButton');
         locateButton.addEventListener('click', () => {
             navigator.geolocation.getCurrentPosition((position) => {
-                const userLocation = [position.coords.longitude, position.coords.latitude];
-                map.flyTo({
-                    center: userLocation,
-                    zoom: 14
-                });
-                new mapboxgl.Marker()
-                    .setLngLat(userLocation)
-                    .addTo(map);
+                const userCoords = [position.coords.longitude, position.coords.latitude];
+                map.flyTo({ center: userCoords, zoom: 15 });
+                new mapboxgl.Marker().setLngLat(userCoords).addTo(map);
             });
+        });
+
+        // عرض المعلومات
+        map.on('click', (e) => {
+            const coordinates = e.lngLat;
+            alert(`أنت على الإحداثيات: ${coordinates.lng.toFixed(4)}, ${coordinates.lat.toFixed(4)}`);
         });
     </script>
 </body>
