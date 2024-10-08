@@ -24,7 +24,7 @@
             margin: 5px 0;
             transition: background-color 0.3s ease;
             width: 100%;
-            font-size: 16px;
+            font-size: 14px; /* حجم الخط أصغر */
         }
         .controlButton:hover {
             background-color: rgba(30, 144, 255, 1);
@@ -37,7 +37,7 @@
             max-width: 90%;
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 5px; /* تقليل الفراغ بين الأزرار */
         }
         #weatherInfo {
             display: none;
@@ -63,6 +63,18 @@
             top: 10px;
             right: 10px;
             z-index: 1;
+        }
+        /* إخفاء مربع تحديد المسافات عند تحميل الصفحة */
+        .distanceBox {
+            display: none; /* إخفاء مربع تحديد المسافات */
+            position: absolute;
+            top: 60px; /* وضعه تحت الأزرار */
+            left: 10px;
+            z-index: 1;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
         }
     </style>
 </head>
@@ -93,6 +105,12 @@
     </div>
 
     <button id="trackingButton" class="trackingButton"></button>
+    
+    <!-- إضافة مربع تحديد المسافات -->
+    <div class="distanceBox" id="distanceBox">
+        <p>تحديد المسافة...</p>
+        <!-- محتويات إضافية لمربع تحديد المسافات -->
+    </div>
 
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.js"></script>
     <script src="https://unpkg.com/@turf/turf"></script>
@@ -158,35 +176,69 @@
             if (navigator.geolocation) {
                 navigator.geolocation.watchPosition(position => {
                     const lngLat = [position.coords.longitude, position.coords.latitude];
-                    map.flyTo({
-                        center: lngLat,
-                        essential: true,
-                        zoom: 18
-                    });
-                    // تحديث الموقع اللحظي في Firebase هنا
-                });
-            }
-        });
-
-        // تتبع الموقع المستمر
-        const trackingButton = document.getElementById('trackingButton');
-        let trackingEnabled = false;
-
-        trackingButton.addEventListener('click', function () {
-            trackingEnabled = !trackingEnabled;
-            if (trackingEnabled) {
-                navigator.geolocation.watchPosition(position => {
-                    const { latitude, longitude } = position.coords;
-                    map.flyTo({ center: [longitude, latitude], zoom: 16 });
-                    // يمكن إضافة تحديثات Firebase هنا
+                    map.setCenter(lngLat);
+                    new mapboxgl.Marker().setLngLat(lngLat).addTo(map);
+                }, () => {
+                    alert('تعذر الحصول على موقعك.');
                 });
             } else {
-                alert("تم إيقاف التتبع");
+                alert('جهازك لا يدعم تحديد الموقع.');
             }
         });
 
-        // أوامر أخرى لتحسين استخدام التطبيق...
+        // عرض الطقس (تنفيذ الدالة هنا)
+        document.getElementById('toggleWeather').addEventListener('click', function () {
+            const weatherInfo = document.getElementById('weatherInfo');
+            weatherInfo.style.display = weatherInfo.style.display === 'none' ? 'block' : 'none';
+            if (weatherInfo.style.display === 'block') {
+                // احصل على معلومات الطقس هنا
+                weatherInfo.innerHTML = 'معلومات الطقس هنا...';
+            }
+        });
 
+        // تتبع العمال (تنفيذ الدالة هنا)
+        document.getElementById('toggleWorkerTracking').addEventListener('click', function () {
+            const workerInfo = document.getElementById('workerInfo');
+            workerInfo.innerHTML = 'تتبع العمال هنا...'; // استبدل بمعلومات حقيقية
+            document.getElementById('distanceBox').style.display = 'block'; // إظهار مربع تحديد المسافات
+        });
+
+        // طلب ماء
+        document.getElementById('requestWater').addEventListener('click', function () {
+            alert('تم طلب الماء.');
+        });
+
+        // تفعيل الوضع الليلي
+        document.getElementById('nightMode').addEventListener('click', function () {
+            document.body.classList.toggle('night-mode');
+        });
+
+        // إضافة مسجد (تنفيذ الدالة هنا)
+        document.getElementById('addMosque').addEventListener('click', function () {
+            const mosqueInfo = document.getElementById('mosqueInfo');
+            mosqueInfo.innerHTML = 'إضافة مسجد هنا...'; // استبدل بمعلومات حقيقية
+        });
+
+        // مشاركة الموقع (تنفيذ الدالة هنا)
+        document.getElementById('shareLocation').addEventListener('click', function () {
+            alert('تمت مشاركة الموقع.');
+        });
+
+        // عرض المواقع المفضلة (تنفيذ الدالة هنا)
+        document.getElementById('favoriteLocations').addEventListener('click', function () {
+            alert('عرض المواقع المفضلة.');
+        });
+
+        // استكشاف الأماكن القريبة (تنفيذ الدالة هنا)
+        document.getElementById('nearbyPlaces').addEventListener('click', function () {
+            alert('استكشاف الأماكن القريبة.');
+        });
+
+        // تفعيل العرض ثلاثي الأبعاد
+        document.getElementById('toggle3D').addEventListener('click', function () {
+            const is3D = map.getPitch() === 0;
+            map.setPitch(is3D ? 60 : 0);
+        });
     </script>
 </body>
 </html>
