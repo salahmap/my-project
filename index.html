@@ -24,6 +24,7 @@
             margin: 5px 0;
             transition: background-color 0.3s ease;
             width: 100%;
+            font-size: 16px;
         }
         .controlButton:hover {
             background-color: rgba(30, 144, 255, 1);
@@ -33,7 +34,10 @@
             top: 10px;
             left: 10px;
             z-index: 1;
-            max-width: 300px;
+            max-width: 90%;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
         }
         #weatherInfo {
             display: none;
@@ -45,7 +49,6 @@
             width: 250px;
             font-size: 14px;
         }
-        #workerInfo, #mosqueInfo { display: none; }
         .mapboxgl-ctrl-geocoder {
             min-width: 50%;
         }
@@ -126,117 +129,43 @@
             hybrid: 'mapbox://styles/mapbox/satellite-streets-v11'
         };
 
-        // إنشاء الخريطة
+        // إنشاء الخريطة وعرض ليبيا عند الفتح
         const map = new mapboxgl.Map({
             container: 'map', 
             style: styles.hybrid, 
-            center: [39.8262, 21.4225], 
-            zoom: 15
+            center: [17.2283, 26.3351], // إحداثيات ليبيا
+            zoom: 5
         });
 
-        // إضافة التحكم في الاتجاهات
-        const directions = new MapboxDirections({
-            accessToken: mapboxgl.accessToken,
-            unit: 'metric',
-            profile: 'mapbox/driving'
+        // حركة عرض حديثة عند فتح الخريطة
+        map.on('load', () => {
+            map.flyTo({
+                center: [17.2283, 26.3351],
+                zoom: 6,
+                speed: 0.8,
+                curve: 1.42,
+                easing: (t) => t
+            });
         });
-        map.addControl(directions, 'top-left');
 
         // تغيير نمط الخريطة
         document.getElementById('styleSelector').addEventListener('change', function () {
             map.setStyle(styles[this.value]);
         });
 
-        // تحديد موقع المستخدم
+        // تحديد موقع المستخدم اللحظي
         document.getElementById('locateButton').addEventListener('click', function () {
             if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(position => {
+                navigator.geolocation.watchPosition(position => {
                     const lngLat = [position.coords.longitude, position.coords.latitude];
                     map.flyTo({
                         center: lngLat,
                         essential: true,
                         zoom: 18
                     });
+                    // تحديث الموقع اللحظي في Firebase هنا
                 });
             }
-        });
-
-        // عرض الطقس
-        document.getElementById('toggleWeather').addEventListener('click', async function () {
-            const weatherElement = document.getElementById('weatherInfo');
-            const response = await fetch('https://api.openweathermap.org/data/2.5/weather?lat=21.4225&lon=39.8262&appid=10c42c7c9928b6fa03fc36bf198846f1&units=metric');
-            const weatherData = await response.json();
-            const { main, weather, wind } = weatherData;
-
-            weatherElement.innerHTML = `
-                <p>درجة الحرارة: ${main.temp} °C</p>
-                <p>الرطوبة: ${main.humidity} %</p>
-                <p>الطقس: ${weather[0].description}</p>
-                <p>سرعة الرياح: ${wind.speed} م/ث</p>
-            `;
-            weatherElement.style.display = weatherElement.style.display === 'none' ? 'block' : 'none';
-        });
-
-        // تتبع العمال
-        document.getElementById('toggleWorkerTracking').addEventListener('click', function () {
-            // تتبع العمال هنا
-        });
-
-        // طلب ماء
-        document.getElementById('requestWater').addEventListener('click', function () {
-            alert("تم إرسال طلب الماء بنجاح!");
-        });
-
-        // تفعيل العرض ثلاثي الأبعاد
-        document.getElementById('toggle3D').addEventListener('click', function () {
-            const pitch = map.getPitch() === 0 ? 60 : 0;
-            map.easeTo({ pitch: pitch });
-        });
-
-        // إضافة مسجد
-        document.getElementById('addMosque').addEventListener('click', function () {
-            const mosqueLngLat = [map.getCenter().lng, map.getCenter().lat];
-            new mapboxgl.Marker({ color: 'green' })
-                .setLngLat(mosqueLngLat)
-                .addTo(map);
-            alert('تم إضافة مسجد جديد');
-        });
-
-        // مشاركة موقعي
-        document.getElementById('shareLocation').addEventListener('click', function () {
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(position => {
-                    const lngLat = [position.coords.longitude, position.coords.latitude];
-                    const shareUrl = `https://www.google.com/maps?q=${lngLat[1]},${lngLat[0]}`;
-                    navigator.clipboard.writeText(shareUrl).then(() => {
-                        alert('تم نسخ الرابط إلى الحافظة');
-                    });
-                });
-            }
-        });
-
-        // عرض المواقع المفضلة
-        document.getElementById('favoriteLocations').addEventListener('click', function () {
-            const favoriteLocations = [
-                { lng: 39.8262, lat: 21.4225, name: 'الموقع المفضل 1' },
-                { lng: 39.8268, lat: 21.4231, name: 'الموقع المفضل 2' }
-            ];
-            favoriteLocations.forEach(location => {
-                new mapboxgl.Marker({ color: 'blue' })
-                    .setLngLat([location.lng, location.lat])
-                    .setPopup(new mapboxgl.Popup().setHTML(`<p>${location.name}</p>`))
-                    .addTo(map);
-            });
-        });
-
-        // استكشاف الأماكن القريبة
-        document.getElementById('nearbyPlaces').addEventListener('click', function () {
-            // استكشاف الأماكن القريبة هنا
-        });
-
-        // تفعيل الوضع الليلي
-        document.getElementById('nightMode').addEventListener('click', function () {
-            map.setStyle('mapbox://styles/mapbox/dark-v10');
         });
 
         // تتبع الموقع المستمر
@@ -255,6 +184,8 @@
                 alert("تم إيقاف التتبع");
             }
         });
+
+        // أوامر أخرى لتحسين استخدام التطبيق...
 
     </script>
 </body>
