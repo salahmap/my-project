@@ -21,8 +21,9 @@
             color: white;
             font-weight: bold;
             cursor: pointer;
-            margin: 5px;
+            margin: 5px 0;
             transition: background-color 0.3s ease;
+            width: 100%;
         }
         .controlButton:hover {
             background-color: rgba(30, 144, 255, 1);
@@ -32,6 +33,7 @@
             top: 10px;
             left: 10px;
             z-index: 1;
+            max-width: 300px;
         }
         #weatherInfo {
             display: none;
@@ -43,8 +45,7 @@
             width: 250px;
             font-size: 14px;
         }
-        #workerInfo { display: none; }
-        #mosqueInfo { display: none; }
+        #workerInfo, #mosqueInfo { display: none; }
         .mapboxgl-ctrl-geocoder {
             min-width: 50%;
         }
@@ -79,12 +80,15 @@
         <button id="requestWater" class="controlButton">طلب ماء</button>
         <button id="toggle3D" class="controlButton">تفعيل العرض ثلاثي الأبعاد</button>
         <button id="addMosque" class="controlButton">إضافة مسجد</button>
+        <button id="shareLocation" class="controlButton">مشاركة موقعي</button>
+        <button id="favoriteLocations" class="controlButton">عرض المواقع المفضلة</button>
+        <button id="nearbyPlaces" class="controlButton">استكشاف الأماكن القريبة</button>
+        <button id="nightMode" class="controlButton">الوضع الليلي</button>
         <div id="weatherInfo"></div>
         <div id="workerInfo"></div>
         <div id="mosqueInfo"></div>
     </div>
 
-    <!-- زر تتبع الحركة -->
     <button id="trackingButton" class="trackingButton"></button>
 
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.js"></script>
@@ -96,9 +100,9 @@
     <link href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.7.0/mapbox-gl-geocoder.css" rel="stylesheet" />
 
     <script>
-        // تكوين Firebase
+        // إعداد Firebase
         const firebaseConfig = {
-            apiKey: "ce6cae3c0977e051e1924a4ac1ece1aa", // مفتاحك
+            apiKey: "ce6cae3c0977e051e1924a4ac1ece1aa",
             authDomain: "adlo-44d1b.firebaseapp.com",
             databaseURL: "https://adlo-44d1b-default-rtdb.firebaseio.com/",
             projectId: "adlo-44d1b",
@@ -124,158 +128,134 @@
 
         // إنشاء الخريطة
         const map = new mapboxgl.Map({
-            container: 'map',
-            style: styles.hybrid,
-            center: [13.1897, 32.8872], // إحداثيات ليبيا
-            zoom: 9,
-            pitch: 45, 
-            bearing: -17.6, 
-            antialias: true
-        });
-
-        // حركة عند تحميل الخريطة
-        map.on('load', () => {
-            map.flyTo({
-                center: [13.1897, 32.8872],
-                zoom: 12,
-                speed: 0.8,
-                curve: 1.4,
-                essential: true
-            });
-
-            // إضافة المساجد الافتراضية
-            const mosques = [
-                { coords: [13.1910, 32.8890], name: "مسجد 1" },
-                { coords: [13.1885, 32.8860], name: "مسجد 2" }
-            ];
-
-            mosques.forEach(mosque => {
-                new mapboxgl.Marker({ color: 'blue' })
-                    .setLngLat(mosque.coords)
-                    .setPopup(new mapboxgl.Popup().setText(mosque.name))
-                    .addTo(map);
-            });
-        });
-
-        // إضافة Geocoder
-        const geocoder = new MapboxGeocoder({
-            accessToken: mapboxgl.accessToken,
-            mapboxgl: mapboxgl,
-            marker: {
-                color: 'orange'
-            },
-            placeholder: 'ابحث هنا...',
+            container: 'map', 
+            style: styles.hybrid, 
+            center: [39.8262, 21.4225], 
             zoom: 15
         });
-        map.addControl(geocoder);
 
-        // تحديد الموقع الحالي
-        const locateButton = document.getElementById('locateButton');
-        let userCoords;
-        let trackingActive = false; // متغير لتتبع الحركة
+        // إضافة التحكم في الاتجاهات
+        const directions = new MapboxDirections({
+            accessToken: mapboxgl.accessToken,
+            unit: 'metric',
+            profile: 'mapbox/driving'
+        });
+        map.addControl(directions, 'top-left');
 
-        locateButton.addEventListener('click', () => {
-            navigator.geolocation.getCurrentPosition((position) => {
-                userCoords = [position.coords.longitude, position.coords.latitude];
-                map.flyTo({ center: userCoords, zoom: 15 });
-
-                const userMarker = new mapboxgl.Marker()
-                    .setLngLat(userCoords)
-                    .addTo(map);
-
-                // تخزين الموقع في Firebase
-                database.ref('users/location').set({
-                    latitude: position.coords.latitude,
-                    longitude: position.coords.longitude
-                });
-            });
+        // تغيير نمط الخريطة
+        document.getElementById('styleSelector').addEventListener('change', function () {
+            map.setStyle(styles[this.value]);
         });
 
-        // تفعيل تتبع العمال
-        const trackingButton = document.getElementById('trackingButton');
-        trackingButton.addEventListener('click', () => {
-            trackingActive = !trackingActive; // تبديل حالة التتبع
-
-            if (trackingActive) {
-                trackingButton.style.backgroundColor = "red"; // تغيير لون الزر عند التفعيل
-                const workerIds = [1, 2, 3]; // أمثلة على معرفات العمال
-
-                workerIds.forEach(workerId => {
-                    database.ref(`workers/${workerId}`).on('value', (snapshot) => {
-                        const workerData = snapshot.val();
-                        if (workerData) {
-                            new mapboxgl.Marker({ color: 'green' })
-                                .setLngLat([workerData.longitude, workerData.latitude])
-                                .addTo(map);
-                        }
+        // تحديد موقع المستخدم
+        document.getElementById('locateButton').addEventListener('click', function () {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(position => {
+                    const lngLat = [position.coords.longitude, position.coords.latitude];
+                    map.flyTo({
+                        center: lngLat,
+                        essential: true,
+                        zoom: 18
                     });
                 });
-            } else {
-                trackingButton.style.backgroundColor = ""; // إعادة اللون الافتراضي
-                // مسح أي علامات للعمال
-                map.eachLayer((layer) => {
-                    if (layer.id.startsWith('worker')) {
-                        map.removeLayer(layer.id);
-                    }
-                });
             }
         });
 
-        // زر إضافة مسجد
-        const addMosqueButton = document.getElementById('addMosque');
-        addMosqueButton.addEventListener('click', () => {
-            const mosqueName = prompt("أدخل اسم المسجد:");
-            if (mosqueName) {
-                const mosqueCoords = map.getCenter(); // إحداثيات الموقع الحالي
+        // عرض الطقس
+        document.getElementById('toggleWeather').addEventListener('click', async function () {
+            const weatherElement = document.getElementById('weatherInfo');
+            const response = await fetch('https://api.openweathermap.org/data/2.5/weather?lat=21.4225&lon=39.8262&appid=10c42c7c9928b6fa03fc36bf198846f1&units=metric');
+            const weatherData = await response.json();
+            const { main, weather, wind } = weatherData;
 
-                // إضافة المسجد إلى الخريطة
-                new mapboxgl.Marker({ color: 'red' })
-                    .setLngLat(mosqueCoords)
-                    .setPopup(new mapboxgl.Popup().setText(mosqueName))
-                    .addTo(map);
-
-                // تخزين المسجد في Firebase
-                const mosqueData = {
-                    name: mosqueName,
-                    latitude: mosqueCoords.lat,
-                    longitude: mosqueCoords.lng
-                };
-                database.ref('mosques/').push(mosqueData);
-            }
+            weatherElement.innerHTML = `
+                <p>درجة الحرارة: ${main.temp} °C</p>
+                <p>الرطوبة: ${main.humidity} %</p>
+                <p>الطقس: ${weather[0].description}</p>
+                <p>سرعة الرياح: ${wind.speed} م/ث</p>
+            `;
+            weatherElement.style.display = weatherElement.style.display === 'none' ? 'block' : 'none';
         });
 
-        // زر عرض الطقس
-        const toggleWeatherButton = document.getElementById('toggleWeather');
-        toggleWeatherButton.addEventListener('click', () => {
-            const weatherInfo = document.getElementById('weatherInfo');
-            if (weatherInfo.style.display === 'none') {
-                weatherInfo.style.display = 'block';
-                weatherInfo.innerText = "الطقس: مشمس، درجة الحرارة: 25 درجة مئوية";
-            } else {
-                weatherInfo.style.display = 'none';
-            }
+        // تتبع العمال
+        document.getElementById('toggleWorkerTracking').addEventListener('click', function () {
+            // تتبع العمال هنا
         });
 
-        // زر طلب ماء
-        const requestWaterButton = document.getElementById('requestWater');
-        requestWaterButton.addEventListener('click', () => {
+        // طلب ماء
+        document.getElementById('requestWater').addEventListener('click', function () {
             alert("تم إرسال طلب الماء بنجاح!");
         });
 
-        // تغيير نمط الخريطة
-        const styleSelector = document.getElementById('styleSelector');
-        styleSelector.addEventListener('change', () => {
-            map.setStyle(styles[styleSelector.value]);
+        // تفعيل العرض ثلاثي الأبعاد
+        document.getElementById('toggle3D').addEventListener('click', function () {
+            const pitch = map.getPitch() === 0 ? 60 : 0;
+            map.easeTo({ pitch: pitch });
         });
 
-        // تفعيل العرض ثلاثي الأبعاد
-        const toggle3DButton = document.getElementById('toggle3D');
-        toggle3DButton.addEventListener('click', () => {
-            const pitch = map.getPitch() === 0 ? 60 : 0;
-            map.setPitch(pitch);
+        // إضافة مسجد
+        document.getElementById('addMosque').addEventListener('click', function () {
+            const mosqueLngLat = [map.getCenter().lng, map.getCenter().lat];
+            new mapboxgl.Marker({ color: 'green' })
+                .setLngLat(mosqueLngLat)
+                .addTo(map);
+            alert('تم إضافة مسجد جديد');
+        });
+
+        // مشاركة موقعي
+        document.getElementById('shareLocation').addEventListener('click', function () {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(position => {
+                    const lngLat = [position.coords.longitude, position.coords.latitude];
+                    const shareUrl = `https://www.google.com/maps?q=${lngLat[1]},${lngLat[0]}`;
+                    navigator.clipboard.writeText(shareUrl).then(() => {
+                        alert('تم نسخ الرابط إلى الحافظة');
+                    });
+                });
+            }
+        });
+
+        // عرض المواقع المفضلة
+        document.getElementById('favoriteLocations').addEventListener('click', function () {
+            const favoriteLocations = [
+                { lng: 39.8262, lat: 21.4225, name: 'الموقع المفضل 1' },
+                { lng: 39.8268, lat: 21.4231, name: 'الموقع المفضل 2' }
+            ];
+            favoriteLocations.forEach(location => {
+                new mapboxgl.Marker({ color: 'blue' })
+                    .setLngLat([location.lng, location.lat])
+                    .setPopup(new mapboxgl.Popup().setHTML(`<p>${location.name}</p>`))
+                    .addTo(map);
+            });
+        });
+
+        // استكشاف الأماكن القريبة
+        document.getElementById('nearbyPlaces').addEventListener('click', function () {
+            // استكشاف الأماكن القريبة هنا
+        });
+
+        // تفعيل الوضع الليلي
+        document.getElementById('nightMode').addEventListener('click', function () {
+            map.setStyle('mapbox://styles/mapbox/dark-v10');
+        });
+
+        // تتبع الموقع المستمر
+        const trackingButton = document.getElementById('trackingButton');
+        let trackingEnabled = false;
+
+        trackingButton.addEventListener('click', function () {
+            trackingEnabled = !trackingEnabled;
+            if (trackingEnabled) {
+                navigator.geolocation.watchPosition(position => {
+                    const { latitude, longitude } = position.coords;
+                    map.flyTo({ center: [longitude, latitude], zoom: 16 });
+                    // يمكن إضافة تحديثات Firebase هنا
+                });
+            } else {
+                alert("تم إيقاف التتبع");
+            }
         });
 
     </script>
 </body>
 </html>
-
