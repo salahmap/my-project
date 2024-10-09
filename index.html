@@ -144,10 +144,17 @@
         let marker;
         let isTracking = false; // متغير لتتبع الحالة
         let isUserInteracting = false; // متغير لتتبع تفاعل المستخدم
+        let watchId; // لتخزين معرف مراقبة الموقع
 
         // تتبع الموقع اللحظي
         document.getElementById('locateButton').addEventListener('click', function () {
             if (navigator.geolocation) {
+                if (isTracking) {
+                    navigator.geolocation.clearWatch(watchId); // إيقاف المراقبة إذا كانت نشطة
+                    isTracking = false;
+                    return; // الخروج إذا كانت قيد التشغيل
+                }
+
                 const successCallback = function (position) {
                     const latitude = position.coords.latitude;
                     const longitude = position.coords.longitude;
@@ -168,54 +175,104 @@
 
                     // بدء تتبع الاتجاه
                     isTracking = true;
-                    // استئناف التفاعل مع الخريطة
-                    map.dragPan.enable();
                 };
 
                 const errorCallback = function (error) {
                     console.error("خطأ في تحديد الموقع: ", error);
                 };
 
-                navigator.geolocation.watchPosition(successCallback, errorCallback, {
+                watchId = navigator.geolocation.watchPosition(successCallback, errorCallback, {
                     enableHighAccuracy: true,
                     maximumAge: 10000,
                     timeout: 5000
                 });
-
-                // إيقاف تدوير الخريطة عند السحب
-                map.dragPan.disable();
-            } else {
-                console.error("تحديد الموقع غير مدعوم في هذا المتصفح.");
             }
         });
 
         // تغيير نمط الخريطة
-        document.getElementById('styleSelector').addEventListener('change', function (e) {
-            map.setStyle(styles[e.target.value]);
+        document.getElementById('styleSelector').addEventListener('change', function () {
+            map.setStyle(styles[this.value]);
         });
 
-        // إعادة تعيين تتبع الموقع
-        map.on('dragstart', function () {
-            isUserInteracting = true;
-        });
+        // إضافة المساجد إلى الخريطة
+        document.getElementById('addMosque').addEventListener('click', function () {
+            const newMosque = {
+                name: prompt("اسم المسجد:"),
+                latitude: parseFloat(prompt("خط العرض:")),
+                longitude: parseFloat(prompt("خط الطول:")),
+            };
 
-        map.on('dragend', function () {
-            isUserInteracting = false;
-        });
-
-        // وظيفة لتمكين التفاعل مع الخريطة مرة أخرى
-        const enableMapInteraction = () => {
-            if (!isUserInteracting) {
-                map.dragPan.enable();
+            if (newMosque.name && !isNaN(newMosque.latitude) && !isNaN(newMosque.longitude)) {
+                const mosqueMarker = new mapboxgl.Marker({ color: 'blue' })
+                    .setLngLat([newMosque.longitude, newMosque.latitude])
+                    .setPopup(new mapboxgl.Popup().setText(newMosque.name)) // تعيين منبثقة
+                    .addTo(map);
+            } else {
+                alert("يرجى إدخال معلومات صحيحة للمسجد.");
             }
-        };
-
-        // استخدام زر لتحديد الموقع
-        document.getElementById('locateButton').addEventListener('click', function () {
-            enableMapInteraction(); // استئناف التفاعل مع الخريطة
         });
 
-        // إضافة أماكن، عرضها، وتحديد مواقع المساجد وغيرها من الخيارات ستكون هنا
+        // التحكم في الوضع الليلي
+        document.getElementById('nightMode').addEventListener('click', function () {
+            if (map.getStyle().name === "Mapbox Streets") {
+                map.setStyle('mapbox://styles/mapbox/dark-v10');
+                this.innerText = "الوضع العادي";
+            } else {
+                map.setStyle('mapbox://styles/mapbox/streets-v11');
+                this.innerText = "الوضع الليلي";
+            }
+        });
+
+        // تتبع دوران الخريطة حسب زاوية الجهاز
+        if (window.DeviceOrientationEvent) {
+            window.addEventListener('deviceorientation', function (event) {
+                const beta = event.beta; // زاوية الميل
+                const gamma = event.gamma; // زاوية الدوران
+                const rotation = (gamma < 0 ? 360 + gamma : gamma) * (Math.PI / 180);
+                const tilt = (beta < 0 ? 0 : beta) * (Math.PI / 180);
+
+                // تحديث اتجاه الخريطة
+                if (isTracking) {
+                    map.setBearing(rotation);
+                }
+            });
+        }
+
+        // استعراض الأماكن القريبة (المساجد كمثال)
+        document.getElementById('showMosques').addEventListener('click', function () {
+            const mosques = [
+                { name: 'مسجد القائد', latitude: 32.8833, longitude: 13.1869 },
+                { name: 'مسجد الرحمن', latitude: 32.8850, longitude: 13.1900 },
+            ];
+
+            mosques.forEach(mosque => {
+                const mosqueMarker = new mapboxgl.Marker({ color: 'green' })
+                    .setLngLat([mosque.longitude, mosque.latitude])
+                    .setPopup(new mapboxgl.Popup().setText(mosque.name))
+                    .addTo(map);
+            });
+        });
+
+        // استكشاف الأماكن القريبة
+        document.getElementById('nearbyPlaces').addEventListener('click', function () {
+            alert("استكشاف الأماكن القريبة قيد التطوير!");
+        });
+
+        // طلب ماء
+        document.getElementById('requestWater').addEventListener('click', function () {
+            alert("تم إرسال طلب الماء!");
+        });
+
+        // تفعيل العرض ثلاثي الأبعاد
+        document.getElementById('toggle3D').addEventListener('click', function () {
+            const currentPitch = map.getPitch();
+            map.setPitch(currentPitch === 0 ? 60 : 0); // التبديل بين العرض ثلاثي الأبعاد والعرض العادي
+        });
+
+        // عرض المواقع المفضلة
+        document.getElementById('favoriteLocations').addEventListener('click', function () {
+            alert("عرض المواقع المفضلة قيد التطوير!");
+        });
     </script>
 </body>
 </html>
