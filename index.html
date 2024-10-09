@@ -180,20 +180,51 @@
         if (window.DeviceOrientationEvent) {
             window.addEventListener('deviceorientation', function(event) {
                 const alpha = event.alpha; // الزاوية
+                const beta = event.beta; // لا نستخدم beta في هذا السياق
+                const gamma = event.gamma; // لا نستخدم gamma في هذا السياق
+
+                // تحديث دوران السهم بناءً على الزاوية
                 if (directionArrowElement) {
-                    directionArrowElement.style.transform = `rotate(${-alpha}deg)`; // استخدام القيمة السلبية لتدوير السهم
+                    directionArrowElement.style.transform = `rotate(${alpha}deg)`;
                 }
-            }, false);
-        } else {
-            console.warn("لا يدعم المتصفح أحداث تغيير الاتجاه.");
+            }, true);
         }
 
-        // تغيير نمط الخريطة
-        document.getElementById('styleSelector').addEventListener('change', function () {
-            map.setStyle(styles[this.value]);
+        // تغييرات الأنماط
+        document.getElementById('styleSelector').addEventListener('change', function (event) {
+            const selectedStyle = styles[event.target.value];
+            map.setStyle(selectedStyle);
         });
 
-        // أزرار إضافية أخرى مثل تتبع العمال، طلب ماء، إلخ يمكن إضافتها هنا
+        // أزرار التحكم الأخرى (المزيد من الوظائف يمكن إضافتها)
+        document.getElementById('toggleWorkerTracking').addEventListener('click', function () {
+            alert('ميزة تتبع العمال قيد التطوير.');
+        });
+
+        document.getElementById('requestWater').addEventListener('click', function () {
+            alert('تم إرسال طلب الماء.');
+        });
+
+        // أزرار التحكم الأخرى (يمكن تطوير المزيد من الميزات)
+        document.getElementById('addMosque').addEventListener('click', function () {
+            alert('إضافة مسجد قيد التطوير.');
+        });
+
+        document.getElementById('favoriteLocations').addEventListener('click', function () {
+            alert('عرض المواقع المفضلة قيد التطوير.');
+        });
+
+        document.getElementById('nearbyPlaces').addEventListener('click', function () {
+            alert('استكشاف الأماكن القريبة قيد التطوير.');
+        });
+
+        document.getElementById('nightMode').addEventListener('click', function () {
+            alert('الوضع الليلي قيد التطوير.');
+        });
+
+        document.getElementById('showMosques').addEventListener('click', function () {
+            alert('عرض المساجد القريبة قيد التطوير.');
+        });
     </script>
 </body>
 </html>
