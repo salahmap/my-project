@@ -143,6 +143,7 @@
         let markerElement;
         let marker;
         let isTracking = false; // متغير لتتبع الحالة
+        let isUserInteracting = false; // متغير لتتبع تفاعل المستخدم مع الخريطة
 
         // تتبع الموقع اللحظي
         document.getElementById('locateButton').addEventListener('click', function () {
@@ -173,67 +174,100 @@
                     console.error("خطأ في تحديد الموقع: ", error);
                 };
 
-                navigator.geolocation.watchPosition(successCallback, errorCallback);
+                navigator.geolocation.watchPosition(successCallback, errorCallback, {
+                    enableHighAccuracy: true,
+                    maximumAge: 10000,
+                    timeout: 5000
+                });
             } else {
-                alert("لا يدعم المتصفح تحديد الموقع.");
+                console.error("تحديد الموقع غير مدعوم في هذا المتصفح.");
             }
         });
 
-        // استخدام DeviceOrientationEvent لتحديث اتجاه الخريطة بناءً على اتجاه الجهاز
-        if (window.DeviceOrientationEvent) {
-            window.addEventListener('deviceorientation', function (event) {
-                if (isTracking) {
-                    const alpha = event.alpha; // الحصول على اتجاه الجهاز بالدرجات
-                    map.setBearing(alpha); // تغيير اتجاه الخريطة بناءً على اتجاه الجهاز
-                    marker.setRotation(alpha); // تغيير اتجاه المؤشر بناءً على اتجاه الجهاز
-                }
-            }, true);
-        }
-
         // تغيير نمط الخريطة
         document.getElementById('styleSelector').addEventListener('change', function () {
-            const selectedStyle = this.value;
-            map.setStyle(styles[selectedStyle]);
+            map.setStyle(styles[this.value]);
         });
 
-        // إضافة منطق للأزرار الأخرى حسب الحاجة
-        document.getElementById('toggleWorkerTracking').addEventListener('click', function () {
-            alert('ميزة تتبع العمال غير متاحة حاليا.');
-        });
-
-        document.getElementById('requestWater').addEventListener('click', function () {
-            alert('تم إرسال طلب الماء.');
-        });
-
-        document.getElementById('toggle3D').addEventListener('click', function () {
-            map.setPitch(60);
-            alert('تم تفعيل العرض ثلاثي الأبعاد.');
-        });
-
-        document.getElementById('addMosque').addEventListener('click', function () {
-            alert('ميزة إضافة مسجد غير متاحة حاليا.');
-        });
-
-        document.getElementById('shareLocation').addEventListener('click', function () {
-            alert('تمت مشاركة موقعك.');
-        });
-
-        document.getElementById('favoriteLocations').addEventListener('click', function () {
-            alert('المواقع المفضلة غير متاحة حاليا.');
-        });
-
-        document.getElementById('nearbyPlaces').addEventListener('click', function () {
-            alert('استكشاف الأماكن القريبة غير متاح حاليا.');
-        });
-
+        // تفعيل الوضع الليلي
         document.getElementById('nightMode').addEventListener('click', function () {
-            document.body.classList.toggle('night-mode');
-            alert('تفعيل الوضع الليلي.');
+            const currentStyle = map.getStyle().sprite.includes('light') ? 'streets' : 'dark';
+            map.setStyle(styles[currentStyle]);
         });
 
-        document.getElementById('showMosques').addEventListener('click', function () {
-            alert('عرض المساجد القريبة غير متاح حاليا.');
+        // استكشاف الأماكن القريبة
+        document.getElementById('nearbyPlaces').addEventListener('click', function () {
+            // استكشاف الأماكن القريبة هنا
+            alert("استكشاف الأماكن القريبة ليس متاحًا بعد.");
         });
+
+        // عرض المساجد القريبة
+        document.getElementById('showMosques').addEventListener('click', function () {
+            // عرض المساجد القريبة هنا
+            alert("عرض المساجد القريبة ليس متاحًا بعد.");
+        });
+
+        // إضافة مسجد
+        document.getElementById('addMosque').addEventListener('click', function () {
+            // إضافة مسجد هنا
+            alert("إضافة مسجد ليس متاحًا بعد.");
+        });
+
+        // مشاركة الموقع
+        document.getElementById('shareLocation').addEventListener('click', function () {
+            if (marker) {
+                const lngLat = marker.getLngLat();
+                alert(`موقعي الحالي: ${lngLat.lng}, ${lngLat.lat}`);
+            } else {
+                alert("يرجى تحديد موقعك أولاً.");
+            }
+        });
+
+        // عرض المواقع المفضلة
+        document.getElementById('favoriteLocations').addEventListener('click', function () {
+            // عرض المواقع المفضلة هنا
+            alert("عرض المواقع المفضلة ليس متاحًا بعد.");
+        });
+
+        // تتبع العمال
+        document.getElementById('toggleWorkerTracking').addEventListener('click', function () {
+            isTracking = !isTracking;
+            this.textContent = isTracking ? "إيقاف تتبع العمال" : "تتبع العمال";
+            // هنا يمكنك تنفيذ كود تتبع العمال
+            alert(isTracking ? "تم تفعيل تتبع العمال." : "تم إيقاف تتبع العمال.");
+        });
+
+        // تعديل تفاعلية الخريطة
+        map.on('move', function () {
+            isUserInteracting = true; // استخدم هذا المتغير لتتبع تفاعل المستخدم
+        });
+
+        map.on('zoom', function () {
+            if (isUserInteracting) {
+                // قد تضيف هنا سلوكيات مخصصة عند الزوم
+            }
+        });
+
+        // منع تدوير الخريطة عندما يقوم المستخدم بتحريك الخريطة
+        map.on('drag', function () {
+            isUserInteracting = false;
+        });
+
+        map.on('style.load', () => {
+            map.setPitch(0); // إعداد زاوية العرض إلى 0 عند التحميل
+        });
+
+        // إضافة خاصية تفاعلية للزر
+        document.getElementById('toggle3D').addEventListener('click', function () {
+            const is3D = map.getPitch() > 0; // إذا كانت الزاوية أكبر من 0
+            map.setPitch(is3D ? 0 : 45); // إذا كانت 3D مفعل، قم بإلغاء التفعيل، والعكس
+            this.textContent = is3D ? "تفعيل العرض ثلاثي الأبعاد" : "إلغاء العرض ثلاثي الأبعاد";
+        });
+
+        // إخفاء عنوان الصفحة
+        document.getElementById('title').style.display = 'none';
+
+        // إضافة أحداث أخرى حسب الحاجة
     </script>
 </body>
 </html>
