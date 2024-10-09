@@ -72,30 +72,12 @@
     <div id="map"></div>
 
     <div class="controls">
-        <button id="toggleWeather" class="iconButton">
-            <i class="fas fa-cloud-sun icon"></i>
-        </button>
         <button id="locateButton" class="iconButton">
             <i class="fas fa-location-arrow icon"></i>
         </button>
-        <select id="styleSelector" class="controlButton">
-            <option value="streets">شوارع</option>
-            <option value="satellite">الأقمار الصناعية</option>
-            <option value="outdoors">خارجية</option>
-            <option value="hybrid" selected>هايبرد</option>
-        </select>
         <button id="toggleWorkerTracking" class="controlButton">تتبع العمال</button>
         <button id="requestWater" class="controlButton">طلب ماء</button>
-        <button id="toggle3D" class="controlButton">تفعيل العرض ثلاثي الأبعاد</button>
-        <button id="addMosque" class="controlButton">إضافة مسجد</button>
-        <button id="shareLocation" class="controlButton">مشاركة موقعي</button>
-        <button id="favoriteLocations" class="controlButton">عرض المواقع المفضلة</button>
-        <button id="nearbyPlaces" class="controlButton">استكشاف الأماكن القريبة</button>
         <button id="nightMode" class="controlButton">الوضع الليلي</button>
-        <button id="showMosques" class="controlButton">عرض المساجد القريبة</button>
-        <div id="weatherInfo"></div>
-        <div id="workerInfo"></div>
-        <div id="mosqueInfo"></div>
     </div>
     
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.js"></script>
@@ -103,8 +85,6 @@
     <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-    <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.7.0/mapbox-gl-geocoder.min.js"></script>
-    <link href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.7.0/mapbox-gl-geocoder.css" rel="stylesheet" />
 
     <script>
         // إعداد Firebase
@@ -127,9 +107,6 @@
 
         // إعداد الأنماط المختلفة للخريطة
         const styles = {
-            streets: 'mapbox://styles/mapbox/streets-v11',
-            satellite: 'mapbox://styles/mapbox/satellite-v9',
-            outdoors: 'mapbox://styles/mapbox/outdoors-v11',
             hybrid: 'mapbox://styles/mapbox/satellite-streets-v11'
         };
 
@@ -188,11 +165,6 @@
             }, true);
         }
 
-        // تغييرات الأنماط
-        document.getElementById('styleSelector').addEventListener('change', function () {
-            map.setStyle(styles[this.value]);
-        });
-
         // تفعيل الوضع الليلي
         document.getElementById('nightMode').addEventListener('click', function () {
             const currentStyle = map.getStyle().id;
@@ -200,16 +172,13 @@
             map.setStyle(newStyle);
         });
 
-        // باقي الأحداث للزرار (مثل طلب الماء، تتبع العمال، إلخ.)
-        document.getElementById('requestWater').addEventListener('click', function () {
-            alert('تم طلب الماء!');
-        });
-
         document.getElementById('toggleWorkerTracking').addEventListener('click', function () {
             alert('تتبع العمال مفعل!');
         });
 
-        // المزيد من الأحداث يمكن إضافتها هنا حسب الحاجة
+        document.getElementById('requestWater').addEventListener('click', function () {
+            alert('تم طلب الماء!');
+        });
     </script>
 </body>
 </html>
