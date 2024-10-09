@@ -58,7 +58,7 @@
         .icon:hover {
             color: #e64a19;
         }
-        .directionArrow {
+        .directionMarker {
             width: 20px;
             height: 20px;
             background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" fill="%23ffcc00" viewBox="0 0 24 24"><path d="M12 2l9 20-9-5-9 5 9-20z"/></svg>');
@@ -141,8 +141,8 @@
             zoom: 12
         });
 
-        let directionArrowMarker;
-        let directionArrowElement;
+        let markerElement;
+        let marker;
 
         // تتبع الموقع اللحظي
         document.getElementById('locateButton').addEventListener('click', function () {
@@ -151,15 +151,15 @@
                     const latitude = position.coords.latitude;
                     const longitude = position.coords.longitude;
 
-                    // إنشاء مؤشر الاتجاه (سهم)
-                    if (!directionArrowElement) {
-                        directionArrowElement = document.createElement('div');
-                        directionArrowElement.className = 'directionArrow';
-                        directionArrowMarker = new mapboxgl.Marker(directionArrowElement)
+                    // إنشاء مؤشر الاتجاه أو تحديثه
+                    if (!markerElement) {
+                        markerElement = document.createElement('div');
+                        markerElement.className = 'directionMarker';
+                        marker = new mapboxgl.Marker(markerElement)
                             .setLngLat([longitude, latitude])
                             .addTo(map);
                     } else {
-                        directionArrowMarker.setLngLat([longitude, latitude]);
+                        marker.setLngLat([longitude, latitude]);
                     }
 
                     // تغيير مركز الخريطة إلى الموقع الحالي
@@ -176,14 +176,14 @@
             }
         });
 
-        // استخدام DeviceOrientationEvent لتحديث اتجاه السهم
+        // استخدام DeviceOrientationEvent لتحديث اتجاه المؤشر
         if (window.DeviceOrientationEvent) {
             window.addEventListener('deviceorientation', function(event) {
                 const alpha = event.alpha; // الزاوية
 
-                // تحديث دوران السهم بناءً على الزاوية
-                if (directionArrowElement) {
-                    directionArrowElement.style.transform = `rotate(${alpha}deg)`; 
+                // تحديث دوران المؤشر بناءً على الزاوية
+                if (markerElement) {
+                    markerElement.style.transform = `rotate(${alpha}deg)`;
                 }
             }, true);
         }
@@ -193,7 +193,7 @@
             map.setStyle(styles[this.value]);
         });
 
-        // كود إضافي لبقية الوظائف الخاصة بالخرائط (مثل تتبع العمال، طلب الماء، تفعيل 3D، إلخ.)
+        // وظائف إضافية: مثل تتبع العمال، الطلبات، أو غيرها يمكن إضافتها كما هو موضح سابقًا.
     </script>
 </body>
 </html>
