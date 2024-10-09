@@ -59,11 +59,12 @@
             color: #e64a19;
         }
         .directionMarker {
-            width: 20px;
-            height: 20px;
+            width: 40px;
+            height: 40px;
             background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" fill="%23ffcc00" viewBox="0 0 24 24"><path d="M12 2l9 20-9-5-9 5 9-20z"/></svg>');
             background-size: cover;
             transform-origin: center;
+            transition: transform 0.2s ease;
         }
     </style>
 </head>
@@ -178,22 +179,15 @@
 
         // استخدام DeviceOrientationEvent لتحديث اتجاه المؤشر
         if (window.DeviceOrientationEvent) {
-            window.addEventListener('deviceorientation', function(event) {
-                const alpha = event.alpha; // الزاوية
-
-                // تحديث دوران المؤشر بناءً على الزاوية
-                if (markerElement) {
-                    markerElement.style.transform = `rotate(${alpha}deg)`;
+            window.addEventListener('deviceorientation', function (event) {
+                const heading = event.alpha; // زاوية الاتجاه
+                if (markerElement && heading !== null) {
+                    markerElement.style.transform = `rotate(${heading}deg)`; // تدوير المؤشر بناءً على الاتجاه
                 }
-            }, true);
+            });
+        } else {
+            console.log("جهازك لا يدعم DeviceOrientationEvent.");
         }
-
-        // تغييرات نمط الخريطة
-        document.getElementById('styleSelector').addEventListener('change', function () {
-            map.setStyle(styles[this.value]);
-        });
-
-        // وظائف إضافية: مثل تتبع العمال، الطلبات، أو غيرها يمكن إضافتها كما هو موضح سابقًا.
     </script>
 </body>
 </html>
