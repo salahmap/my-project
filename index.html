@@ -143,25 +143,8 @@
         let markerElement;
         let marker;
         let isTracking = false; // متغير لتتبع الحالة
-        let isUserInteracting = false; // متغير لتتبع تفاعل المستخدم مع الخريطة
-
-        // الحركة الجميلة عند تحميل الخريطة
-        map.on('load', function() {
-            map.flyTo({
-                center: [13.1913, 32.8872],
-                zoom: 14,
-                essential: true, // هذا يضمن أن الحركة تحدث حتى لو كانت الخريطة ليست في وضع التفاعل
-                duration: 2000 // مدة الحركة بالمللي ثانية
-            });
-            // تكبير وتحريك للخريطة بشكل جميل
-            setTimeout(() => {
-                map.flyTo({
-                    zoom: 15,
-                    essential: true,
-                    duration: 1000
-                });
-            }, 2000);
-        });
+        let isUserInteracting = false; // متغير لتتبع تفاعل المستخدم
+        let canDragMap = true; // متغير لتحديد إمكانية سحب الخريطة
 
         // تتبع الموقع اللحظي
         document.getElementById('locateButton').addEventListener('click', function () {
@@ -169,103 +152,160 @@
                 const successCallback = function (position) {
                     const latitude = position.coords.latitude;
                     const longitude = position.coords.longitude;
-                    const coords = [longitude, latitude];
 
-                    if (marker) {
-                        marker.setLngLat(coords);
-                    } else {
-                        marker = new mapboxgl.Marker({ color: '#ff5722' })
-                            .setLngLat(coords)
+                    // إنشاء مؤشر الاتجاه أو تحديثه
+                    if (!markerElement) {
+                        markerElement = document.createElement('div');
+                        markerElement.className = 'directionMarker';
+                        marker = new mapboxgl.Marker(markerElement)
+                            .setLngLat([longitude, latitude])
                             .addTo(map);
+                    } else {
+                        marker.setLngLat([longitude, latitude]);
                     }
 
-                    map.flyTo({ center: coords, zoom: 15 });
+                    // تغيير مركز الخريطة إلى الموقع الحالي
+                    map.flyTo({ center: [longitude, latitude], zoom: 16 });
+
+                    // بدء تتبع الاتجاه
+                    isTracking = true;
+                    canDragMap = true; // إعادة تمكين سحب الخريطة
+                    map.dragRotate.enable(); // تمكين تدوير الخريطة
                 };
 
-                navigator.geolocation.getCurrentPosition(successCallback, function () {
-                    alert("خطأ في تحديد الموقع. تأكد من تمكين موقعك.");
-                });
-            } else {
-                alert("لا يدعم متصفحك تحديد المواقع.");
+                const errorCallback = function (error) {
+                    console.error("Error getting location: ", error);
+                };
+
+                navigator.geolocation.getCurrentPosition(successCallback, errorCallback);
             }
         });
 
-        // اختيار نمط الخريطة
-        document.getElementById('styleSelector').addEventListener('change', function (e) {
-            map.setStyle(styles[e.target.value]);
+        // التحكم في تفاعل المستخدم مع الخريطة
+        map.on('dragstart', () => {
+            canDragMap = false; // تعطيل سحب الخريطة
+            map.dragRotate.disable(); // تعطيل تدوير الخريطة
         });
 
-        // تفعيل تتبع العمال
-        document.getElementById('toggleWorkerTracking').addEventListener('click', function () {
-            isTracking = !isTracking;
-            this.innerText = isTracking ? "إيقاف تتبع العمال" : "تتبع العمال";
-            if (isTracking) {
-                // إضافة وظيفة تتبع العمال هنا
-            } else {
-                // إيقاف تتبع العمال هنا
-            }
+        map.on('dragend', () => {
+            canDragMap = true; // إعادة تمكين سحب الخريطة
+            map.dragRotate.enable(); // إعادة تمكين تدوير الخريطة
         });
 
-        // طلب ماء
+        // تغيير نمط الخريطة
+        document.getElementById('styleSelector').addEventListener('change', function () {
+            const selectedStyle = this.value;
+            map.setStyle(styles[selectedStyle]);
+        });
+
+        // وظيفة طلب الماء
         document.getElementById('requestWater').addEventListener('click', function () {
-            alert("تم إرسال طلب الماء.");
-            // إضافة وظيفة طلب الماء هنا
+            const userLocation = marker ? marker.getLngLat() : null;
+            if (userLocation) {
+                // إرسال الطلب إلى قاعدة البيانات
+                database.ref('water_requests').push({
+                    latitude: userLocation.lat,
+                    longitude: userLocation.lng,
+                    timestamp: firebase.database.ServerValue.TIMESTAMP
+                });
+                alert('تم إرسال طلب الماء!');
+            } else {
+                alert('يرجى تحديد موقعك أولاً!');
+            }
         });
 
-        // تفعيل الوضع الليلي
-        document.getElementById('nightMode').addEventListener('click', function () {
-            document.body.classList.toggle('night');
-            this.innerText = document.body.classList.contains('night') ? "الوضع النهاري" : "الوضع الليلي";
+        // وظيفة لتتبع العمال
+        document.getElementById('toggleWorkerTracking').addEventListener('click', function () {
+            isTracking = !isTracking; // تبديل حالة التتبع
+            this.innerText = isTracking ? 'إيقاف تتبع العمال' : 'تتبع العمال';
+            if (isTracking) {
+                alert('تم تفعيل تتبع العمال!');
+            } else {
+                alert('تم إيقاف تتبع العمال!');
+            }
         });
 
-        // إضافة مسجد
+        // عرض مواقع المساجد
+        document.getElementById('showMosques').addEventListener('click', function () {
+            database.ref('mosques').once('value').then(function (snapshot) {
+                snapshot.forEach(function (childSnapshot) {
+                    const mosqueData = childSnapshot.val();
+                    const mosqueLocation = [mosqueData.longitude, mosqueData.latitude];
+                    new mapboxgl.Marker()
+                        .setLngLat(mosqueLocation)
+                        .setPopup(new mapboxgl.Popup().setText(mosqueData.name)) // يمكنك إضافة المزيد من المعلومات هنا
+                        .addTo(map);
+                });
+            });
+        });
+
+        // إضافات للمساجد
         document.getElementById('addMosque').addEventListener('click', function () {
-            const mosqueName = prompt("أدخل اسم المسجد:");
-            if (mosqueName) {
-                alert("تم إضافة المسجد: " + mosqueName);
-                // إضافة وظيفة إضافة المسجد هنا
+            const userLocation = marker ? marker.getLngLat() : null;
+            if (userLocation) {
+                const mosqueName = prompt('أدخل اسم المسجد:');
+                if (mosqueName) {
+                    database.ref('mosques').push({
+                        name: mosqueName,
+                        latitude: userLocation.lat,
+                        longitude: userLocation.lng,
+                        timestamp: firebase.database.ServerValue.TIMESTAMP
+                    });
+                    alert('تم إضافة المسجد!');
+                }
+            } else {
+                alert('يرجى تحديد موقعك أولاً!');
             }
         });
 
         // مشاركة الموقع
         document.getElementById('shareLocation').addEventListener('click', function () {
-            if (marker) {
-                const coords = marker.getLngLat();
-                alert("مشاركتي للموقع: " + coords);
-                // إضافة وظيفة مشاركة الموقع هنا
+            const userLocation = marker ? marker.getLngLat() : null;
+            if (userLocation) {
+                alert(`موقعي الحالي هو: ${userLocation.lat}, ${userLocation.lng}`);
             } else {
-                alert("يرجى تحديد موقعك أولاً.");
+                alert('يرجى تحديد موقعك أولاً!');
             }
         });
 
-        // عرض الأماكن القريبة
-        document.getElementById('nearbyPlaces').addEventListener('click', function () {
-            alert("استكشاف الأماكن القريبة...");
-            // إضافة وظيفة استكشاف الأماكن القريبة هنا
-        });
-
-        // عرض المواقع المفضلة
+        // المواقع المفضلة
         document.getElementById('favoriteLocations').addEventListener('click', function () {
-            alert("عرض المواقع المفضلة...");
-            // إضافة وظيفة عرض المواقع المفضلة هنا
+            // استرجاع المواقع المفضلة من قاعدة البيانات
+            database.ref('favorite_locations').once('value').then(function (snapshot) {
+                snapshot.forEach(function (childSnapshot) {
+                    const locationData = childSnapshot.val();
+                    new mapboxgl.Marker()
+                        .setLngLat([locationData.longitude, locationData.latitude])
+                        .setPopup(new mapboxgl.Popup().setText(locationData.name))
+                        .addTo(map);
+                });
+            });
         });
 
-        // عرض المساجد القريبة
-        document.getElementById('showMosques').addEventListener('click', function () {
-            alert("عرض المساجد القريبة...");
-            // إضافة وظيفة عرض المساجد القريبة هنا
+        // استكشاف الأماكن القريبة
+        document.getElementById('nearbyPlaces').addEventListener('click', function () {
+            const userLocation = marker ? marker.getLngLat() : null;
+            if (userLocation) {
+                // استخدم API لاسترجاع الأماكن القريبة
+                // يمكنك استخدام Mapbox Geocoding API أو أي API آخر
+                alert(`استكشاف الأماكن القريبة من: ${userLocation.lat}, ${userLocation.lng}`);
+            } else {
+                alert('يرجى تحديد موقعك أولاً!');
+            }
+        });
+
+        // الوضع الليلي
+        document.getElementById('nightMode').addEventListener('click', function () {
+            const currentStyle = map.getStyle().sprite.indexOf('streets') >= 0 ? 'satellite' : 'streets';
+            map.setStyle(styles[currentStyle]);
+            this.innerText = currentStyle === 'streets' ? 'تفعيل الوضع الليلي' : 'إيقاف الوضع الليلي';
         });
 
         // تفعيل العرض ثلاثي الأبعاد
         document.getElementById('toggle3D').addEventListener('click', function () {
-            map.setPitch(60); // تغيير الميل لعرض ثلاثي الأبعاد
-            this.innerText = "إيقاف العرض ثلاثي الأبعاد";
-            setTimeout(() => {
-                map.setPitch(0); // العودة إلى العرض الثنائي الأبعاد
-                this.innerText = "تفعيل العرض ثلاثي الأبعاد";
-            }, 5000); // استعادة العرض الثنائي الأبعاد بعد 5 ثواني
+            map.setPitch(60); // تعيين الميل
+            this.innerText = 'إيقاف العرض ثلاثي الأبعاد';
         });
-
     </script>
 </body>
 </html>
