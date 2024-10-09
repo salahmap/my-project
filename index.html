@@ -150,7 +150,6 @@
                 const successCallback = function (position) {
                     const latitude = position.coords.latitude;
                     const longitude = position.coords.longitude;
-                    const heading = position.coords.heading; // زاوية الاتجاه
 
                     // إنشاء مؤشر الاتجاه (سهم)
                     if (!directionArrowElement) {
@@ -161,11 +160,6 @@
                             .addTo(map);
                     } else {
                         directionArrowMarker.setLngLat([longitude, latitude]);
-                    }
-
-                    // ضبط دوران السهم بناءً على زاوية الاتجاه
-                    if (heading !== null) {
-                        directionArrowElement.style.transform = `rotate(${heading}deg)`; // استخدام القيم الصحيحة لتدوير السهم
                     }
 
                     // تغيير مركز الخريطة إلى الموقع الحالي
@@ -182,29 +176,24 @@
             }
         });
 
+        // استخدام DeviceOrientationEvent لتحديث اتجاه السهم
+        if (window.DeviceOrientationEvent) {
+            window.addEventListener('deviceorientation', function(event) {
+                const alpha = event.alpha; // الزاوية
+                if (directionArrowElement) {
+                    directionArrowElement.style.transform = `rotate(${-alpha}deg)`; // استخدام القيمة السلبية لتدوير السهم
+                }
+            }, false);
+        } else {
+            console.warn("لا يدعم المتصفح أحداث تغيير الاتجاه.");
+        }
+
         // تغيير نمط الخريطة
         document.getElementById('styleSelector').addEventListener('change', function () {
-            const selectedStyle = this.value;
-            map.setStyle(styles[selectedStyle]);
+            map.setStyle(styles[this.value]);
         });
 
-        // تنفيذ ميزات إضافية مثل تتبع العمال وطلب المياه
-        document.getElementById('toggleWorkerTracking').addEventListener('click', function () {
-            // تنفيذ تتبع العمال
-            console.log("تتبع العمال مفعل");
-        });
-
-        document.getElementById('requestWater').addEventListener('click', function () {
-            // تنفيذ طلب المياه
-            console.log("طلب ماء قيد التفعيل");
-        });
-
-        document.getElementById('nightMode').addEventListener('click', function () {
-            // تفعيل الوضع الليلي
-            console.log("الوضع الليلي مفعل");
-        });
-
-        // أضف مزايا إضافية وفقًا لاحتياجاتك
+        // أزرار إضافية أخرى مثل تتبع العمال، طلب ماء، إلخ يمكن إضافتها هنا
     </script>
 </body>
 </html>
