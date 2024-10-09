@@ -59,8 +59,8 @@
             color: #e64a19;
         }
         .directionArrow {
-            width: 20px;
-            height: 20px;
+            width: 30px; /* حجم علامة الموقع */
+            height: 30px;
             background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" fill="%23ffcc00" viewBox="0 0 24 24"><path d="M12 2l9 20-9-5-9 5 9-20z"/></svg>');
             background-size: cover;
             transform-origin: center;
@@ -151,7 +151,7 @@
                     const latitude = position.coords.latitude;
                     const longitude = position.coords.longitude;
 
-                    // إنشاء مؤشر الاتجاه (سهم)
+                    // إنشاء مؤشر الموقع
                     if (!directionArrowElement) {
                         directionArrowElement = document.createElement('div');
                         directionArrowElement.className = 'directionArrow';
@@ -181,50 +181,35 @@
             window.addEventListener('deviceorientation', function(event) {
                 const alpha = event.alpha; // الزاوية
 
-                // تحديث دوران السهم بناءً على الزاوية
+                // تحديث دوران علامة الموقع بناءً على الزاوية
                 if (directionArrowElement) {
                     directionArrowElement.style.transform = `rotate(${alpha}deg)`;
                 }
             }, true);
         }
 
-        // تغييرات نمط الخريطة
+        // تغييرات الأنماط
         document.getElementById('styleSelector').addEventListener('change', function () {
             map.setStyle(styles[this.value]);
         });
 
-        // وظائف إضافية: تتبع العمال، طلب ماء، وإضافة مساجد، وغيرها.
-        document.getElementById('toggleWorkerTracking').addEventListener('click', function () {
-            // كود تتبع العمال هنا
-        });
-
-        document.getElementById('requestWater').addEventListener('click', function () {
-            // كود طلب الماء هنا
-        });
-
-        document.getElementById('addMosque').addEventListener('click', function () {
-            // كود إضافة مسجد هنا
-        });
-
-        document.getElementById('shareLocation').addEventListener('click', function () {
-            // كود مشاركة الموقع هنا
-        });
-
-        document.getElementById('favoriteLocations').addEventListener('click', function () {
-            // كود عرض المواقع المفضلة هنا
-        });
-
-        document.getElementById('nearbyPlaces').addEventListener('click', function () {
-            // كود استكشاف الأماكن القريبة هنا
-        });
-
+        // تفعيل الوضع الليلي
         document.getElementById('nightMode').addEventListener('click', function () {
-            // كود تفعيل الوضع الليلي هنا
+            const currentStyle = map.getStyle().id;
+            const newStyle = currentStyle === 'mapbox://styles/mapbox/dark-v10' ? styles.hybrid : 'mapbox://styles/mapbox/dark-v10';
+            map.setStyle(newStyle);
         });
 
-        document.getElementById('showMosques').addEventListener('click', function () {
-            // كود عرض المساجد القريبة هنا
+        // باقي الأحداث للزرار (مثل طلب الماء، تتبع العمال، إلخ.)
+        document.getElementById('requestWater').addEventListener('click', function () {
+            alert('تم طلب الماء!');
         });
+
+        document.getElementById('toggleWorkerTracking').addEventListener('click', function () {
+            alert('تتبع العمال مفعل!');
+        });
+
+        // المزيد من الأحداث يمكن إضافتها هنا حسب الحاجة
     </script>
 </body>
 </html>
