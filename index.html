@@ -70,6 +70,13 @@
             width: 20px;
             height: 20px;
         }
+        .directionArrow {
+            width: 20px;
+            height: 20px;
+            background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" fill="%23ffcc00" viewBox="0 0 24 24"><path d="M12 2l9 20-9-5-9 5 9-20z"/></svg>');
+            background-size: cover;
+            transform-origin: center;
+        }
     </style>
 </head>
 <body>
@@ -148,6 +155,8 @@
 
         let userMarker;
         let userMarkerElement;
+        let directionArrowMarker;
+        let directionArrowElement;
 
         // تتبع الموقع اللحظي
         document.getElementById('locateButton').addEventListener('click', function () {
@@ -155,7 +164,7 @@
                 const successCallback = function (position) {
                     const latitude = position.coords.latitude;
                     const longitude = position.coords.longitude;
-                    const heading = position.coords.heading;  // الحصول على الاتجاه
+                    const heading = position.coords.heading; // زاوية الاتجاه
 
                     // إنشاء عنصر الأيقونة الملونة
                     if (!userMarkerElement) {
@@ -168,41 +177,41 @@
                         userMarker.setLngLat([longitude, latitude]);
                     }
 
-                    // تدوير الخريطة بناءً على الاتجاه
-                    if (heading !== null) {
-                        map.setBearing(heading);
+                    // إنشاء مؤشر الاتجاه (سهم)
+                    if (!directionArrowElement) {
+                        directionArrowElement = document.createElement('div');
+                        directionArrowElement.className = 'directionArrow';
+                        directionArrowMarker = new mapboxgl.Marker(directionArrowElement)
+                            .setLngLat([longitude, latitude])
+                            .addTo(map);
+                    } else {
+                        directionArrowMarker.setLngLat([longitude, latitude]);
                     }
 
-                    // إعادة تمركز الخريطة
-                    map.flyTo({
-                        center: [longitude, latitude],
-                        zoom: 14,
-                        speed: 0.5
-                    });
+                    // ضبط دوران السهم بناءً على زاوية الاتجاه
+                    if (heading !== null) {
+                        directionArrowElement.style.transform = `rotate(${heading}deg)`;
+                    }
 
-                    // تحديث الموقع كل ثانية
-                    setTimeout(function() {
-                        navigator.geolocation.getCurrentPosition(successCallback, errorCallback);
-                    }, 1000);
+                    // تغيير مركز الخريطة إلى الموقع الحالي
+                    map.flyTo({ center: [longitude, latitude], zoom: 16 });
                 };
 
                 const errorCallback = function (error) {
-                    console.error("خطأ في تحديد الموقع:", error);
+                    console.error("حدث خطأ أثناء تحديد الموقع:", error);
                 };
 
-                // البدء في تتبع الموقع
-                navigator.geolocation.getCurrentPosition(successCallback, errorCallback);
+                navigator.geolocation.watchPosition(successCallback, errorCallback);
             } else {
-                console.error("المتصفح لا يدعم تحديد الموقع الجغرافي");
+                alert("الموقع غير مدعوم على هذا المتصفح.");
             }
         });
 
-        // تحديث نوع النمط عند التحديد من القائمة
-        document.getElementById('styleSelector').addEventListener('change', function (e) {
-            const style = e.target.value;
-            map.setStyle(styles[style]);
+        // تغيير نمط الخريطة
+        document.getElementById('styleSelector').addEventListener('change', function () {
+            const selectedStyle = document.getElementById('styleSelector').value;
+            map.setStyle(styles[selectedStyle]);
         });
     </script>
 </body>
 </html>
-
