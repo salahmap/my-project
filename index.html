@@ -12,6 +12,7 @@
             font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
+            background-color: #f4f4f4;
         }
         #map { height: 100vh; width: 100%; }
         .controlButton {
@@ -40,42 +41,34 @@
             flex-direction: column;
             gap: 5px;
         }
-        #weatherInfo {
-            display: none;
-            background-color: rgba(0, 0, 0, 0.75);
-            color: white;
-            padding: 15px;
-            border-radius: 10px;
-            margin-top: 10px;
-            width: 250px;
-            font-size: 14px;
-        }
-        .mapboxgl-ctrl-geocoder {
-            min-width: 50%;
-        }
         .iconButton {
             width: 40px;
             height: 40px;
             border: none;
             cursor: pointer;
-            background-size: cover;
+            background: none;
             margin: 5px;
             z-index: 2;
         }
-        .distanceBox {
-            display: none;
-            position: absolute;
-            top: 60px;
-            left: 10px;
-            z-index: 1;
-            background-color: rgba(255, 255, 255, 0.8);
-            padding: 10px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-        }
         .icon {
             font-size: 20px;
-            color: white;
+            color: #ff5722;
+            transition: color 0.3s;
+        }
+        .icon:hover {
+            color: #e64a19;
+        }
+        .userMarker {
+            background-color: #ffcc00;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+        }
+        .workerMarker {
+            background-color: #4caf50;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
         }
     </style>
 </head>
@@ -110,10 +103,6 @@
         <div id="mosqueInfo"></div>
     </div>
     
-    <div class="distanceBox" id="distanceBox">
-        <p>تحديد المسافة...</p>
-    </div>
-
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.js"></script>
     <script src="https://unpkg.com/@turf/turf"></script>
     <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.js"></script>
@@ -157,28 +146,38 @@
             zoom: 12
         });
 
-        // حركة عرض حديثة عند فتح الخريطة
-        map.on('load', () => {
-            map.flyTo({
-                center: [13.1913, 32.8872], // إحداثيات طرابلس
-                zoom: 16,
-                speed: 0.8,
-                curve: 1.42,
-                easing: (t) => t
-            });
-        });
+        let userMarker;
+        let userMarkerElement;
 
-        // تحديث الموقع اللحظي كل 0.1 ثانية
+        // تتبع الموقع اللحظي
         document.getElementById('locateButton').addEventListener('click', function () {
             if (navigator.geolocation) {
                 const successCallback = function (position) {
                     const latitude = position.coords.latitude;
                     const longitude = position.coords.longitude;
+
+                    // إنشاء عنصر الأيقونة الملونة
+                    if (!userMarkerElement) {
+                        userMarkerElement = document.createElement('div');
+                        userMarkerElement.className = 'userMarker';
+                        userMarker = new mapboxgl.Marker(userMarkerElement)
+                            .setLngLat([longitude, latitude])
+                            .addTo(map);
+                    } else {
+                        userMarker.setLngLat([longitude, latitude]);
+                    }
+
+                    // إعادة تمركز الخريطة
                     map.flyTo({
                         center: [longitude, latitude],
                         zoom: 14,
                         speed: 0.5
                     });
+
+                    // تحديث الموقع كل ثانية
+                    setTimeout(function() {
+                        navigator.geolocation.getCurrentPosition(successCallback, errorCallback);
+                    }, 1000); // 1000ms
                 };
 
                 const errorCallback = function (error) {
@@ -193,14 +192,85 @@
 
                 navigator.geolocation.getCurrentPosition(successCallback, errorCallback, options);
             } else {
-                alert("Geolocation is not supported by this browser.");
+                console.error("Geolocation is not supported by this browser.");
             }
         });
 
-        // تغيير نمط الخريطة عند اختيار النمط من القائمة
-        document.getElementById('styleSelector').addEventListener('change', function () {
+        // تتبع العمال في قاعدة البيانات
+        let workerMarkers = [];
+        document.getElementById('toggleWorkerTracking').addEventListener('click', function () {
+            // تحقق من حالة التتبع
+            if (workerMarkers.length > 0) {
+                // أزل جميع علامات العمال
+                workerMarkers.forEach(marker => marker.remove());
+                workerMarkers = [];
+                this.innerText = 'تتبع العمال'; // إعادة النص الأصلي
+            } else {
+                // إضافة علامات العمال من قاعدة البيانات
+                const workersRef = database.ref('workers'); // تأكد من اسم المسار الصحيح
+                workersRef.on('value', function(snapshot) {
+                    snapshot.forEach(function(workerSnapshot) {
+                        const worker = workerSnapshot.val();
+                        const workerMarkerElement = document.createElement('div');
+                        workerMarkerElement.className = 'workerMarker';
+                        const workerMarker = new mapboxgl.Marker(workerMarkerElement)
+                            .setLngLat([worker.longitude, worker.latitude])
+                            .addTo(map);
+                        workerMarkers.push(workerMarker);
+                    });
+                });
+                this.innerText = 'إيقاف تتبع العمال'; // تغيير النص أثناء التتبع
+            }
+        });
+
+        // تغيير نمط الخريطة
+        document.getElementById('styleSelector').addEventListener('change', function() {
             const selectedStyle = this.value;
             map.setStyle(styles[selectedStyle]);
+        });
+
+        // طلب ماء
+        document.getElementById('requestWater').addEventListener('click', function() {
+            alert("تم طلب الماء!"); // يمكنك هنا إضافة تفاصيل أكبر
+        });
+
+        // الوضع الليلي
+        document.getElementById('nightMode').addEventListener('click', function() {
+            const currentStyle = map.getStyle().name;
+            if (currentStyle === "Mapbox Streets") {
+                map.setStyle("mapbox://styles/mapbox/dark-v10");
+                this.innerText = 'الوضع العادي';
+            } else {
+                map.setStyle("mapbox://styles/mapbox/streets-v11");
+                this.innerText = 'الوضع الليلي';
+            }
+        });
+
+        // عرض المساجد القريبة
+        document.getElementById('showMosques').addEventListener('click', function() {
+            // إضافة منطق لعرض المساجد القريبة
+            alert("عرض المساجد القريبة!"); // يمكنك هنا إضافة تفاصيل أكبر
+        });
+
+        // إضافة مسجد
+        document.getElementById('addMosque').addEventListener('click', function() {
+            // منطق لإضافة مسجد
+            alert("أضف مسجداً جديداً!"); // يمكنك هنا إضافة تفاصيل أكبر
+        });
+
+        // مشاركة الموقع
+        document.getElementById('shareLocation').addEventListener('click', function() {
+            alert("مشاركة موقعي!"); // يمكنك هنا إضافة تفاصيل أكبر
+        });
+
+        // عرض المواقع المفضلة
+        document.getElementById('favoriteLocations').addEventListener('click', function() {
+            alert("عرض المواقع المفضلة!"); // يمكنك هنا إضافة تفاصيل أكبر
+        });
+
+        // استكشاف الأماكن القريبة
+        document.getElementById('nearbyPlaces').addEventListener('click', function() {
+            alert("استكشاف الأماكن القريبة!"); // يمكنك هنا إضافة تفاصيل أكبر
         });
     </script>
 </body>
