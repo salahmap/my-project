@@ -142,6 +142,7 @@
 
         let markerElement;
         let marker;
+        let isTracking = false; // متغير لتتبع الحالة
 
         // تتبع الموقع اللحظي
         document.getElementById('locateButton').addEventListener('click', function () {
@@ -163,6 +164,9 @@
 
                     // تغيير مركز الخريطة إلى الموقع الحالي
                     map.flyTo({ center: [longitude, latitude], zoom: 16 });
+
+                    // بدء تتبع الاتجاه
+                    isTracking = true;
                 };
 
                 const errorCallback = function (error) {
@@ -178,15 +182,57 @@
         // استخدام DeviceOrientationEvent لتحديث اتجاه الخريطة بناءً على اتجاه الجهاز
         if (window.DeviceOrientationEvent) {
             window.addEventListener('deviceorientation', function (event) {
-                const alpha = event.alpha; // الحصول على اتجاه الجهاز بالدرجات
-                map.setBearing(alpha); // تغيير اتجاه الخريطة بناءً على اتجاه الجهاز
-            });
+                if (isTracking) {
+                    const alpha = event.alpha; // الحصول على اتجاه الجهاز بالدرجات
+                    map.setBearing(alpha); // تغيير اتجاه الخريطة بناءً على اتجاه الجهاز
+                    marker.setRotation(alpha); // تغيير اتجاه المؤشر بناءً على اتجاه الجهاز
+                }
+            }, true);
         }
 
-        // تغيير نمط الخريطة بناءً على اختيار المستخدم
-        document.getElementById('styleSelector').addEventListener('change', function (event) {
-            const selectedStyle = event.target.value;
+        // تغيير نمط الخريطة
+        document.getElementById('styleSelector').addEventListener('change', function () {
+            const selectedStyle = this.value;
             map.setStyle(styles[selectedStyle]);
+        });
+
+        // إضافة منطق للأزرار الأخرى حسب الحاجة
+        document.getElementById('toggleWorkerTracking').addEventListener('click', function () {
+            alert('ميزة تتبع العمال غير متاحة حاليا.');
+        });
+
+        document.getElementById('requestWater').addEventListener('click', function () {
+            alert('تم إرسال طلب الماء.');
+        });
+
+        document.getElementById('toggle3D').addEventListener('click', function () {
+            map.setPitch(60);
+            alert('تم تفعيل العرض ثلاثي الأبعاد.');
+        });
+
+        document.getElementById('addMosque').addEventListener('click', function () {
+            alert('ميزة إضافة مسجد غير متاحة حاليا.');
+        });
+
+        document.getElementById('shareLocation').addEventListener('click', function () {
+            alert('تمت مشاركة موقعك.');
+        });
+
+        document.getElementById('favoriteLocations').addEventListener('click', function () {
+            alert('المواقع المفضلة غير متاحة حاليا.');
+        });
+
+        document.getElementById('nearbyPlaces').addEventListener('click', function () {
+            alert('استكشاف الأماكن القريبة غير متاح حاليا.');
+        });
+
+        document.getElementById('nightMode').addEventListener('click', function () {
+            document.body.classList.toggle('night-mode');
+            alert('تفعيل الوضع الليلي.');
+        });
+
+        document.getElementById('showMosques').addEventListener('click', function () {
+            alert('عرض المساجد القريبة غير متاح حاليا.');
         });
     </script>
 </body>
