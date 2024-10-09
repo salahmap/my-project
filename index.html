@@ -58,18 +58,6 @@
         .icon:hover {
             color: #e64a19;
         }
-        .userMarker {
-            background-color: #ffcc00;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-        }
-        .workerMarker {
-            background-color: #4caf50;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-        }
         .directionArrow {
             width: 20px;
             height: 20px;
@@ -153,8 +141,6 @@
             zoom: 12
         });
 
-        let userMarker;
-        let userMarkerElement;
         let directionArrowMarker;
         let directionArrowElement;
 
@@ -165,17 +151,6 @@
                     const latitude = position.coords.latitude;
                     const longitude = position.coords.longitude;
                     const heading = position.coords.heading; // زاوية الاتجاه
-
-                    // إنشاء عنصر الأيقونة الملونة
-                    if (!userMarkerElement) {
-                        userMarkerElement = document.createElement('div');
-                        userMarkerElement.className = 'userMarker';
-                        userMarker = new mapboxgl.Marker(userMarkerElement)
-                            .setLngLat([longitude, latitude])
-                            .addTo(map);
-                    } else {
-                        userMarker.setLngLat([longitude, latitude]);
-                    }
 
                     // إنشاء مؤشر الاتجاه (سهم)
                     if (!directionArrowElement) {
@@ -190,7 +165,7 @@
 
                     // ضبط دوران السهم بناءً على زاوية الاتجاه
                     if (heading !== null) {
-                        directionArrowElement.style.transform = `rotate(${heading}deg)`;
+                        directionArrowElement.style.transform = `rotate(${heading}deg)`; // استخدام القيم الصحيحة لتدوير السهم
                     }
 
                     // تغيير مركز الخريطة إلى الموقع الحالي
@@ -198,20 +173,38 @@
                 };
 
                 const errorCallback = function (error) {
-                    console.error("حدث خطأ أثناء تحديد الموقع:", error);
+                    console.error("خطأ في تحديد الموقع: ", error);
                 };
 
                 navigator.geolocation.watchPosition(successCallback, errorCallback);
             } else {
-                alert("الموقع غير مدعوم على هذا المتصفح.");
+                alert("لا يدعم المتصفح تحديد الموقع.");
             }
         });
 
         // تغيير نمط الخريطة
         document.getElementById('styleSelector').addEventListener('change', function () {
-            const selectedStyle = document.getElementById('styleSelector').value;
+            const selectedStyle = this.value;
             map.setStyle(styles[selectedStyle]);
         });
+
+        // تنفيذ ميزات إضافية مثل تتبع العمال وطلب المياه
+        document.getElementById('toggleWorkerTracking').addEventListener('click', function () {
+            // تنفيذ تتبع العمال
+            console.log("تتبع العمال مفعل");
+        });
+
+        document.getElementById('requestWater').addEventListener('click', function () {
+            // تنفيذ طلب المياه
+            console.log("طلب ماء قيد التفعيل");
+        });
+
+        document.getElementById('nightMode').addEventListener('click', function () {
+            // تفعيل الوضع الليلي
+            console.log("الوضع الليلي مفعل");
+        });
+
+        // أضف مزايا إضافية وفقًا لاحتياجاتك
     </script>
 </body>
 </html>
