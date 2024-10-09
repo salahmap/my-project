@@ -177,7 +177,7 @@
                     // تحديث الموقع كل ثانية
                     setTimeout(function() {
                         navigator.geolocation.getCurrentPosition(successCallback, errorCallback);
-                    }, 1000); // 1000ms
+                    }, 1000); // 1000ms = 1 ثانية
                 };
 
                 const errorCallback = function (error) {
@@ -204,74 +204,63 @@
                 // أزل جميع علامات العمال
                 workerMarkers.forEach(marker => marker.remove());
                 workerMarkers = [];
-                this.innerText = 'تتبع العمال'; // إعادة النص الأصلي
+                console.log("Worker tracking stopped.");
             } else {
-                // إضافة علامات العمال من قاعدة البيانات
-                const workersRef = database.ref('workers'); // تأكد من اسم المسار الصحيح
-                workersRef.on('value', function(snapshot) {
-                    snapshot.forEach(function(workerSnapshot) {
-                        const worker = workerSnapshot.val();
-                        const workerMarkerElement = document.createElement('div');
-                        workerMarkerElement.className = 'workerMarker';
-                        const workerMarker = new mapboxgl.Marker(workerMarkerElement)
-                            .setLngLat([worker.longitude, worker.latitude])
-                            .addTo(map);
-                        workerMarkers.push(workerMarker);
-                    });
+                // استرجع بيانات العمال من Firebase وأضف علامات على الخريطة
+                const workersRef = database.ref('workers');
+                workersRef.on('value', snapshot => {
+                    const workers = snapshot.val();
+                    if (workers) {
+                        Object.keys(workers).forEach(workerId => {
+                            const worker = workers[workerId];
+                            const workerMarkerElement = document.createElement('div');
+                            workerMarkerElement.className = 'workerMarker';
+                            const workerMarker = new mapboxgl.Marker(workerMarkerElement)
+                                .setLngLat([worker.longitude, worker.latitude])
+                                .addTo(map);
+                            workerMarkers.push(workerMarker);
+                        });
+                        console.log("Worker tracking started.");
+                    }
                 });
-                this.innerText = 'إيقاف تتبع العمال'; // تغيير النص أثناء التتبع
             }
         });
 
-        // تغيير نمط الخريطة
-        document.getElementById('styleSelector').addEventListener('change', function() {
+        // تفعيل الوضع الليلي
+        document.getElementById('nightMode').addEventListener('click', function () {
+            map.setStyle('mapbox://styles/mapbox/dark-v10');
+        });
+
+        // إضافة خاصية لتغيير نمط الخريطة
+        document.getElementById('styleSelector').addEventListener('change', function () {
             const selectedStyle = this.value;
             map.setStyle(styles[selectedStyle]);
         });
 
-        // طلب ماء
-        document.getElementById('requestWater').addEventListener('click', function() {
-            alert("تم طلب الماء!"); // يمكنك هنا إضافة تفاصيل أكبر
-        });
-
-        // الوضع الليلي
-        document.getElementById('nightMode').addEventListener('click', function() {
-            const currentStyle = map.getStyle().name;
-            if (currentStyle === "Mapbox Streets") {
-                map.setStyle("mapbox://styles/mapbox/dark-v10");
-                this.innerText = 'الوضع العادي';
-            } else {
-                map.setStyle("mapbox://styles/mapbox/streets-v11");
-                this.innerText = 'الوضع الليلي';
-            }
-        });
-
-        // عرض المساجد القريبة
-        document.getElementById('showMosques').addEventListener('click', function() {
-            // إضافة منطق لعرض المساجد القريبة
-            alert("عرض المساجد القريبة!"); // يمكنك هنا إضافة تفاصيل أكبر
+        // إضافة خاصية لعرض معلومات الطقس
+        document.getElementById('toggleWeather').addEventListener('click', function () {
+            alert('هذه الخاصية تحتاج إلى ربط مع API خاص بالطقس.');
         });
 
         // إضافة مسجد
-        document.getElementById('addMosque').addEventListener('click', function() {
-            // منطق لإضافة مسجد
-            alert("أضف مسجداً جديداً!"); // يمكنك هنا إضافة تفاصيل أكبر
+        document.getElementById('addMosque').addEventListener('click', function () {
+            alert('هذه الخاصية تحت التطوير.');
         });
 
-        // مشاركة الموقع
-        document.getElementById('shareLocation').addEventListener('click', function() {
-            alert("مشاركة موقعي!"); // يمكنك هنا إضافة تفاصيل أكبر
+        // إضافة مشاركة الموقع
+        document.getElementById('shareLocation').addEventListener('click', function () {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(function (position) {
+                    const latitude = position.coords.latitude;
+                    const longitude = position.coords.longitude;
+                    const locationLink = `https://www.google.com/maps?q=${latitude},${longitude}`;
+                    prompt('انسخ الرابط وشاركه مع أصدقائك:', locationLink);
+                });
+            } else {
+                alert('متصفحك لا يدعم خاصية تحديد الموقع.');
+            }
         });
 
-        // عرض المواقع المفضلة
-        document.getElementById('favoriteLocations').addEventListener('click', function() {
-            alert("عرض المواقع المفضلة!"); // يمكنك هنا إضافة تفاصيل أكبر
-        });
-
-        // استكشاف الأماكن القريبة
-        document.getElementById('nearbyPlaces').addEventListener('click', function() {
-            alert("استكشاف الأماكن القريبة!"); // يمكنك هنا إضافة تفاصيل أكبر
-        });
     </script>
 </body>
 </html>
