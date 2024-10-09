@@ -180,8 +180,6 @@
         if (window.DeviceOrientationEvent) {
             window.addEventListener('deviceorientation', function(event) {
                 const alpha = event.alpha; // الزاوية
-                const beta = event.beta; // لا نستخدم beta في هذا السياق
-                const gamma = event.gamma; // لا نستخدم gamma في هذا السياق
 
                 // تحديث دوران السهم بناءً على الزاوية
                 if (directionArrowElement) {
@@ -190,40 +188,42 @@
             }, true);
         }
 
-        // تغييرات الأنماط
-        document.getElementById('styleSelector').addEventListener('change', function (event) {
-            const selectedStyle = styles[event.target.value];
-            map.setStyle(selectedStyle);
+        // تغييرات نمط الخريطة
+        document.getElementById('styleSelector').addEventListener('change', function () {
+            map.setStyle(styles[this.value]);
         });
 
-        // أزرار التحكم الأخرى (المزيد من الوظائف يمكن إضافتها)
+        // وظائف إضافية: تتبع العمال، طلب ماء، وإضافة مساجد، وغيرها.
         document.getElementById('toggleWorkerTracking').addEventListener('click', function () {
-            alert('ميزة تتبع العمال قيد التطوير.');
+            // كود تتبع العمال هنا
         });
 
         document.getElementById('requestWater').addEventListener('click', function () {
-            alert('تم إرسال طلب الماء.');
+            // كود طلب الماء هنا
         });
 
-        // أزرار التحكم الأخرى (يمكن تطوير المزيد من الميزات)
         document.getElementById('addMosque').addEventListener('click', function () {
-            alert('إضافة مسجد قيد التطوير.');
+            // كود إضافة مسجد هنا
+        });
+
+        document.getElementById('shareLocation').addEventListener('click', function () {
+            // كود مشاركة الموقع هنا
         });
 
         document.getElementById('favoriteLocations').addEventListener('click', function () {
-            alert('عرض المواقع المفضلة قيد التطوير.');
+            // كود عرض المواقع المفضلة هنا
         });
 
         document.getElementById('nearbyPlaces').addEventListener('click', function () {
-            alert('استكشاف الأماكن القريبة قيد التطوير.');
+            // كود استكشاف الأماكن القريبة هنا
         });
 
         document.getElementById('nightMode').addEventListener('click', function () {
-            alert('الوضع الليلي قيد التطوير.');
+            // كود تفعيل الوضع الليلي هنا
         });
 
         document.getElementById('showMosques').addEventListener('click', function () {
-            alert('عرض المساجد القريبة قيد التطوير.');
+            // كود عرض المساجد القريبة هنا
         });
     </script>
 </body>
