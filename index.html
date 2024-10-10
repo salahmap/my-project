@@ -89,7 +89,6 @@
         <button id="requestWater" class="controlButton">طلب ماء</button>
         <button id="toggle3D" class="controlButton">تفعيل العرض ثلاثي الأبعاد</button>
         <button id="addMosque" class="controlButton">إضافة مسجد</button>
-        <button id="shareLocation" class="controlButton">مشاركة موقعي</button>
         <button id="favoriteLocations" class="controlButton">عرض المواقع المفضلة</button>
         <button id="nearbyPlaces" class="controlButton">استكشاف الأماكن القريبة</button>
         <button id="nightMode" class="controlButton">الوضع الليلي</button>
@@ -173,124 +172,33 @@
                     }
 
                     // تغيير مركز الخريطة إلى الموقع الحالي
-                    map.flyTo({ center: [longitude, latitude], zoom: 16 });
-
-                    // بدء تتبع الاتجاه
-                    isTracking = true;
-                    watchId = navigator.geolocation.watchPosition(successCallback, errorCallback, {
-                        enableHighAccuracy: true
-                    });
-
-                    // بدء توجيه الزاوية
-                    startDirectionTracking(); // بدء التوجيه
+                    map.setCenter([longitude, latitude]);
                 };
 
                 const errorCallback = function (error) {
-                    console.error('خطأ في تحديد الموقع:', error);
+                    console.error('خطأ في الوصول إلى الموقع:', error);
                 };
 
-                navigator.geolocation.getCurrentPosition(successCallback, errorCallback);
+                watchId = navigator.geolocation.watchPosition(successCallback, errorCallback);
+                isTracking = true; // تعيين الحالة إلى نشطة
+            } else {
+                alert("الجهاز لا يدعم تحديد المواقع.");
             }
         });
 
-        // بدء تتبع الاتجاه
-        function startDirectionTracking() {
-            if (directionActive) return; // الخروج إذا كانت قيد التشغيل
-
-            directionActive = true; // تعيين الحالة النشطة
-            const rotateMarker = () => {
-                if (isTracking) {
-                    navigator.geolocation.getCurrentPosition((position) => {
-                        const heading = position.coords.heading || 0; // قم بتعيين زاوية افتراضية إذا لم تكن متاحة
-                        markerElement.style.transform = `rotate(${heading}deg)`;
-                    });
-                }
-                requestAnimationFrame(rotateMarker);
-            };
-            rotateMarker(); // بدء التحريك
-        }
-
-        // تغيير أنماط الخريطة عند الاختيار
-        document.getElementById('styleSelector').addEventListener('change', function (e) {
-            map.setStyle(styles[e.target.value]);
+        // تغيير أنماط الخريطة
+        document.getElementById('styleSelector').addEventListener('change', function () {
+            const selectedStyle = this.value;
+            map.setStyle(styles[selectedStyle]);
         });
 
-        // إضافة مؤشرات للمساجد
-        const mosques = [
-            { name: "مسجد الإيمان", lng: 13.1875, lat: 32.8835 },
-            { name: "مسجد الشهداء", lng: 13.1977, lat: 32.8894 },
-            { name: "مسجد النصر", lng: 13.1775, lat: 32.8830 }
-        ];
-
-        mosques.forEach(mosque => {
-            new mapboxgl.Marker()
-                .setLngLat([mosque.lng, mosque.lat])
-                .setPopup(new mapboxgl.Popup().setText(mosque.name))
-                .addTo(map);
-        });
+        // إضافة ميزات أخرى حسب الحاجة
+        // ...
 
         // تفعيل الوضع الليلي
         document.getElementById('nightMode').addEventListener('click', function () {
-            const currentStyle = map.getStyle().id;
-            const nightStyle = currentStyle === 'mapbox://styles/mapbox/dark-v10' ? 'mapbox://styles/mapbox/light-v10' : 'mapbox://styles/mapbox/dark-v10';
-            map.setStyle(nightStyle);
+            map.setStyle('mapbox://styles/mapbox/dark-v10');
         });
-
-        // التفاعل مع زر إضافة مسجد
-        document.getElementById('addMosque').addEventListener('click', function () {
-            const mosqueName = prompt("أدخل اسم المسجد:");
-            if (mosqueName) {
-                const lng = parseFloat(prompt("أدخل خط الطول:"));
-                const lat = parseFloat(prompt("أدخل خط العرض:"));
-                if (!isNaN(lng) && !isNaN(lat)) {
-                    new mapboxgl.Marker()
-                        .setLngLat([lng, lat])
-                        .setPopup(new mapboxgl.Popup().setText(mosqueName))
-                        .addTo(map);
-                } else {
-                    alert("خطأ: يجب أن تكون إحداثيات خط الطول والعرض أرقامًا.");
-                }
-            }
-        });
-
-        // وظيفة لمشاركة الموقع
-        document.getElementById('shareLocation').addEventListener('click', function () {
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition((position) => {
-                    const { latitude, longitude } = position.coords;
-                    const link = `https://www.google.com/maps/@${latitude},${longitude},15z`;
-                    alert(`شارك موقعك عبر هذا الرابط: ${link}`);
-                }, (error) => {
-                    alert('تعذر تحديد موقعك.');
-                });
-            }
-        });
-
-        // وظيفة لاستكشاف الأماكن القريبة
-        document.getElementById('nearbyPlaces').addEventListener('click', function () {
-            alert("الأماكن القريبة هي: مطاعم، مقاهي، مساجد.");
-        });
-
-        // وظيفة لعرض المواقع المفضلة
-        document.getElementById('favoriteLocations').addEventListener('click', function () {
-            alert("المواقع المفضلة: مسجد الإيمان، مطعم الطازج.");
-        });
-
-        // عرض معلومات الطقس
-        const getWeather = () => {
-            navigator.geolocation.getCurrentPosition((position) => {
-                const { latitude, longitude } = position.coords;
-                const weatherAPIKey = 'YOUR_OPENWEATHER_API_KEY'; // قم بتعديل هذا
-                fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${weatherAPIKey}&units=metric`)
-                    .then(response => response.json())
-                    .then(data => {
-                        const weather = `الطقس: ${data.weather[0].description}, درجة الحرارة: ${data.main.temp} °C`;
-                        document.getElementById('weatherInfo').innerText = weather;
-                    });
-            });
-        };
-
-        document.getElementById('toggleWeather').addEventListener('click', getWeather);
     </script>
 </body>
 </html>
