@@ -61,7 +61,7 @@
         .directionMarker {
             width: 40px;
             height: 40px;
-            background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" fill="%23ffcc00" viewBox="0 0 24 24"><path d="M12 2l9 20-9-5-9 5 9-20z"/></svg>');
+            background-image: url('https://img.icons8.com/ios/50/000000/marker.png'); /* استبدال الصورة هنا */
             background-size: cover;
         }
     </style>
@@ -173,85 +173,46 @@
                     }
 
                     // تغيير مركز الخريطة إلى الموقع الحالي
-                    map.flyTo({ center: [longitude, latitude], zoom: 16 });
-
-                    // بدء تتبع الاتجاه
-                    isTracking = true;
-                    watchId = navigator.geolocation.watchPosition(successCallback, errorCallback, {
-                        enableHighAccuracy: true
+                    map.flyTo({
+                        center: [longitude, latitude],
+                        zoom: 14,
+                        speed: 0.5,
+                        curve: 1,
+                        easing: (t) => t,
                     });
 
-                    // بدء توجيه الزاوية
-                    startDirectionTracking(); // بدء توجيه الزاوية
+                    // تحديث حالة الاتجاه
+                    if (directionActive) {
+                        markerElement.style.transform = `rotate(${position.coords.heading}deg)`; // قم بتدوير المؤشر
+                    }
                 };
 
                 const errorCallback = function (error) {
-                    console.error("خطأ في تحديد الموقع:", error);
+                    console.error('خطأ في تحديد الموقع: ', error);
                 };
 
                 watchId = navigator.geolocation.watchPosition(successCallback, errorCallback, {
-                    enableHighAccuracy: true
+                    enableHighAccuracy: true,
+                    maximumAge: 0,
+                    timeout: 10000
                 });
+                isTracking = true; // تحديث الحالة إلى تتبع
             } else {
-                alert("المتصفح لا يدعم تحديد الموقع.");
+                alert('المتصفح لا يدعم تحديد الموقع.');
             }
         });
 
-        // بدء توجيه الزاوية
-        function startDirectionTracking() {
-            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-                DeviceOrientationEvent.requestPermission()
-                    .then(response => {
-                        if (response === 'granted') {
-                            directionActive = true;
-                            window.addEventListener('deviceorientation', updateDirection);
-                        } else {
-                            alert('إذن الوصول إلى الاتجاه مرفوض');
-                        }
-                    })
-                    .catch(console.error);
-            } else {
-                directionActive = true;
-                window.addEventListener('deviceorientation', updateDirection);
-            }
-        }
-
-        // تحديث الاتجاه بناءً على بيانات الاتجاه
-        function updateDirection(event) {
-            if (directionActive) {
-                const alpha = event.alpha; // الاتجاه الحقيقي
-                markerElement.style.transform = `rotate(${-alpha}deg)`; // تدوير المؤشر
-            }
-        }
-
-        // تغيير الأنماط عند اختيار نمط جديد
+        // تغيير أنماط الخريطة
         document.getElementById('styleSelector').addEventListener('change', function () {
-            const selectedStyle = styles[this.value];
-            map.setStyle(selectedStyle);
+            map.setStyle(styles[this.value]);
         });
 
-        // إيقاف توجيه الزاوية عند النقر
-        document.getElementById('toggleWorkerTracking').addEventListener('click', function () {
-            isUserInteracting = !isUserInteracting; // عكس حالة التفاعل
-            if (isUserInteracting) {
-                this.textContent = 'إيقاف تتبع العمال';
-            } else {
-                this.textContent = 'تتبع العمال';
-                // إيقاف التوجيه أيضًا
-                if (directionActive) {
-                    window.removeEventListener('deviceorientation', updateDirection);
-                    directionActive = false;
-                }
-            }
-        });
-
-        // إضافة ميزات أخرى كما هو مطلوب (طلب ماء، إضافة مسجد، مشاركة الموقع، إلخ)
-        // ...
-
-        // عرض المساجد القريبة
+        // عرض مساجد قريبة (مؤقت)
         document.getElementById('showMosques').addEventListener('click', function () {
-            // هنا يمكنك إضافة الشيفرة الخاصة بعرض المساجد
+            alert('سيتم إضافة هذه الميزة قريبًا.');
         });
+
+        // إعداد الأحداث الأخرى...
     </script>
 </body>
 </html>
