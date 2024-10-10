@@ -149,6 +149,9 @@
         // تتبع الموقع اللحظي
         document.getElementById('locateButton').addEventListener('click', function () {
             if (navigator.geolocation) {
+                // إعادة تمكين التتبع إذا تحركت الخريطة مسبقًا
+                userMovedMap = false;
+
                 if (isTracking) {
                     navigator.geolocation.clearWatch(watchId); // إيقاف المراقبة إذا كانت نشطة
                     isTracking = false;
@@ -171,42 +174,38 @@
 
                     // تحريك الخريطة إلى الموقع الحالي بسلاسة
                     if (!userMovedMap) {
-                        map.flyTo({
-                            center: [longitude, latitude],
-                            zoom: 14, // مستوى التكبير المطلوب
-                            essential: true
-                        });
+                        map.flyTo({ center: [longitude, latitude], zoom: 14 });
                     }
                 };
 
-                const errorCallback = function () {
-                    alert("تعذر الوصول إلى موقعك");
+                const errorCallback = function (error) {
+                    console.log(`خطأ في تحديد الموقع: ${error.message}`);
                 };
 
-                // مراقبة الموقع كلما تغير
+                // تفعيل تتبع الموقع
                 watchId = navigator.geolocation.watchPosition(successCallback, errorCallback, {
-                    enableHighAccuracy: true
+                    enableHighAccuracy: true,
+                    timeout: 5000,
+                    maximumAge: 0
                 });
                 isTracking = true;
             } else {
-                alert("الموقع غير مدعوم في المتصفح الخاص بك");
+                alert('خدمة الموقع غير مدعومة في المتصفح الخاص بك.');
             }
         });
 
-        // عند تحريك الخريطة، إيقاف تتبع الموقع
-        map.on('dragstart', function () {
+        // التحقق إذا تحرك المستخدم الخريطة
+        map.on('dragend', function () {
             userMovedMap = true;
-            if (isTracking && watchId) {
-                navigator.geolocation.clearWatch(watchId);
-                isTracking = false;
-            }
         });
 
-        // تغيير النمط حسب اختيار المستخدم
+        // تبديل الأنماط
         document.getElementById('styleSelector').addEventListener('change', function () {
             const selectedStyle = this.value;
             map.setStyle(styles[selectedStyle]);
         });
+
+        // باقي الأكواد ...
     </script>
 </body>
 </html>
