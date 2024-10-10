@@ -1,234 +1,93 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>تطبيق الخريطة المحسن</title>
-    <link href="https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.css" rel="stylesheet" />
-    <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.css" type="text/css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #f4f4f4;
-        }
-        #map { height: 100vh; width: 100%; }
-        .controlButton {
-            background-color: rgba(30, 144, 255, 0.8);
-            border: none;
-            border-radius: 10px;
-            padding: 10px;
-            color: white;
-            font-weight: bold;
-            cursor: pointer;
-            margin: 5px 0;
-            transition: background-color 0.3s ease;
-            width: 100%;
-            font-size: 14px;
-        }
-        .controlButton:hover {
-            background-color: rgba(30, 144, 255, 1);
-        }
-        .controls {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            z-index: 1;
-            max-width: 90%;
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-        .iconButton {
-            width: 40px;
-            height: 40px;
-            border: none;
-            cursor: pointer;
-            background: none;
-            margin: 5px;
-            z-index: 2;
-        }
-        .icon {
-            font-size: 20px;
-            color: #ff5722;
-            transition: color 0.3s;
-        }
-        .icon:hover {
-            color: #e64a19;
-        }
-        .directionMarker {
-            width: 40px;
-            height: 40px;
-            background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" fill="%23ffcc00" viewBox="0 0 24 24"><path d="M12 2l9 20-9-5-9 5 9-20z"/></svg>');
-            background-size: cover;
-        }
-    </style>
-</head>
-<body>
-    <h1 id="title" style="display: none;">تطبيق الخريطة المحسن</h1>
-    <div id="map"></div>
+let isTracking = false; // متغير لتتبع الحالة
+let watchId; // لتخزين معرف مراقبة الموقع
+let marker; // المتغير الخاص بالمؤشر
+let map; // المتغير الخاص بالخريطة
 
-    <div class="controls">
-        <button id="toggleWeather" class="iconButton">
-            <i class="fas fa-cloud-sun icon"></i>
-        </button>
-        <button id="locateButton" class="iconButton">
-            <i class="fas fa-location-arrow icon"></i>
-        </button>
-        <select id="styleSelector" class="controlButton">
-            <option value="streets">شوارع</option>
-            <option value="satellite">الأقمار الصناعية</option>
-            <option value="outdoors">خارجية</option>
-            <option value="hybrid" selected>هايبرد</option>
-        </select>
-        <button id="toggleWorkerTracking" class="controlButton">تتبع العمال</button>
-        <button id="requestWater" class="controlButton">طلب ماء</button>
-        <button id="toggle3D" class="controlButton">تفعيل العرض ثلاثي الأبعاد</button>
-        <button id="addMosque" class="controlButton">إضافة مسجد</button>
-        <button id="shareLocation" class="controlButton">مشاركة موقعي</button>
-        <button id="favoriteLocations" class="controlButton">عرض المواقع المفضلة</button>
-        <button id="nearbyPlaces" class="controlButton">استكشاف الأماكن القريبة</button>
-        <button id="nightMode" class="controlButton">الوضع الليلي</button>
-        <button id="showMosques" class="controlButton">عرض المساجد القريبة</button>
-        <div id="weatherInfo"></div>
-        <div id="workerInfo"></div>
-        <div id="mosqueInfo"></div>
-    </div>
-    
-    <script src="https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.js"></script>
-    <script src="https://unpkg.com/@turf/turf"></script>
-    <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-    <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.7.0/mapbox-gl-geocoder.min.js"></script>
-    <link href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.7.0/mapbox-gl-geocoder.css" rel="stylesheet" />
+// إعداد الخريطة
+mapboxgl.accessToken = 'YOUR_MAPBOX_ACCESS_TOKEN'; // استبدل هذا برمز الوصول الخاص بك
+map = new mapboxgl.Map({
+    container: 'map', // ID عنصر الخريطة
+    style: 'mapbox://styles/mapbox/streets-v11',
+    center: [0, 0], // الإحداثيات الأولية
+    zoom: 14 // مستوى التكبير الابتدائي
+});
 
-    <script>
-        // إعداد Firebase
-        const firebaseConfig = {
-            apiKey: "ce6cae3c0977e051e1924a4ac1ece1aa",
-            authDomain: "adlo-44d1b.firebaseapp.com",
-            databaseURL: "https://adlo-44d1b-default-rtdb.firebaseio.com/",
-            projectId: "adlo-44d1b",
-            storageBucket: "adlo-44d1b.appspot.com",
-            messagingSenderId: "96260637269",
-            appId: "1:96260637269:web:e3bc37ab2b41038c254adc",
-            measurementId: "G-R0SGBWC3CJ"
-        };
-        firebase.initializeApp(firebaseConfig);
-        const database = firebase.database();
+// إضافة زر لتحديد الموقع
+const locateButton = document.getElementById('locateButton');
+locateButton.addEventListener('click', function () {
+    if (navigator.geolocation) {
+        if (isTracking) {
+            navigator.geolocation.clearWatch(watchId); // إيقاف المراقبة إذا كانت نشطة
+            isTracking = false;
+            if (marker) marker.remove(); // إزالة العلامة عند إيقاف المراقبة
+            this.innerHTML = '<i class="fas fa-location-arrow icon"></i> تحديد الموقع'; // تغيير نص الزر
+        } else {
+            watchId = navigator.geolocation.watchPosition(position => {
+                const { latitude, longitude } = position.coords;
 
-        // مفتاح Mapbox
-        const mapboxToken = "pk.eyJ1IjoiY2hvb3NlbWUiLCJhIjoiY20wZnVpemI2MHpreTJqcjR4ZThuam9pYyJ9.F1CjHrnJ7m-VwM_LHt0Q9Q";
-        mapboxgl.accessToken = mapboxToken;
-
-        // إعداد الأنماط المختلفة للخريطة
-        const styles = {
-            streets: 'mapbox://styles/mapbox/streets-v11',
-            satellite: 'mapbox://styles/mapbox/satellite-v9',
-            outdoors: 'mapbox://styles/mapbox/outdoors-v11',
-            hybrid: 'mapbox://styles/mapbox/satellite-streets-v11'
-        };
-
-        // إنشاء الخريطة وعرض طرابلس عند الفتح
-        const map = new mapboxgl.Map({
-            container: 'map', 
-            style: styles.hybrid, 
-            center: [13.1913, 32.8872], // إحداثيات طرابلس
-            zoom: 12
-        });
-
-        let markerElement;
-        let marker;
-        let isTracking = false; // متغير لتتبع الحالة
-        let watchId; // لتخزين معرف مراقبة الموقع
-
-        // تتبع الموقع اللحظي
-        document.getElementById('locateButton').addEventListener('click', function () {
-            if (navigator.geolocation) {
-                if (isTracking) {
-                    navigator.geolocation.clearWatch(watchId); // إيقاف المراقبة إذا كانت نشطة
-                    isTracking = false;
-                    marker.remove(); // إزالة العلامة عند إيقاف المراقبة
-                    this.innerHTML = '<i class="fas fa-location-arrow icon"></i> تحديد الموقع'; // تغيير نص الزر
+                // إذا لم يكن هناك مؤشر، أنشئه
+                if (!marker) {
+                    const markerElement = document.createElement('div');
+                    markerElement.className = 'blue-marker'; // استخدام فئة CSS للمؤشر الأزرق
+                    marker = new mapboxgl.Marker(markerElement, {
+                        anchor: 'center' // تحديد نقطة تثبيت المؤشر في المركز
+                    }).setLngLat([longitude, latitude]).addTo(map);
                 } else {
-                    watchId = navigator.geolocation.watchPosition(position => {
-                        const { latitude, longitude } = position.coords;
-                        if (!marker) {
-                            markerElement = document.createElement('div');
-                            markerElement.className = 'directionMarker';
-                            marker = new mapboxgl.Marker(markerElement).setLngLat([longitude, latitude]).addTo(map);
-                        } else {
-                            marker.setLngLat([longitude, latitude]); // تحديث موقع العلامة
-                        }
-                        map.setCenter([longitude, latitude]);
-                    });
-                    isTracking = true;
-                    this.innerHTML = '<i class="fas fa-stop icon"></i> إيقاف تحديد الموقع'; // تغيير نص الزر
+                    marker.setLngLat([longitude, latitude]); // تحديث موقع العلامة
                 }
-            } else {
-                alert('جهازك لا يدعم تحديد الموقع الجغرافي');
-            }
-        });
 
-        // تغيير نمط الخريطة
-        document.getElementById('styleSelector').addEventListener('change', function () {
-            map.setStyle(styles[this.value]);
-        });
+                // مركز الخريطة إلى موقع المستخدم
+                map.setCenter([longitude, latitude]);
+            });
 
-        // إدارة حالة تتبع العمال
-        document.getElementById('toggleWorkerTracking').addEventListener('click', function () {
-            // يمكن إضافة المنطق الخاص بتتبع العمال هنا
-            document.getElementById('workerInfo').innerText = 'تتبع العمال قيد التشغيل'; // رسالة توضيحية
-        });
+            // تحديث نص الزر
+            isTracking = true;
+            this.innerHTML = '<i class="fas fa-stop icon"></i> إيقاف تحديد الموقع'; // تغيير نص الزر
+        }
+    } else {
+        alert('جهازك لا يدعم تحديد الموقع الجغرافي');
+    }
+});
 
-        // إدارة طلب الماء
-        document.getElementById('requestWater').addEventListener('click', function () {
-            alert('تم إرسال طلب ماء'); // رسالة توضيحية
-        });
+// إيقاف تحديد الموقع عند تحريك الخريطة
+map.on('move', () => {
+    if (isTracking) {
+        navigator.geolocation.clearWatch(watchId); // إيقاف المراقبة
+        isTracking = false; // تغيير حالة التتبع
+        if (marker) marker.remove(); // إزالة المؤشر
+        locateButton.innerHTML = '<i class="fas fa-location-arrow icon"></i> تحديد الموقع'; // تغيير نص الزر
+    }
+});
 
-        // إدارة الوضع الليلي
-        document.getElementById('nightMode').addEventListener('click', function () {
-            map.setStyle('mapbox://styles/mapbox/dark-v10'); // تغيير النمط إلى الوضع الليلي
-        });
+// إعادة مركز المؤشر إلى الخريطة عند الضغط على زر تحديد الموقع
+locateButton.addEventListener('click', () => {
+    if (isTracking && marker) {
+        const { lng, lat } = marker.getLngLat();
+        map.setCenter([lng, lat]); // إعادة المركز إلى المؤشر
+    }
+});
 
-        // إدارة إضافة المساجد
-        document.getElementById('addMosque').addEventListener('click', function () {
-            const mosqueName = prompt('ادخل اسم المسجد:');
-            if (mosqueName) {
-                // يمكن إضافة المنطق الخاص بإضافة المسجد هنا
-                alert(`تم إضافة المسجد: ${mosqueName}`); // رسالة توضيحية
-            }
-        });
-
-        // إدارة مشاركة الموقع
-        document.getElementById('shareLocation').addEventListener('click', function () {
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(position => {
-                    const { latitude, longitude } = position.coords;
-                    alert(`موقعك الحالي: ${latitude}, ${longitude}`); // رسالة توضيحية
-                });
-            } else {
-                alert('جهازك لا يدعم تحديد الموقع الجغرافي');
-            }
-        });
-
-        // إدارة عرض المواقع المفضلة
-        document.getElementById('favoriteLocations').addEventListener('click', function () {
-            alert('عرض المواقع المفضلة'); // رسالة توضيحية
-        });
-
-        // إدارة استكشاف الأماكن القريبة
-        document.getElementById('nearbyPlaces').addEventListener('click', function () {
-            alert('استكشاف الأماكن القريبة'); // رسالة توضيحية
-        });
-
-        // إدارة عرض المساجد القريبة
-        document.getElementById('showMosques').addEventListener('click', function () {
-            alert('عرض المساجد القريبة'); // رسالة توضيحية
-        });
-    </script>
-</body>
-</html>
+// CSS للمؤشر الأزرق
+const style = document.createElement('style');
+style.innerHTML = `
+    .blue-marker {
+        background-color: blue; /* اللون الأزرق */
+        width: 30px; /* عرض المؤشر */
+        height: 30px; /* ارتفاع المؤشر */
+        border-radius: 50%; /* الشكل الدائري */
+        position: relative; /* إعداد النسق النسبي */
+    }
+    .blue-marker::after {
+        content: ''; /* محتوى فارغ */
+        position: absolute;
+        top: -10px; /* موضع الضوء */
+        left: 50%;
+        transform: translateX(-50%);
+        width: 8px; /* عرض الضوء */
+        height: 8px; /* ارتفاع الضوء */
+        background-color: yellow; /* لون الضوء */
+        border-radius: 50%; /* شكل دائري للضوء */
+        box-shadow: 0 0 10px yellow; /* تأثير ضوئي */
+    }
+`;
+document.head.appendChild(style);
