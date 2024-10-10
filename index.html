@@ -61,8 +61,10 @@
         .directionMarker {
             width: 40px;
             height: 40px;
-            background-image: url('https://img.icons8.com/ios/50/000000/marker.png'); /* استبدال الصورة هنا */
+            background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" fill="%23ffcc00" viewBox="0 0 24 24"><path d="M12 2l9 20-9-5-9 5 9-20z"/></svg>');
             background-size: cover;
+            position: absolute; /* إضافة */
+            transform: translate(-50%, -50%); /* مركز المؤشر */
         }
     </style>
 </head>
@@ -141,9 +143,7 @@
         });
 
         let markerElement;
-        let marker;
         let isTracking = false; // متغير لتتبع الحالة
-        let isUserInteracting = false; // متغير لتتبع تفاعل المستخدم
         let watchId; // لتخزين معرف مراقبة الموقع
         let directionActive = false; // لتتبع حالة الاتجاه
 
@@ -153,7 +153,6 @@
                 if (isTracking) {
                     navigator.geolocation.clearWatch(watchId); // إيقاف المراقبة إذا كانت نشطة
                     isTracking = false;
-                    directionActive = false; // إيقاف توجيه الزاوية
                     return; // الخروج إذا كانت قيد التشغيل
                 }
 
@@ -165,6 +164,7 @@
                     if (!markerElement) {
                         markerElement = document.createElement('div');
                         markerElement.className = 'directionMarker';
+                        markerElement.style.display = 'block'; // تأكد من أنه يظهر
                         marker = new mapboxgl.Marker(markerElement)
                             .setLngLat([longitude, latitude])
                             .addTo(map);
@@ -173,46 +173,124 @@
                     }
 
                     // تغيير مركز الخريطة إلى الموقع الحالي
-                    map.flyTo({
-                        center: [longitude, latitude],
-                        zoom: 14,
-                        speed: 0.5,
-                        curve: 1,
-                        easing: (t) => t,
+                    map.flyTo({ center: [longitude, latitude], zoom: 16 });
+
+                    // بدء تتبع الاتجاه
+                    isTracking = true;
+                    watchId = navigator.geolocation.watchPosition(successCallback, errorCallback, {
+                        enableHighAccuracy: true
                     });
 
-                    // تحديث حالة الاتجاه
-                    if (directionActive) {
-                        markerElement.style.transform = `rotate(${position.coords.heading}deg)`; // قم بتدوير المؤشر
-                    }
+                    // بدء توجيه الزاوية
+                    startDirectionTracking(); // بدء التوجيه
                 };
 
                 const errorCallback = function (error) {
-                    console.error('خطأ في تحديد الموقع: ', error);
+                    console.error('خطأ في تحديد الموقع:', error);
                 };
 
-                watchId = navigator.geolocation.watchPosition(successCallback, errorCallback, {
-                    enableHighAccuracy: true,
-                    maximumAge: 0,
-                    timeout: 10000
-                });
-                isTracking = true; // تحديث الحالة إلى تتبع
-            } else {
-                alert('المتصفح لا يدعم تحديد الموقع.');
+                navigator.geolocation.getCurrentPosition(successCallback, errorCallback);
             }
         });
 
-        // تغيير أنماط الخريطة
-        document.getElementById('styleSelector').addEventListener('change', function () {
-            map.setStyle(styles[this.value]);
+        // بدء تتبع الاتجاه
+        function startDirectionTracking() {
+            if (directionActive) return; // الخروج إذا كانت قيد التشغيل
+
+            directionActive = true; // تعيين الحالة النشطة
+            const rotateMarker = () => {
+                if (isTracking) {
+                    navigator.geolocation.getCurrentPosition((position) => {
+                        const heading = position.coords.heading || 0; // قم بتعيين زاوية افتراضية إذا لم تكن متاحة
+                        markerElement.style.transform = `rotate(${heading}deg)`;
+                    });
+                }
+                requestAnimationFrame(rotateMarker);
+            };
+            rotateMarker(); // بدء التحريك
+        }
+
+        // تغيير أنماط الخريطة عند الاختيار
+        document.getElementById('styleSelector').addEventListener('change', function (e) {
+            map.setStyle(styles[e.target.value]);
         });
 
-        // عرض مساجد قريبة (مؤقت)
-        document.getElementById('showMosques').addEventListener('click', function () {
-            alert('سيتم إضافة هذه الميزة قريبًا.');
+        // إضافة مؤشرات للمساجد
+        const mosques = [
+            { name: "مسجد الإيمان", lng: 13.1875, lat: 32.8835 },
+            { name: "مسجد الشهداء", lng: 13.1977, lat: 32.8894 },
+            { name: "مسجد النصر", lng: 13.1775, lat: 32.8830 }
+        ];
+
+        mosques.forEach(mosque => {
+            new mapboxgl.Marker()
+                .setLngLat([mosque.lng, mosque.lat])
+                .setPopup(new mapboxgl.Popup().setText(mosque.name))
+                .addTo(map);
         });
 
-        // إعداد الأحداث الأخرى...
+        // تفعيل الوضع الليلي
+        document.getElementById('nightMode').addEventListener('click', function () {
+            const currentStyle = map.getStyle().id;
+            const nightStyle = currentStyle === 'mapbox://styles/mapbox/dark-v10' ? 'mapbox://styles/mapbox/light-v10' : 'mapbox://styles/mapbox/dark-v10';
+            map.setStyle(nightStyle);
+        });
+
+        // التفاعل مع زر إضافة مسجد
+        document.getElementById('addMosque').addEventListener('click', function () {
+            const mosqueName = prompt("أدخل اسم المسجد:");
+            if (mosqueName) {
+                const lng = parseFloat(prompt("أدخل خط الطول:"));
+                const lat = parseFloat(prompt("أدخل خط العرض:"));
+                if (!isNaN(lng) && !isNaN(lat)) {
+                    new mapboxgl.Marker()
+                        .setLngLat([lng, lat])
+                        .setPopup(new mapboxgl.Popup().setText(mosqueName))
+                        .addTo(map);
+                } else {
+                    alert("خطأ: يجب أن تكون إحداثيات خط الطول والعرض أرقامًا.");
+                }
+            }
+        });
+
+        // وظيفة لمشاركة الموقع
+        document.getElementById('shareLocation').addEventListener('click', function () {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition((position) => {
+                    const { latitude, longitude } = position.coords;
+                    const link = `https://www.google.com/maps/@${latitude},${longitude},15z`;
+                    alert(`شارك موقعك عبر هذا الرابط: ${link}`);
+                }, (error) => {
+                    alert('تعذر تحديد موقعك.');
+                });
+            }
+        });
+
+        // وظيفة لاستكشاف الأماكن القريبة
+        document.getElementById('nearbyPlaces').addEventListener('click', function () {
+            alert("الأماكن القريبة هي: مطاعم، مقاهي، مساجد.");
+        });
+
+        // وظيفة لعرض المواقع المفضلة
+        document.getElementById('favoriteLocations').addEventListener('click', function () {
+            alert("المواقع المفضلة: مسجد الإيمان، مطعم الطازج.");
+        });
+
+        // عرض معلومات الطقس
+        const getWeather = () => {
+            navigator.geolocation.getCurrentPosition((position) => {
+                const { latitude, longitude } = position.coords;
+                const weatherAPIKey = 'YOUR_OPENWEATHER_API_KEY'; // قم بتعديل هذا
+                fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${weatherAPIKey}&units=metric`)
+                    .then(response => response.json())
+                    .then(data => {
+                        const weather = `الطقس: ${data.weather[0].description}, درجة الحرارة: ${data.main.temp} °C`;
+                        document.getElementById('weatherInfo').innerText = weather;
+                    });
+            });
+        };
+
+        document.getElementById('toggleWeather').addEventListener('click', getWeather);
     </script>
 </body>
 </html>
