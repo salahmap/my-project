@@ -144,14 +144,10 @@
         let markerElement;
         let isTracking = false; // متغير لتتبع الحالة
         let watchId; // لتخزين معرف مراقبة الموقع
-        let userMovedMap = false; // لمعرفة إذا كان المستخدم قد حرك الخريطة
 
         // تتبع الموقع اللحظي
         document.getElementById('locateButton').addEventListener('click', function () {
             if (navigator.geolocation) {
-                // إعادة تمكين التتبع إذا تحركت الخريطة مسبقًا
-                userMovedMap = false;
-
                 if (isTracking) {
                     navigator.geolocation.clearWatch(watchId); // إيقاف المراقبة إذا كانت نشطة
                     isTracking = false;
@@ -173,39 +169,67 @@
                     }
 
                     // تحريك الخريطة إلى الموقع الحالي بسلاسة
-                    if (!userMovedMap) {
-                        map.flyTo({ center: [longitude, latitude], zoom: 14 });
-                    }
+                    map.flyTo({ center: [longitude, latitude], zoom: 14 });
+
+                    // تغيير الحالة إلى التتبع
+                    isTracking = true;
                 };
 
                 const errorCallback = function (error) {
-                    console.log(`خطأ في تحديد الموقع: ${error.message}`);
+                    console.error("خطأ في تحديد الموقع:", error);
                 };
 
-                // تفعيل تتبع الموقع
-                watchId = navigator.geolocation.watchPosition(successCallback, errorCallback, {
-                    enableHighAccuracy: true,
-                    timeout: 5000,
-                    maximumAge: 0
-                });
-                isTracking = true;
+                // بدء مراقبة الموقع
+                watchId = navigator.geolocation.watchPosition(successCallback, errorCallback, { enableHighAccuracy: true });
             } else {
-                alert('خدمة الموقع غير مدعومة في المتصفح الخاص بك.');
+                alert('الموقع غير مدعوم في المتصفح.');
             }
         });
 
-        // التحقق إذا تحرك المستخدم الخريطة
-        map.on('dragend', function () {
-            userMovedMap = true;
-        });
-
-        // تبديل الأنماط
+        // تغيير نمط الخريطة بناءً على اختيار المستخدم
         document.getElementById('styleSelector').addEventListener('change', function () {
-            const selectedStyle = this.value;
+            const selectedStyle = document.getElementById('styleSelector').value;
             map.setStyle(styles[selectedStyle]);
         });
 
-        // باقي الأكواد ...
+        // تفعيل 3D
+        document.getElementById('toggle3D').addEventListener('click', function () {
+            const layers = map.getStyle().layers;
+            const labelLayerId = layers.find(
+                (layer) => layer.type === 'symbol' && layer.layout['text-field']
+            ).id;
+
+            map.addLayer({
+                'id': '3d-buildings',
+                'source': 'composite',
+                'source-layer': 'building',
+                'filter': ['==', 'extrude', 'true'],
+                'type': 'fill-extrusion',
+                'minzoom': 15,
+                'paint': {
+                    'fill-extrusion-color': '#aaa',
+                    'fill-extrusion-height': [
+                        'interpolate',
+                        ['linear'],
+                        ['zoom'],
+                        15,
+                        0,
+                        15.05,
+                        ['get', 'height']
+                    ],
+                    'fill-extrusion-base': [
+                        'interpolate',
+                        ['linear'],
+                        ['zoom'],
+                        15,
+                        0,
+                        15.05,
+                        ['get', 'min_height']
+                    ],
+                    'fill-extrusion-opacity': 0.6
+                }
+            }, labelLayerId);
+        });
     </script>
 </body>
 </html>
