@@ -144,91 +144,64 @@
         let markerElement;
         let isTracking = false; // متغير لتتبع الحالة
         let watchId; // لتخزين معرف مراقبة الموقع
+        let userMovedMap = false; // متغير لتتبع تحريك الخريطة يدويًا
 
         // تتبع الموقع اللحظي
         document.getElementById('locateButton').addEventListener('click', function () {
             if (navigator.geolocation) {
                 if (isTracking) {
-                    navigator.geolocation.clearWatch(watchId); // إيقاف المراقبة إذا كانت نشطة
-                    isTracking = false;
-                    return; // الخروج إذا كانت قيد التشغيل
+                    map.flyTo({ center: markerElement.getLngLat(), zoom: 14 });
+                    return;
+                }
+                if (userMovedMap) {
+                    map.flyTo({ center: markerElement.getLngLat(), zoom: 14 });
+                    userMovedMap = false;
+                    return;
                 }
 
-                const successCallback = function (position) {
+                watchId = navigator.geolocation.watchPosition(function (position) {
                     const latitude = position.coords.latitude;
                     const longitude = position.coords.longitude;
-
-                    // إنشاء مؤشر الاتجاه أو تحديثه
-                    if (!markerElement) {
-                        markerElement = document.createElement('div');
-                        markerElement.className = 'directionMarker';
-                        markerElement.id = 'directionMarker';
-                        new mapboxgl.Marker(markerElement).setLngLat([longitude, latitude]).addTo(map);
-                    } else {
+                    
+                    // تحديث موقع العلامة بدون تحريك الخريطة إذا تم تحريكها يدويًا
+                    if (markerElement) {
                         markerElement.setLngLat([longitude, latitude]);
+                    } else {
+                        markerElement = new mapboxgl.Marker({ color: "#ffcc00" })
+                            .setLngLat([longitude, latitude])
+                            .addTo(map);
                     }
 
-                    // تحريك الخريطة إلى الموقع الحالي بسلاسة
-                    map.flyTo({ center: [longitude, latitude], zoom: 14 });
-
-                    // تغيير الحالة إلى التتبع
+                    // تمركز الخريطة فقط إذا لم يتحرك المستخدم يدويًا
+                    if (!userMovedMap) {
+                        map.flyTo({ center: [longitude, latitude], zoom: 14 });
+                    }
+                    
                     isTracking = true;
-                };
-
-                const errorCallback = function (error) {
-                    console.error("خطأ في تحديد الموقع:", error);
-                };
-
-                // بدء مراقبة الموقع
-                watchId = navigator.geolocation.watchPosition(successCallback, errorCallback, { enableHighAccuracy: true });
-            } else {
-                alert('الموقع غير مدعوم في المتصفح.');
+                }, function (error) {
+                    console.error('Error watching position:', error);
+                }, { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 });
             }
         });
 
-        // تغيير نمط الخريطة بناءً على اختيار المستخدم
-        document.getElementById('styleSelector').addEventListener('change', function () {
-            const selectedStyle = document.getElementById('styleSelector').value;
-            map.setStyle(styles[selectedStyle]);
+        // استشعار تحريك الخريطة يدويًا
+        map.on('dragstart', function () {
+            userMovedMap = true;
         });
 
-        // تفعيل 3D
-        document.getElementById('toggle3D').addEventListener('click', function () {
-            const layers = map.getStyle().layers;
-            const labelLayerId = layers.find(
-                (layer) => layer.type === 'symbol' && layer.layout['text-field']
-            ).id;
+        // زر إيقاف تتبع الموقع
+        document.getElementById('toggleWorkerTracking').addEventListener('click', function () {
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+                markerElement = null;
+                isTracking = false;
+            }
+        });
 
-            map.addLayer({
-                'id': '3d-buildings',
-                'source': 'composite',
-                'source-layer': 'building',
-                'filter': ['==', 'extrude', 'true'],
-                'type': 'fill-extrusion',
-                'minzoom': 15,
-                'paint': {
-                    'fill-extrusion-color': '#aaa',
-                    'fill-extrusion-height': [
-                        'interpolate',
-                        ['linear'],
-                        ['zoom'],
-                        15,
-                        0,
-                        15.05,
-                        ['get', 'height']
-                    ],
-                    'fill-extrusion-base': [
-                        'interpolate',
-                        ['linear'],
-                        ['zoom'],
-                        15,
-                        0,
-                        15.05,
-                        ['get', 'min_height']
-                    ],
-                    'fill-extrusion-opacity': 0.6
-                }
-            }, labelLayerId);
+        // تغيير الأنماط
+        document.getElementById('styleSelector').addEventListener('change', function (event) {
+            const selectedStyle = event.target.value;
+            map.setStyle(styles[selectedStyle]);
         });
     </script>
 </body>
