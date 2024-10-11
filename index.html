@@ -73,10 +73,8 @@
     <div id="map"></div>
 
     <div class="controls">
-        <button id="toggleWeather" class="iconButton">
-            <i class="fas fa-cloud-sun icon"></i>
-        </button>
-        <button id="locateButton" class="iconButton">
+        <button id="toggleWeather" class="controlButton">الطقس الآن</button>
+        <button id="locateButton" class="iconButton" style="background-color: rgba(0, 255, 0, 0.8);">
             <i class="fas fa-location-arrow icon"></i>
         </button>
         <select id="styleSelector" class="controlButton">
@@ -87,8 +85,7 @@
         </select>
         <button id="toggleWorkerTracking" class="controlButton">تتبع العمال</button>
         <button id="requestWater" class="controlButton">طلب ماء</button>
-        <button id="toggle3D" class="controlButton">تفعيل العرض ثلاثي الأبعاد</button>
-        <button id="addMosque" class="controlButton">إضافة مسجد</button>
+        <button id="publicMarker" class="controlButton">وضع علامة عامة</button>
         <button id="favoriteLocations" class="controlButton">عرض المواقع المفضلة</button>
         <button id="nearbyPlaces" class="controlButton">استكشاف الأماكن القريبة</button>
         <button id="nightMode" class="controlButton">الوضع الليلي</button>
@@ -133,12 +130,23 @@
             hybrid: 'mapbox://styles/mapbox/satellite-streets-v11'
         };
 
-        // إنشاء الخريطة وعرض طرابلس عند الفتح
+        // إنشاء الخريطة وعرض طرابلس عند الفتح مع الحركة من الفضاء
         const map = new mapboxgl.Map({
             container: 'map', 
             style: styles.hybrid, 
             center: [13.1913, 32.8872], // إحداثيات طرابلس
             zoom: 12
+        });
+
+        // الحركة عند فتح الخريطة
+        map.flyTo({
+            center: [13.1913, 32.8872],
+            zoom: 14,
+            speed: 1, // سرعة الحركة
+            curve: 1, // انحناء الحركة
+            easing: function(t) {
+                return t;
+            }
         });
 
         let markerElement;
@@ -147,62 +155,105 @@
         let userMovedMap = false; // متغير لتتبع تحريك الخريطة يدويًا
 
         // تتبع الموقع اللحظي
-        document.getElementById('locateButton').addEventListener('click', function () {
+        document.getElementById('locateButton').addEventListener('click', () => {
             if (navigator.geolocation) {
-                if (isTracking) {
-                    map.flyTo({ center: markerElement.getLngLat(), zoom: 14 });
-                    return;
-                }
-                if (userMovedMap) {
-                    map.flyTo({ center: markerElement.getLngLat(), zoom: 14 });
-                    userMovedMap = false;
-                    return;
-                }
-
-                watchId = navigator.geolocation.watchPosition(function (position) {
-                    const latitude = position.coords.latitude;
-                    const longitude = position.coords.longitude;
-                    
-                    // تحديث موقع العلامة بدون تحريك الخريطة إذا تم تحريكها يدويًا
-                    if (markerElement) {
-                        markerElement.setLngLat([longitude, latitude]);
-                    } else {
-                        markerElement = new mapboxgl.Marker({ color: "#ffcc00" })
-                            .setLngLat([longitude, latitude])
-                            .addTo(map);
-                    }
-
-                    // تمركز الخريطة فقط إذا لم يتحرك المستخدم يدويًا
-                    if (!userMovedMap) {
-                        map.flyTo({ center: [longitude, latitude], zoom: 14 });
-                    }
-                    
-                    isTracking = true;
-                }, function (error) {
-                    console.error('Error watching position:', error);
-                }, { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 });
+                navigator.geolocation.getCurrentPosition(position => {
+                    const userCoordinates = [position.coords.longitude, position.coords.latitude];
+                    if (markerElement) markerElement.remove();
+                    markerElement = new mapboxgl.Marker({ color: 'red' })
+                        .setLngLat(userCoordinates)
+                        .addTo(map);
+                    map.setCenter(userCoordinates);
+                });
             }
         });
 
-        // استشعار تحريك الخريطة يدويًا
-        map.on('dragstart', function () {
-            userMovedMap = true;
+        // إضافة خيارات العلامة العامة
+        document.getElementById('publicMarker').addEventListener('click', () => {
+            const markerType = prompt("اختر علامة (1. علامة عادية، 2. علامة مميزة، 3. علامة سريعة):");
+            if (markerType) {
+                const name = prompt("أدخل اسم العلامة:");
+                const phone = prompt("أدخل رقم الهاتف:");
+                addMarker(markerType, name, phone);
+            }
         });
 
-        // زر إيقاف تتبع الموقع
-        document.getElementById('toggleWorkerTracking').addEventListener('click', function () {
-            if (watchId) {
+        // دالة لإضافة علامة
+        function addMarker(markerType, name, phone) {
+            const coordinates = map.getCenter().toArray();
+            let markerColor;
+
+            // تعيين اللون بناءً على نوع العلامة
+            switch (markerType) {
+                case '1':
+                    markerColor = 'blue';
+                    break;
+                case '2':
+                    markerColor = 'green';
+                    break;
+                case '3':
+                    markerColor = 'orange';
+                    break;
+                default:
+                    alert("نوع العلامة غير صحيح.");
+                    return;
+            }
+
+            const markerElement = new mapboxgl.Marker({ color: markerColor })
+                .setLngLat(coordinates)
+                .addTo(map);
+
+            // إضافة العلامة إلى قاعدة البيانات
+            const markerRef = database.ref('markers').push();
+            markerRef.set({
+                type: markerType,
+                coordinates: coordinates,
+                name: name,
+                phone: phone,
+                timestamp: new Date().toISOString()
+            });
+
+            // عرض رسالة تأكيد
+            alert("تم إضافة العلامة بنجاح.");
+        }
+
+        // تعيين المراقبة لتحديد الموقع
+        document.getElementById('toggleWorkerTracking').addEventListener('click', () => {
+            if (isTracking) {
                 navigator.geolocation.clearWatch(watchId);
-                markerElement = null;
                 isTracking = false;
+                alert("تم إيقاف تتبع العمال.");
+            } else {
+                watchId = navigator.geolocation.watchPosition(position => {
+                    const userCoordinates = [position.coords.longitude, position.coords.latitude];
+                    if (markerElement) markerElement.remove();
+                    markerElement = new mapboxgl.Marker({ color: 'red' })
+                        .setLngLat(userCoordinates)
+                        .addTo(map);
+                    map.setCenter(userCoordinates);
+                    if (!userMovedMap) map.flyTo({ center: userCoordinates, zoom: 14 });
+                });
+                isTracking = true;
+                alert("تم بدء تتبع العمال.");
             }
         });
 
-        // تغيير الأنماط
-        document.getElementById('styleSelector').addEventListener('change', function (event) {
-            const selectedStyle = event.target.value;
-            map.setStyle(styles[selectedStyle]);
+        // تغيير نمط الخريطة
+        document.getElementById('styleSelector').addEventListener('change', (e) => {
+            map.setStyle(styles[e.target.value]);
+            map.flyTo({ zoom: 12 }); // إعادة التكبير عند تغيير النمط
         });
+
+        // زر الطقس
+        document.getElementById('toggleWeather').addEventListener('click', () => {
+            const weatherData = getWeather(); // هنا يمكنك إدخال الدالة الخاصة بجلب بيانات الطقس
+            document.getElementById('weatherInfo').innerText = `الطقس الحالي: ${weatherData}`;
+        });
+
+        // هنا يمكنك وضع دالة لجلب بيانات الطقس
+        function getWeather() {
+            return "دافئ ومشمس"; // مثال، يجب استبداله بالدالة الفعلية
+        }
     </script>
 </body>
 </html>
