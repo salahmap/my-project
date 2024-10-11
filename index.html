@@ -73,8 +73,10 @@
     <div id="map"></div>
 
     <div class="controls">
-        <button id="toggleWeather" class="controlButton">الطقس الآن</button>
-        <button id="locateButton" class="iconButton" style="background-color: rgba(0, 255, 0, 0.8);">
+        <button id="toggleWeather" class="iconButton">
+            <i class="fas fa-cloud-sun icon"></i>
+        </button>
+        <button id="locateButton" class="iconButton">
             <i class="fas fa-location-arrow icon"></i>
         </button>
         <select id="styleSelector" class="controlButton">
@@ -85,7 +87,8 @@
         </select>
         <button id="toggleWorkerTracking" class="controlButton">تتبع العمال</button>
         <button id="requestWater" class="controlButton">طلب ماء</button>
-        <button id="publicMarker" class="controlButton">وضع علامة عامة</button>
+        <button id="toggle3D" class="controlButton">تفعيل العرض ثلاثي الأبعاد</button>
+        <button id="addMosque" class="controlButton">إضافة مسجد</button>
         <button id="favoriteLocations" class="controlButton">عرض المواقع المفضلة</button>
         <button id="nearbyPlaces" class="controlButton">استكشاف الأماكن القريبة</button>
         <button id="nightMode" class="controlButton">الوضع الليلي</button>
@@ -130,23 +133,29 @@
             hybrid: 'mapbox://styles/mapbox/satellite-streets-v11'
         };
 
-        // إنشاء الخريطة وعرض طرابلس عند الفتح مع الحركة من الفضاء
+        // إنشاء الخريطة وعرض منظر فضائي
         const map = new mapboxgl.Map({
             container: 'map', 
             style: styles.hybrid, 
             center: [13.1913, 32.8872], // إحداثيات طرابلس
-            zoom: 12
+            zoom: 2, // تكبير لرؤية الأرض بالكامل
+            pitch: 60 // ضبط الزاوية لتعطي شعوراً بالارتفاع
         });
 
-        // الحركة عند فتح الخريطة
-        map.flyTo({
-            center: [13.1913, 32.8872],
-            zoom: 14,
-            speed: 1, // سرعة الحركة
-            curve: 1, // انحناء الحركة
-            easing: function(t) {
-                return t;
-            }
+        // الحركة نحو طرابلس بعد تحميل الخريطة
+        function flyToTripoli() {
+            map.flyTo({
+                center: [13.1913, 32.8872], // إحداثيات طرابلس
+                zoom: 12, // تكبير إلى مستوى الشارع
+                pitch: 0, // إزالة الميل أثناء الانتقال
+                speed: 1, // سرعة الحركة
+                curve: 1, // مرونة الحركة
+                easing: (t) => t // أسلوب الحركة
+            });
+        }
+
+        map.on('load', function() {
+            flyToTripoli(); // قم بتحريك الخريطة إلى طرابلس عند تحميلها
         });
 
         let markerElement;
@@ -155,105 +164,93 @@
         let userMovedMap = false; // متغير لتتبع تحريك الخريطة يدويًا
 
         // تتبع الموقع اللحظي
-        document.getElementById('locateButton').addEventListener('click', () => {
+        document.getElementById('locateButton').addEventListener('click', function () {
             if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(position => {
-                    const userCoordinates = [position.coords.longitude, position.coords.latitude];
-                    if (markerElement) markerElement.remove();
-                    markerElement = new mapboxgl.Marker({ color: 'red' })
-                        .setLngLat(userCoordinates)
-                        .addTo(map);
-                    map.setCenter(userCoordinates);
-                });
-            }
-        });
-
-        // إضافة خيارات العلامة العامة
-        document.getElementById('publicMarker').addEventListener('click', () => {
-            const markerType = prompt("اختر علامة (1. علامة عادية، 2. علامة مميزة، 3. علامة سريعة):");
-            if (markerType) {
-                const name = prompt("أدخل اسم العلامة:");
-                const phone = prompt("أدخل رقم الهاتف:");
-                addMarker(markerType, name, phone);
-            }
-        });
-
-        // دالة لإضافة علامة
-        function addMarker(markerType, name, phone) {
-            const coordinates = map.getCenter().toArray();
-            let markerColor;
-
-            // تعيين اللون بناءً على نوع العلامة
-            switch (markerType) {
-                case '1':
-                    markerColor = 'blue';
-                    break;
-                case '2':
-                    markerColor = 'green';
-                    break;
-                case '3':
-                    markerColor = 'orange';
-                    break;
-                default:
-                    alert("نوع العلامة غير صحيح.");
+                if (isTracking) {
+                    map.flyTo({ center: markerElement.getLngLat(), zoom: 14 });
                     return;
-            }
+                }
+                if (userMovedMap) {
+                    map.flyTo({ center: markerElement.getLngLat(), zoom: 14 });
+                    userMovedMap = false;
+                    return;
+                }
 
-            const markerElement = new mapboxgl.Marker({ color: markerColor })
-                .setLngLat(coordinates)
-                .addTo(map);
+                watchId = navigator.geolocation.watchPosition(function (position) {
+                    const latitude = position.coords.latitude;
+                    const longitude = position.coords.longitude;
 
-            // إضافة العلامة إلى قاعدة البيانات
-            const markerRef = database.ref('markers').push();
-            markerRef.set({
-                type: markerType,
-                coordinates: coordinates,
-                name: name,
-                phone: phone,
-                timestamp: new Date().toISOString()
-            });
+                    if (!markerElement) {
+                        markerElement = new mapboxgl.Marker({ color: '#FF0000' })
+                            .setLngLat([longitude, latitude])
+                            .addTo(map);
+                    } else {
+                        markerElement.setLngLat([longitude, latitude]);
+                    }
 
-            // عرض رسالة تأكيد
-            alert("تم إضافة العلامة بنجاح.");
-        }
-
-        // تعيين المراقبة لتحديد الموقع
-        document.getElementById('toggleWorkerTracking').addEventListener('click', () => {
-            if (isTracking) {
-                navigator.geolocation.clearWatch(watchId);
-                isTracking = false;
-                alert("تم إيقاف تتبع العمال.");
-            } else {
-                watchId = navigator.geolocation.watchPosition(position => {
-                    const userCoordinates = [position.coords.longitude, position.coords.latitude];
-                    if (markerElement) markerElement.remove();
-                    markerElement = new mapboxgl.Marker({ color: 'red' })
-                        .setLngLat(userCoordinates)
-                        .addTo(map);
-                    map.setCenter(userCoordinates);
-                    if (!userMovedMap) map.flyTo({ center: userCoordinates, zoom: 14 });
+                    if (!isTracking) {
+                        map.flyTo({ center: [longitude, latitude], zoom: 14 });
+                    }
                 });
-                isTracking = true;
-                alert("تم بدء تتبع العمال.");
+
+                isTracking = true; // تحديث حالة تتبع الموقع
+            } else {
+                alert('الموقع غير مدعوم.');
             }
+        });
+
+        // إيقاف تتبع الموقع
+        map.on('move', function () {
+            userMovedMap = true;
+        });
+
+        document.getElementById('toggleWorkerTracking').addEventListener('click', function () {
+            // قم بتفعيل أو إلغاء تفعيل تتبع العمال هنا
+        });
+
+        document.getElementById('requestWater').addEventListener('click', function () {
+            alert('تم طلب الماء.');
+        });
+
+        document.getElementById('toggle3D').addEventListener('click', function () {
+            const is3DEnabled = map.getPitch() === 60;
+            map.setPitch(is3DEnabled ? 0 : 60); // تغيير بين 3D و 2D
         });
 
         // تغيير نمط الخريطة
-        document.getElementById('styleSelector').addEventListener('change', (e) => {
-            map.setStyle(styles[e.target.value]);
-            map.flyTo({ zoom: 12 }); // إعادة التكبير عند تغيير النمط
+        document.getElementById('styleSelector').addEventListener('change', function (e) {
+            const selectedStyle = styles[e.target.value];
+            map.setStyle(selectedStyle);
+
+            // تكبير الخريطة بشكل سلس عند تغيير النمط
+            map.flyTo({ center: map.getCenter(), zoom: 12, speed: 1, curve: 1, easing: (t) => t });
         });
 
-        // زر الطقس
-        document.getElementById('toggleWeather').addEventListener('click', () => {
-            const weatherData = getWeather(); // هنا يمكنك إدخال الدالة الخاصة بجلب بيانات الطقس
-            document.getElementById('weatherInfo').innerText = `الطقس الحالي: ${weatherData}`;
+        // إضافة المساجد
+        document.getElementById('addMosque').addEventListener('click', function () {
+            alert('إضافة مسجد قريبة.');
         });
 
-        // هنا يمكنك وضع دالة لجلب بيانات الطقس
-        function getWeather() {
-            return "دافئ ومشمس"; // مثال، يجب استبداله بالدالة الفعلية
-        }
+        // عرض المواقع المفضلة
+        document.getElementById('favoriteLocations').addEventListener('click', function () {
+            alert('عرض المواقع المفضلة.');
+        });
+
+        // استكشاف الأماكن القريبة
+        document.getElementById('nearbyPlaces').addEventListener('click', function () {
+            alert('استكشاف الأماكن القريبة.');
+        });
+
+        // الوضع الليلي
+        document.getElementById('nightMode').addEventListener('click', function () {
+            document.body.style.backgroundColor = document.body.style.backgroundColor === 'black' ? '#f4f4f4' : 'black';
+            document.body.style.color = document.body.style.color === 'white' ? 'black' : 'white';
+        });
+
+        // عرض المساجد القريبة
+        document.getElementById('showMosques').addEventListener('click', function () {
+            alert('عرض المساجد القريبة.');
+        });
     </script>
 </body>
 </html>
