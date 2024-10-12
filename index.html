@@ -106,27 +106,27 @@
             container: 'map',
             style: styles.hybrid,
             center: [13.1897, 32.8872], // إحداثيات ليبيا
-            zoom: 1, // التكبير المبدئي للعالم (من الفضاء)
-            pitch: 0, // ميل الخريطة
-            bearing: 0, // دوران الخريطة
+            zoom: 1,  // مستوى تكبير منخفض جدًا (يمثل الفضاء)
+            pitch: 0,  // لا يوجد ميل عند البدء
+            bearing: 0, // دوران الخريطة عند البدء
             antialias: true
         });
 
-        // حركة حديثة عند تحميل الخريطة
+        // حركة من الفضاء إلى ليبيا عند تحميل الخريطة
         map.on('load', () => {
-            // حركة الطيران من الفضاء إلى طرابلس
+            // إضافة حركة سلسة تبدأ من الفضاء باتجاه ليبيا
             setTimeout(() => {
                 map.flyTo({
-                    center: [13.1897, 32.8872], // إحداثيات طرابلس
-                    zoom: 12, // التكبير النهائي لطرابلس
-                    speed: 0.6, // السرعة
-                    curve: 1.5, // السلاسة
-                    pitch: 45, // ميل الخريطة إلى 45 درجة
-                    bearing: -17.6, // دوران الخريطة
-                    easing: (t) => t, // التأثير
-                    essential: true // تأكيد الحركة
+                    center: [13.1897, 32.8872],  // إحداثيات طرابلس، ليبيا
+                    zoom: 12,  // مستوى تكبير نحو طرابلس
+                    pitch: 45,  // إمالة الخريطة لإعطاء تأثير ثلاثي الأبعاد
+                    bearing: -17.6,  // دوران الخريطة بشكل طفيف
+                    speed: 0.8,  // سرعة الحركة
+                    curve: 1.4,  // سلاسة الحركة
+                    easing: (t) => t,  // وظيفة لتحديد كيف تكون الحركة
+                    essential: true  // يضمن أن الحركة تعمل في جميع الظروف
                 });
-            }, 2000); // الانتظار لثانيتين قبل بدء الحركة
+            }, 2000);  // التأخير لمدة ثانيتين قبل بدء الحركة
 
             // إضافة المساجد الافتراضية (يمكن تعديلها لاحقًا)
             const mosques = [
@@ -184,10 +184,46 @@
             const weatherInfoDiv = document.getElementById('weatherInfo');
             if (weatherInfoDiv.style.display === 'none') {
                 weatherInfoDiv.style.display = 'block';
-                weatherInfoDiv.innerHTML = '<h4>الطقس: مشمس</h4>';
+                weatherInfoDiv.innerHTML = 'طقس اليوم: 25 درجة مئوية مشمس';
             } else {
                 weatherInfoDiv.style.display = 'none';
             }
+        });
+
+        // تتبع العمال
+        const toggleWorkerTrackingButton = document.getElementById('toggleWorkerTracking');
+        toggleWorkerTrackingButton.addEventListener('click', () => {
+            const workerInfoDiv = document.getElementById('workerInfo');
+            if (workerInfoDiv.style.display === 'none') {
+                workerInfoDiv.style.display = 'block';
+                workerInfoDiv.innerHTML = 'الموقع الحالي للعمال: جاري التتبع...';
+            } else {
+                workerInfoDiv.style.display = 'none';
+            }
+        });
+
+        // طلب الماء
+        const requestWaterButton = document.getElementById('requestWater');
+        requestWaterButton.addEventListener('click', () => {
+            alert('تم طلب الماء بنجاح.');
+        });
+
+        // تفعيل العرض ثلاثي الأبعاد
+        const toggle3DButton = document.getElementById('toggle3D');
+        toggle3DButton.addEventListener('click', () => {
+            const is3D = map.getPitch() > 0;
+            map.easeTo({ pitch: is3D ? 0 : 45 });
+        });
+
+        // إضافة مسجد جديد
+        const addMosqueButton = document.getElementById('addMosque');
+        addMosqueButton.addEventListener('click', () => {
+            const mosqueCoords = [map.getCenter().lng, map.getCenter().lat];
+            new mapboxgl.Marker({ color: 'blue' })
+                .setLngLat(mosqueCoords)
+                .setPopup(new mapboxgl.Popup().setText('مسجد جديد'))
+                .addTo(map);
+            alert('تم إضافة مسجد جديد.');
         });
     </script>
 </body>
