@@ -133,29 +133,12 @@
             hybrid: 'mapbox://styles/mapbox/satellite-streets-v11'
         };
 
-        // إنشاء الخريطة وعرض منظر فضائي
+        // إنشاء الخريطة وعرض طرابلس عند الفتح
         const map = new mapboxgl.Map({
             container: 'map', 
             style: styles.hybrid, 
             center: [13.1913, 32.8872], // إحداثيات طرابلس
-            zoom: 2, // تكبير لرؤية الأرض بالكامل
-            pitch: 60 // ضبط الزاوية لتعطي شعوراً بالارتفاع
-        });
-
-        // الحركة نحو طرابلس بعد تحميل الخريطة
-        function flyToTripoli() {
-            map.flyTo({
-                center: [13.1913, 32.8872], // إحداثيات طرابلس
-                zoom: 12, // تكبير إلى مستوى الشارع
-                pitch: 0, // إزالة الميل أثناء الانتقال
-                speed: 1, // سرعة الحركة
-                curve: 1, // مرونة الحركة
-                easing: (t) => t // أسلوب الحركة
-            });
-        }
-
-        map.on('load', function() {
-            flyToTripoli(); // قم بتحريك الخريطة إلى طرابلس عند تحميلها
+            zoom: 12
         });
 
         let markerElement;
@@ -179,77 +162,46 @@
                 watchId = navigator.geolocation.watchPosition(function (position) {
                     const latitude = position.coords.latitude;
                     const longitude = position.coords.longitude;
-
-                    if (!markerElement) {
-                        markerElement = new mapboxgl.Marker({ color: '#FF0000' })
+                    
+                    // تحديث موقع العلامة بدون تحريك الخريطة إذا تم تحريكها يدويًا
+                    if (markerElement) {
+                        markerElement.setLngLat([longitude, latitude]);
+                    } else {
+                        markerElement = new mapboxgl.Marker({ color: "#ffcc00" })
                             .setLngLat([longitude, latitude])
                             .addTo(map);
-                    } else {
-                        markerElement.setLngLat([longitude, latitude]);
                     }
 
-                    if (!isTracking) {
+                    // تمركز الخريطة فقط إذا لم يتحرك المستخدم يدويًا
+                    if (!userMovedMap) {
                         map.flyTo({ center: [longitude, latitude], zoom: 14 });
                     }
-                });
-
-                isTracking = true; // تحديث حالة تتبع الموقع
-            } else {
-                alert('الموقع غير مدعوم.');
+                    
+                    isTracking = true;
+                }, function (error) {
+                    console.error('Error watching position:', error);
+                }, { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 });
             }
         });
 
-        // إيقاف تتبع الموقع
-        map.on('move', function () {
+        // استشعار تحريك الخريطة يدويًا
+        map.on('dragstart', function () {
             userMovedMap = true;
         });
 
+        // زر إيقاف تتبع الموقع
         document.getElementById('toggleWorkerTracking').addEventListener('click', function () {
-            // قم بتفعيل أو إلغاء تفعيل تتبع العمال هنا
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+                markerElement = null;
+                isTracking = false;
+            }
         });
 
-        document.getElementById('requestWater').addEventListener('click', function () {
-            alert('تم طلب الماء.');
-        });
-
-        document.getElementById('toggle3D').addEventListener('click', function () {
-            const is3DEnabled = map.getPitch() === 60;
-            map.setPitch(is3DEnabled ? 0 : 60); // تغيير بين 3D و 2D
-        });
-
-        // تغيير نمط الخريطة
-        document.getElementById('styleSelector').addEventListener('change', function (e) {
-            const selectedStyle = styles[e.target.value];
-            map.setStyle(selectedStyle);
-
-            // تكبير الخريطة بشكل سلس عند تغيير النمط
-            map.flyTo({ center: map.getCenter(), zoom: 12, speed: 1, curve: 1, easing: (t) => t });
-        });
-
-        // إضافة المساجد
-        document.getElementById('addMosque').addEventListener('click', function () {
-            alert('إضافة مسجد قريبة.');
-        });
-
-        // عرض المواقع المفضلة
-        document.getElementById('favoriteLocations').addEventListener('click', function () {
-            alert('عرض المواقع المفضلة.');
-        });
-
-        // استكشاف الأماكن القريبة
-        document.getElementById('nearbyPlaces').addEventListener('click', function () {
-            alert('استكشاف الأماكن القريبة.');
-        });
-
-        // الوضع الليلي
-        document.getElementById('nightMode').addEventListener('click', function () {
-            document.body.style.backgroundColor = document.body.style.backgroundColor === 'black' ? '#f4f4f4' : 'black';
-            document.body.style.color = document.body.style.color === 'white' ? 'black' : 'white';
-        });
-
-        // عرض المساجد القريبة
-        document.getElementById('showMosques').addEventListener('click', function () {
-            alert('عرض المساجد القريبة.');
+        // تغيير الأنماط
+        document.getElementById('styleSelector').addEventListener('change', function (event) {
+            const selectedStyle = event.target.value;
+            map.setStyle(styles[selectedStyle]);
         });
     </script>
 </body>
