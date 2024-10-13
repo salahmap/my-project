@@ -155,11 +155,11 @@
         document.getElementById('locateButton').addEventListener('click', function () {
             if (navigator.geolocation) {
                 if (isTracking) {
-                    map.flyTo({ center: markerElement.getLngLat(), zoom: 14 });
+                    map.flyTo({ center: markerElement.getLngLat(), zoom: 16 }); // تم تعديل الزوم إلى 16
                     return;
                 }
                 if (userMovedMap) {
-                    map.flyTo({ center: markerElement.getLngLat(), zoom: 14 });
+                    map.flyTo({ center: markerElement.getLngLat(), zoom: 16 }); // تم تعديل الزوم إلى 16
                     userMovedMap = false;
                     return;
                 }
@@ -180,24 +180,22 @@
                     if (!userMovedMap) {
                         map.flyTo({
                             center: [longitude, latitude],
-                            zoom: 14
+                            zoom: 16 // تم تعديل الزوم إلى 16
                         });
                     }
+
                 }, function (error) {
-                    console.log("خطأ في الحصول على الموقع: ", error);
+                    console.error('حدث خطأ في تحديد الموقع: ', error);
                 });
                 isTracking = true;
             } else {
-                console.log("تتبع الموقع غير مدعوم.");
+                console.error('المتصفح لا يدعم خاصية تتبع الموقع');
             }
         });
 
-        map.on('drag', () => { userMovedMap = true; });
-
-        // تغيير نمط الخريطة بناءً على الاختيار
-        document.getElementById('styleSelector').addEventListener('change', function () {
-            const selectedStyle = this.value;
-            map.setStyle(styles[selectedStyle]);
+        // منع تحريك الخريطة تلقائيًا إذا قام المستخدم بتحريكها يدويًا
+        map.on('dragstart', function () {
+            userMovedMap = true;
         });
     </script>
 </body>
