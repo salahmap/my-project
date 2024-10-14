@@ -58,6 +58,46 @@
         .icon:hover {
             color: #e64a19;
         }
+
+        /* تخصيص زر تحديد الموقع ليكون في الأسفل جهة اليمين */
+        #locateButton {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            width: 60px;
+            height: 60px;
+            background: url('/mnt/data/photo_2024-10-14_14-49-51-removebg-preview.png') no-repeat center;
+            background-size: contain;
+            cursor: pointer;
+        }
+
+        /* تخصيص زر الطقس ليكون نصيًا */
+        #toggleWeather {
+            background-color: rgba(255, 87, 34, 0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        #toggleWeather:hover {
+            background-color: rgba(255, 87, 34, 1);
+        }
+
+        #weatherInfo {
+            padding: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            border-radius: 5px;
+            display: none;
+            position: absolute;
+            top: 100px;
+            right: 10px;
+            z-index: 2;
+        }
     </style>
 </head>
 <body>
@@ -65,12 +105,8 @@
     <div id="map"></div>
 
     <div class="controls">
-        <button id="toggleWeather" class="iconButton">
-            <i class="fas fa-cloud-sun icon"></i>
-        </button>
-        <button id="locateButton" class="iconButton">
-            <i class="fas fa-location-arrow icon"></i>
-        </button>
+        <button id="toggleWeather" class="iconButton">الطقس الآن</button>
+        <button id="locateButton"></button>
         <select id="styleSelector" class="controlButton">
             <option value="streets">شوارع</option>
             <option value="satellite">الأقمار الصناعية</option>
@@ -139,63 +175,48 @@
                 center: [13.1913, 32.8872], // موقع طرابلس
                 zoom: 12, // زوم مقرب إلى طرابلس
                 speed: 0.8, // سرعة التحرك
-                curve: 1, // منحنى الحركة لجعلها سلسة
+                curve: 1.5, // درجة الانحناء
                 easing: function (t) {
-                    return t * (2 - t); // دالة الحركة لتخفيف السرعة بسلاسة
+                    return t;
                 }
             });
         });
 
-        let markerElement;
-        let isTracking = false; // متغير لتتبع الحالة
-        let watchId; // لتخزين معرف مراقبة الموقع
-        let userMovedMap = false; // متغير لتتبع تحريك الخريطة يدويًا
+        // تغيير نمط الخريطة بناءً على الاختيار من القائمة
+        document.getElementById('styleSelector').addEventListener('change', function () {
+            map.setStyle(styles[this.value]);
+        });
 
-        // تتبع الموقع اللحظي
+        // تحديث الموقع الخاص بالمستخدم عند الضغط على زر تحديد الموقع
         document.getElementById('locateButton').addEventListener('click', function () {
             if (navigator.geolocation) {
-                if (isTracking) {
-                    map.flyTo({ center: markerElement.getLngLat(), zoom: 16 }); // تم تعديل الزوم إلى 16
-                    return;
-                }
-                if (userMovedMap) {
-                    map.flyTo({ center: markerElement.getLngLat(), zoom: 16 }); // تم تعديل الزوم إلى 16
-                    userMovedMap = false;
-                    return;
-                }
-
-                watchId = navigator.geolocation.watchPosition(function (position) {
-                    const latitude = position.coords.latitude;
-                    const longitude = position.coords.longitude;
-                    
-                    // تحديث موقع العلامة بدون تحريك الخريطة إذا تم تحريكها يدويًا
-                    if (markerElement) {
-                        markerElement.setLngLat([longitude, latitude]);
-                    } else {
-                        markerElement = new mapboxgl.Marker({ color: "#ffcc00" })
-                            .setLngLat([longitude, latitude])
-                            .addTo(map);
-                    }
-
-                    if (!userMovedMap) {
-                        map.flyTo({
-                            center: [longitude, latitude],
-                            zoom: 16 // تم تعديل الزوم إلى 16
-                        });
-                    }
-
-                }, function (error) {
-                    console.error('حدث خطأ في تحديد الموقع: ', error);
+                navigator.geolocation.getCurrentPosition(function (position) {
+                    const lng = position.coords.longitude;
+                    const lat = position.coords.latitude;
+                    map.flyTo({ center: [lng, lat], zoom: 14 });
                 });
-                isTracking = true;
             } else {
-                console.error('المتصفح لا يدعم خاصية تتبع الموقع');
+                alert('الرجاء تمكين تحديد الموقع الجغرافي.');
             }
         });
 
-        // منع تحريك الخريطة تلقائيًا إذا قام المستخدم بتحريكها يدويًا
-        map.on('dragstart', function () {
-            userMovedMap = true;
+        // إعداد عرض الطقس
+        document.getElementById('toggleWeather').addEventListener('click', function () {
+            const weatherInfo = document.getElementById('weatherInfo');
+            weatherInfo.style.display = (weatherInfo.style.display === 'none') ? 'block' : 'none';
+
+            if (weatherInfo.innerHTML === '') {
+                fetch('https://api.openweathermap.org/data/2.5/weather?q=Tripoli,LY&appid=0b2462eb11574ad95c493001cb5c9c69&units=metric')
+                    .then(response => response.json())
+                    .then(data => {
+                        const weatherDescription = data.weather[0].description;
+                        const temp = data.main.temp;
+                        weatherInfo.innerHTML = `الطقس: ${weatherDescription}, درجة الحرارة: ${temp}°C`;
+                    })
+                    .catch(err => {
+                        weatherInfo.innerHTML = 'فشل في جلب بيانات الطقس.';
+                    });
+            }
         });
     </script>
 </body>
