@@ -58,45 +58,25 @@
         .icon:hover {
             color: #e64a19;
         }
-
-        /* تخصيص زر تحديد الموقع ليكون في الأسفل جهة اليمين */
-        #locateButton {
+        #locateButtonContainer {
             position: absolute;
-            bottom: 10px;
-            right: 10px;
-            width: 60px;
-            height: 60px;
-            background: url('/mnt/data/photo_2024-10-14_14-49-51-removebg-preview.png') no-repeat center;
-            background-size: contain;
-            cursor: pointer;
+            bottom: 20px; /* مسافة من الأسفل */
+            right: 20px; /* مسافة من اليمين */
+            z-index: 2;
         }
-
-        /* تخصيص زر الطقس ليكون نصيًا */
-        #toggleWeather {
-            background-color: rgba(255, 87, 34, 0.8);
-            color: white;
-            padding: 10px;
-            border-radius: 10px;
+        #locateButton {
+            background-color: rgba(30, 144, 255, 0.8);
             border: none;
-            cursor: pointer;
+            border-radius: 10px;
+            padding: 10px;
+            color: white;
             font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
             font-size: 14px;
         }
-
-        #toggleWeather:hover {
-            background-color: rgba(255, 87, 34, 1);
-        }
-
-        #weatherInfo {
-            padding: 10px;
-            background-color: rgba(0, 0, 0, 0.7);
-            color: white;
-            border-radius: 5px;
-            display: none;
-            position: absolute;
-            top: 100px;
-            right: 10px;
-            z-index: 2;
+        #locateButton:hover {
+            background-color: rgba(30, 144, 255, 1);
         }
     </style>
 </head>
@@ -105,27 +85,29 @@
     <div id="map"></div>
 
     <div class="controls">
-        <button id="toggleWeather" class="iconButton">الطقس الآن</button>
-        <button id="locateButton"></button>
+        <button id="toggleWeather" class="iconButton">
+            <i class="fas fa-cloud-sun icon"></i>
+        </button>
         <select id="styleSelector" class="controlButton">
             <option value="streets">شوارع</option>
             <option value="satellite">الأقمار الصناعية</option>
             <option value="outdoors">خارجية</option>
             <option value="hybrid" selected>هايبرد</option>
+            <option value="dark">الوضع الليلي</option> <!-- إضافة الوضع الليلي هنا -->
         </select>
-        <button id="toggleWorkerTracking" class="controlButton">تتبع العمال</button>
         <button id="requestWater" class="controlButton">طلب ماء</button>
-        <button id="toggle3D" class="controlButton">تفعيل العرض ثلاثي الأبعاد</button>
-        <button id="addMosque" class="controlButton">إضافة مسجد</button>
-        <button id="favoriteLocations" class="controlButton">عرض المواقع المفضلة</button>
-        <button id="nearbyPlaces" class="controlButton">استكشاف الأماكن القريبة</button>
-        <button id="nightMode" class="controlButton">الوضع الليلي</button>
-        <button id="showMosques" class="controlButton">عرض المساجد القريبة</button>
+        <button id="toggle3D" class="controlButton">3D</button> <!-- تغيير اسم الزر هنا -->
+        <button id="showMosques" class="controlButton">عرض المساجد القريبة</button> <!-- زر عرض المساجد -->
         <div id="weatherInfo"></div>
         <div id="workerInfo"></div>
         <div id="mosqueInfo"></div>
+        <div id="distanceInfo" style="display: none;"></div> <!-- معلومات المسافة -->
     </div>
-    
+
+    <div id="locateButtonContainer">
+        <button id="locateButton">تحديد موقعي</button>
+    </div>
+
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.js"></script>
     <script src="https://unpkg.com/@turf/turf"></script>
     <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.js"></script>
@@ -158,7 +140,8 @@
             streets: 'mapbox://styles/mapbox/streets-v11',
             satellite: 'mapbox://styles/mapbox/satellite-v9',
             outdoors: 'mapbox://styles/mapbox/outdoors-v11',
-            hybrid: 'mapbox://styles/mapbox/satellite-streets-v11'
+            hybrid: 'mapbox://styles/mapbox/satellite-streets-v11',
+            dark: 'mapbox://styles/mapbox/dark-v10' // إضافة نمط الوضع الليلي
         };
 
         // إنشاء الخريطة مع زوم منخفض جدًا كأنك ترى الأرض من الفضاء
@@ -175,47 +158,190 @@
                 center: [13.1913, 32.8872], // موقع طرابلس
                 zoom: 12, // زوم مقرب إلى طرابلس
                 speed: 0.8, // سرعة التحرك
-                curve: 1.5, // درجة الانحناء
+                curve: 1, // منحنى الحركة لجعلها سلسة
                 easing: function (t) {
-                    return t;
+                    return t * (2 - t); // دالة الحركة لتخفيف السرعة بسلاسة
                 }
             });
         });
 
-        // تغيير نمط الخريطة بناءً على الاختيار من القائمة
-        document.getElementById('styleSelector').addEventListener('change', function () {
-            map.setStyle(styles[this.value]);
-        });
+        let markerElement;
+        let isTracking = false; // متغير لتتبع الحالة
+        let watchId; // لتخزين معرف مراقبة الموقع
+        const workerMarkers = []; // مصفوفة لتخزين علامات العمال
 
-        // تحديث الموقع الخاص بالمستخدم عند الضغط على زر تحديد الموقع
+        // تتبع الموقع اللحظي للمستخدم
         document.getElementById('locateButton').addEventListener('click', function () {
             if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(function (position) {
-                    const lng = position.coords.longitude;
+                if (isTracking) {
+                    map.flyTo({
+                        center: [markerElement.getLngLat().lng, markerElement.getLngLat().lat], 
+                        zoom: 14
+                    });
+                    return; 
+                }
+                watchId = navigator.geolocation.watchPosition(function (position) {
                     const lat = position.coords.latitude;
-                    map.flyTo({ center: [lng, lat], zoom: 14 });
+                    const lng = position.coords.longitude;
+
+                    if (!markerElement) {
+                        markerElement = new mapboxgl.Marker({
+                            color: 'blue'
+                        })
+                            .setLngLat([lng, lat])
+                            .addTo(map);
+                    } else {
+                        markerElement.setLngLat([lng, lat]);
+                    }
+
+                    // إظهار العمال القريبين
+                    showNearbyWorkers(lat, lng);
+                    isTracking = true;
+                }, function (error) {
+                    console.error(error);
+                }, {
+                    enableHighAccuracy: true
                 });
             } else {
-                alert('الرجاء تمكين تحديد الموقع الجغرافي.');
+                alert('الجغرافيا غير مدعومة في هذا المتصفح.');
             }
         });
 
-        // إعداد عرض الطقس
+        // وظيفة لإظهار العمال القريبين
+        function showNearbyWorkers(lat, lng) {
+            const workersRef = database.ref('workers');
+            workersRef.once('value').then(snapshot => {
+                const workersData = snapshot.val();
+                if (workersData) {
+                    for (const workerId in workersData) {
+                        const worker = workersData[workerId];
+                        const workerLat = worker.location.latitude;
+                        const workerLng = worker.location.longitude;
+
+                        const distance = turf.distance([lng, lat], [workerLng, workerLat], { units: 'kilometers' });
+
+                        if (distance <= 5) { // 5 كم
+                            const marker = new mapboxgl.Marker({ color: 'green' })
+                                .setLngLat([workerLng, workerLat])
+                                .addTo(map);
+                            workerMarkers.push(marker); // إضافة العلامة للمصفوفة
+                        }
+                    }
+                }
+            });
+        }
+
+        // حدث زر تغيير نمط الخريطة
+        document.getElementById('styleSelector').addEventListener('change', function () {
+            const selectedStyle = styles[this.value];
+            map.setStyle(selectedStyle);
+        });
+
+        // حدث زر عرض المساجد القريبة
+        document.getElementById('showMosques').addEventListener('click', function () {
+            if (markerElement) {
+                const userLocation = markerElement.getLngLat();
+                const userLat = userLocation.lat;
+                const userLng = userLocation.lng;
+                showNearbyMosques(userLat, userLng);
+            } else {
+                alert('يرجى تحديد موقعك أولاً.');
+            }
+        });
+
+        // وظيفة لإظهار المساجد القريبة
+        function showNearbyMosques(userLat, userLng) {
+            const mosquesRef = database.ref('mosques');
+            mosquesRef.once('value').then(snapshot => {
+                const mosquesData = snapshot.val();
+                if (mosquesData) {
+                    const nearbyMosques = [];
+                    for (const mosqueId in mosquesData) {
+                        const mosque = mosquesData[mosqueId];
+                        const mosqueLat = mosque.location.latitude;
+                        const mosqueLng = mosque.location.longitude;
+
+                        const distance = turf.distance([userLng, userLat], [mosqueLng, mosqueLat], { units: 'kilometers' });
+                        
+                        if (distance <= 1.5) { // 1500 متر
+                            const marker = new mapboxgl.Marker({ color: 'red' })
+                                .setLngLat([mosqueLng, mosqueLat])
+                                .addTo(map);
+                            nearbyMosques.push(mosque);
+                            const path = turf.lineString([[userLng, userLat], [mosqueLng, mosqueLat]]);
+                            map.addSource('route', {
+                                'type': 'geojson',
+                                'data': path
+                            });
+                            map.addLayer({
+                                'id': 'route',
+                                'type': 'line',
+                                'source': 'route',
+                                'layout': {
+                                    'line-join': 'round',
+                                    'line-cap': 'round'
+                                },
+                                'paint': {
+                                    'line-color': '#888',
+                                    'line-width': 8
+                                }
+                            });
+                        }
+                    }
+                    // إظهار معلومات المساجد
+                    if (nearbyMosques.length > 0) {
+                        let mosqueInfoHtml = '<h3>المساجد القريبة:</h3><ul>';
+                        nearbyMosques.forEach(mosque => {
+                            mosqueInfoHtml += `<li>${mosque.name}</li>`;
+                        });
+                        mosqueInfoHtml += '</ul>';
+                        document.getElementById('mosqueInfo').innerHTML = mosqueInfoHtml;
+                        document.getElementById('mosqueInfo').style.display = 'block';
+                    } else {
+                        document.getElementById('mosqueInfo').innerHTML = '<p>لا توجد مساجد قريبة.</p>';
+                    }
+                }
+            });
+        }
+
+        // حدث زر طلب الماء
+        document.getElementById('requestWater').addEventListener('click', function () {
+            if (markerElement) {
+                const userLocation = markerElement.getLngLat();
+                const userLat = userLocation.lat;
+                const userLng = userLocation.lng;
+
+                // تخزين الطلب في قاعدة البيانات
+                const requestRef = database.ref('waterRequests').push();
+                requestRef.set({
+                    userId: "userIdPlaceholder", // استبدل بمعرف المستخدم الفعلي
+                    location: {
+                        latitude: userLat,
+                        longitude: userLng
+                    },
+                    timestamp: firebase.database.ServerValue.TIMESTAMP
+                }).then(() => {
+                    alert('تم إرسال طلب الماء بنجاح!');
+                });
+            } else {
+                alert('يرجى تحديد موقعك أولاً.');
+            }
+        });
+
+        // حدث زر 3D
+        document.getElementById('toggle3D').addEventListener('click', function () {
+            const currentPitch = map.getPitch();
+            map.setPitch(currentPitch === 0 ? 60 : 0); // تبديل بين 0 و 60 درجة
+        });
+
+        // حدث زر توقعات الطقس
         document.getElementById('toggleWeather').addEventListener('click', function () {
             const weatherInfo = document.getElementById('weatherInfo');
-            weatherInfo.style.display = (weatherInfo.style.display === 'none') ? 'block' : 'none';
-
-            if (weatherInfo.innerHTML === '') {
-                fetch('https://api.openweathermap.org/data/2.5/weather?q=Tripoli,LY&appid=0b2462eb11574ad95c493001cb5c9c69&units=metric')
-                    .then(response => response.json())
-                    .then(data => {
-                        const weatherDescription = data.weather[0].description;
-                        const temp = data.main.temp;
-                        weatherInfo.innerHTML = `الطقس: ${weatherDescription}, درجة الحرارة: ${temp}°C`;
-                    })
-                    .catch(err => {
-                        weatherInfo.innerHTML = 'فشل في جلب بيانات الطقس.';
-                    });
+            if (weatherInfo.style.display === 'none') {
+                weatherInfo.style.display = 'block';
+                weatherInfo.innerHTML = 'سيتم عرض معلومات الطقس هنا.';
+            } else {
+                weatherInfo.style.display = 'none';
             }
         });
     </script>
