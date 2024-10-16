@@ -60,8 +60,8 @@
         }
         #locateButtonContainer {
             position: absolute;
-            bottom: 20px;
-            right: 20px;
+            bottom: 20px; /* مسافة من الأسفل */
+            right: 20px; /* مسافة من اليمين */
             z-index: 2;
         }
         #locateButton {
@@ -77,9 +77,6 @@
         }
         #locateButton:hover {
             background-color: rgba(30, 144, 255, 1);
-        }
-        .marker-popup {
-            text-align: center;
         }
     </style>
 </head>
@@ -99,8 +96,8 @@
             <option value="dark">الوضع الليلي</option> <!-- إضافة الوضع الليلي هنا -->
         </select>
         <button id="requestWater" class="controlButton">طلب ماء</button>
-        <button id="toggle3D" class="controlButton">3D</button>
-        <button id="addMarker" class="controlButton">وضع علامة عامة</button> <!-- زر وضع علامة عامة -->
+        <button id="toggle3D" class="controlButton">3D</button> <!-- تغيير اسم الزر هنا -->
+        <button id="addMarkerButton" class="controlButton">وضع علامة عامة</button> <!-- الزر الجديد -->
         <div id="weatherInfo"></div>
         <div id="workerInfo"></div>
         <div id="mosqueInfo"></div>
@@ -108,6 +105,25 @@
 
     <div id="locateButtonContainer">
         <button id="locateButton">تحديد موقعي</button>
+    </div>
+
+    <!-- نافذة التحذير -->
+    <div id="confirmationPopup" style="display:none; position:fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 10px; padding: 20px; z-index: 3;">
+        <h2>تحذير</h2>
+        <p>سيتم وضع العلامة في المكان الذي تقف فيه حاليا. هل أنت موافق؟</p>
+        <button id="confirmYes">نعم</button>
+        <button id="confirmNo">لا</button>
+    </div>
+
+    <!-- نافذة إدخال الاسم ورقم الهاتف -->
+    <div id="inputPopup" style="display:none; position:fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 10px; padding: 20px; z-index: 3;">
+        <h2>إضافة معلومات</h2>
+        <label for="nameInput">اسم:</label>
+        <input type="text" id="nameInput" placeholder="أدخل الاسم">
+        <label for="phoneInput">رقم هاتف:</label>
+        <input type="text" id="phoneInput" placeholder="أدخل رقم الهاتف">
+        <button id="submitInfo">التالي</button>
+        <button id="cancelInput">إلغاء</button>
     </div>
 
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.js"></script>
@@ -154,196 +170,126 @@
             zoom: 2 // زوم 2 لعرض العالم من بعيد
         });
 
-        // بعد تحميل الخريطة، قم بالتحرك تدريجيًا نحو طرابلس مع تكبير الزوم
-        map.on('load', function () {
-            map.flyTo({
-                center: [13.1913, 32.8872], // موقع طرابلس
-                zoom: 12, // زوم مقرب إلى طرابلس
-                speed: 0.8, // سرعة التحرك
-                curve: 1, // منحنى الحركة لجعلها سلسة
-                easing: function (t) {
-                    return t * (2 - t); // دالة الحركة لتخفيف السرعة بسلاسة
-                }
-            });
+        // بعد تحميل الخريطة، قم بالتحرك تدريجيًا نحو طرابلس
+        map.on('load', () => {
+            map.flyTo({ center: [13.1913, 32.8872], zoom: 10, speed: 0.2 });
         });
 
-        let markerElement;
-        let isTracking = false; // متغير لتتبع الحالة
-        let watchId; // لتخزين معرف مراقبة الموقع
-        const workerMarkers = []; // مصفوفة لتخزين علامات العمال
+        // إعداد التحكم في البحث
+        const geocoder = new MapboxGeocoder({
+            accessToken: mapboxgl.accessToken,
+            language: "ar",
+            marker: true,
+            mapboxgl: mapboxgl
+        });
 
-        // تتبع الموقع اللحظي للمستخدم
-        document.getElementById('locateButton').addEventListener('click', function () {
-            if (navigator.geolocation) {
-                if (isTracking) {
-                    map.flyTo({
-                        center: [markerElement.getLngLat().lng, markerElement.getLngLat().lat], 
-                        zoom: 14
-                    });
-                    return; // إذا كانت العملية نشطة، أعد التوجيه فقط
-                }
-                watchId = navigator.geolocation.watchPosition(function (position) {
-                    const lng = position.coords.longitude;
-                    const lat = position.coords.latitude;
+        map.addControl(geocoder);
 
-                    // إذا كانت العلامة موجودة، حدث موقعها، وإلا أنشئ واحدة جديدة
-                    if (!markerElement) {
-                        markerElement = new mapboxgl.Marker({ color: "red" })
-                            .setLngLat([lng, lat])
-                            .addTo(map);
-                    } else {
-                        markerElement.setLngLat([lng, lat]);
-                    }
-
-                    map.flyTo({
-                        center: [lng, lat],
-                        zoom: 14
-                    });
-
-                    isTracking = true; // تعيين الحالة إلى تتبع
-                }, function (error) {
-                    console.error("خطأ في الحصول على الموقع:", error);
-                });
-            } else {
-                console.error("الموقع غير مدعوم في هذا المتصفح");
+        // إعداد التحكم في تحديد الموقع
+        const locateControl = new mapboxgl.GeolocateControl({
+            positionOptions: {
+                enableHighAccuracy: true
+            },
+            trackUserLocation: true,
+            showUserHeading: true,
+            fitBoundsOptions: {
+                maxZoom: 15
             }
         });
 
-        // عند تغيير نوع الخريطة، قم بتحديث الخريطة بالنمط المختار
-        const styleSelector = document.getElementById('styleSelector');
-        styleSelector.addEventListener('change', function () {
-            const selectedStyle = styleSelector.value;
+        map.addControl(locateControl);
+
+        // إضافة الأزرار للتبديل بين الأنماط
+        document.getElementById('styleSelector').addEventListener('change', function () {
+            const selectedStyle = this.value;
             map.setStyle(styles[selectedStyle]);
         });
 
-        // وظيفة البحث عن عمال قريبين
-        function findNearbyWorkers() {
-            const currentLocation = markerElement.getLngLat();
+        // تفعيل خاصية تحديد الموقع
+        document.getElementById('locateButton').addEventListener('click', () => {
+            locateControl.trigger();
+        });
 
-            workerMarkers.forEach(function (marker) {
-                const workerLocation = marker.getLngLat();
-                const distance = turf.distance(
-                    [currentLocation.lng, currentLocation.lat],
-                    [workerLocation.lng, workerLocation.lat]
-                );
-                if (distance <= 1.5) { // 1.5 كم
-                    alert("يوجد عامل بالقرب منك!");
-                }
-            });
-        }
+        // تفعيل زر إضافة علامة عامة
+        document.getElementById('addMarkerButton').addEventListener('click', () => {
+            document.getElementById('confirmationPopup').style.display = 'block';
+        });
 
-        // تتبع الطقس عند الضغط على زر الطقس
-        let weatherVisible = false;
-        const weatherElement = document.getElementById('weatherInfo');
-        const toggleWeatherButton = document.getElementById('toggleWeather');
+        // تأكيد وضع العلامة
+        document.getElementById('confirmYes').addEventListener('click', () => {
+            const userLocation = map.getCenter();
+            // إضافة العلامة في الموقع الحالي
+            new mapboxgl.Marker()
+                .setLngLat(userLocation)
+                .addTo(map);
+            // عرض نافذة إدخال الاسم ورقم الهاتف
+            document.getElementById('inputPopup').style.display = 'block';
+            document.getElementById('confirmationPopup').style.display = 'none';
+        });
 
-        toggleWeatherButton.addEventListener('click', function () {
-            weatherVisible = !weatherVisible;
-            if (weatherVisible) {
-                weatherElement.style.display = 'block';
-                fetchWeatherData();
+        // إلغاء وضع العلامة
+        document.getElementById('confirmNo').addEventListener('click', () => {
+            document.getElementById('confirmationPopup').style.display = 'none';
+        });
+
+        // إرسال المعلومات المدخلة إلى Firebase
+        document.getElementById('submitInfo').addEventListener('click', () => {
+            const name = document.getElementById('nameInput').value;
+            const phone = document.getElementById('phoneInput').value;
+            if (name && phone) {
+                const markerData = {
+                    name: name,
+                    phone: phone,
+                    location: {
+                        lng: map.getCenter().lng,
+                        lat: map.getCenter().lat
+                    }
+                };
+                const markersRef = database.ref('markers');
+                markersRef.push(markerData)
+                    .then(() => {
+                        alert('تم حفظ العلامة بنجاح.');
+                        document.getElementById('inputPopup').style.display = 'none';
+                        document.getElementById('nameInput').value = '';
+                        document.getElementById('phoneInput').value = '';
+                    })
+                    .catch((error) => {
+                        alert('حدث خطأ: ' + error.message);
+                    });
             } else {
-                weatherElement.style.display = 'none';
+                alert('يرجى ملء جميع الحقول.');
             }
         });
 
-        // جلب بيانات الطقس
-        function fetchWeatherData() {
-            fetch("https://api.open-meteo.com/v1/forecast?latitude=32.8872&longitude=13.1913&current_weather=true&timezone=auto")
-                .then(response => response.json())
-                .then(data => {
-                    const weatherInfo = `
-                        <p>الطقس الحالي:</p>
-                        <p>درجة الحرارة: ${data.current_weather.temperature}°C</p>
-                        <p>سرعة الرياح: ${data.current_weather.windspeed} كم/سا</p>
-                    `;
-                    weatherElement.innerHTML = weatherInfo;
-                })
-                .catch(error => console.error("خطأ في جلب بيانات الطقس:", error));
-        }
-
-        // طلب الماء
-        const requestWaterButton = document.getElementById('requestWater');
-        requestWaterButton.addEventListener('click', function () {
-            alert('تم إرسال طلب الماء إلى جميع العمال في الجوار');
+        // إلغاء نافذة إدخال المعلومات
+        document.getElementById('cancelInput').addEventListener('click', () => {
+            document.getElementById('inputPopup').style.display = 'none';
         });
 
-        // تفعيل العرض الثلاثي الأبعاد
-        const toggle3DButton = document.getElementById('toggle3D');
-        let is3DEnabled = false;
-        toggle3DButton.addEventListener('click', function () {
-            const layers = map.getStyle().layers;
-            is3DEnabled = !is3DEnabled;
-
-            for (const layer of layers) {
-                if (layer.type === 'fill-extrusion') {
-                    map.setLayoutProperty(layer.id, 'visibility', is3DEnabled ? 'visible' : 'none');
-                }
+        // التبديل بين حالات الطقس
+        document.getElementById('toggleWeather').addEventListener('click', () => {
+            const weatherInfo = document.getElementById('weatherInfo');
+            if (weatherInfo.style.display === 'none') {
+                weatherInfo.style.display = 'block';
+                weatherInfo.innerText = 'معلومات الطقس هنا...';
+            } else {
+                weatherInfo.style.display = 'none';
             }
         });
 
-        // إضافة عامل
-        function addWorkerMarker(lng, lat) {
-            const marker = new mapboxgl.Marker({ color: "green" })
-                .setLngLat([lng, lat])
-                .addTo(map);
-
-            workerMarkers.push(marker);
-        }
-
-        // إضافة زر وضع علامة عامة
-        const addMarkerButton = document.getElementById('addMarker');
-        addMarkerButton.addEventListener('click', function () {
-            const markerType = prompt('اختر نوع العلامة: 1. جمع تبرعات لمسجد، 2. مكان جمع تبرعات، 3. مكان عائلة محتاجة');
-            if (!markerType) return;
-
-            const lng = markerElement.getLngLat().lng;
-            const lat = markerElement.getLngLat().lat;
-
-            if (markerType === '1') {
-                addMarkerWithIcon(lng, lat, 'icon-mosque', 'جمع تبرعات لمسجد');
-            } else if (markerType === '2') {
-                addMarkerWithIcon(lng, lat, 'icon-donation', 'مكان جمع تبرعات');
-            } else if (markerType === '3') {
-                addMarkerWithIcon(lng, lat, 'icon-family', 'مكان عائلة محتاجة');
-            }
+        // عرض معلومات عن العمال
+        document.getElementById('requestWater').addEventListener('click', () => {
+            const workerInfo = document.getElementById('workerInfo');
+            workerInfo.innerText = 'العمال المتاحين هنا...';
+            workerInfo.style.display = workerInfo.style.display === 'block' ? 'none' : 'block';
         });
 
-        // إضافة العلامة إلى الخريطة مع الأيقونة المناسبة
-        function addMarkerWithIcon(lng, lat, iconClass, description) {
-            const el = document.createElement('div');
-            el.className = iconClass;
-            el.style.width = '30px';
-            el.style.height = '30px';
-
-            new mapboxgl.Marker(el)
-                .setLngLat([lng, lat])
-                .setPopup(new mapboxgl.Popup().setHTML(`<h3>${description}</h3>`))
-                .addTo(map);
-        }
-
-        // إضافة علامة في Firebase
-        function addMarkerToFirebase(lng, lat, description) {
-            const newMarkerRef = database.ref('markers').push();
-            newMarkerRef.set({
-                lng,
-                lat,
-                description
-            });
-        }
-
-        // جلب العلامات من Firebase
-        function fetchMarkersFromFirebase() {
-            database.ref('markers').once('value', (snapshot) => {
-                snapshot.forEach((childSnapshot) => {
-                    const data = childSnapshot.val();
-                    addMarkerWithIcon(data.lng, data.lat, 'icon-mosque', data.description);
-                });
-            });
-        }
-
-        // جلب العلامات عند تحميل الصفحة
-        fetchMarkersFromFirebase();
+        // عرض معلومات عن المساجد
+        document.getElementById('toggle3D').addEventListener('click', () => {
+            const mosqueInfo = document.getElementById('mosqueInfo');
+            mosqueInfo.innerText = 'معلومات عن المساجد هنا...';
+            mosqueInfo.style.display = mosqueInfo.style.display === 'block' ? 'none' : 'block';
+        });
     </script>
 </body>
 </html>
