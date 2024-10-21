@@ -96,7 +96,7 @@
             <option value="dark">الوضع الليلي</option> <!-- إضافة الوضع الليلي هنا -->
         </select>
         <button id="requestWater" class="controlButton">طلب ماء</button>
-        <button id="toggle3D" class="controlButton">3D</button> <!-- تغيير اسم الزر هنا -->
+        <button id="requestWorker" class="controlButton">طلب عامل</button>
         <div id="weatherInfo"></div>
         <div id="workerInfo"></div>
         <div id="mosqueInfo"></div>
@@ -124,6 +124,25 @@
         <button id="submitInfo">التالي</button>
         <button id="cancelInput">إلغاء</button>
     </div>
+
+    <!-- نافذة إدخال تفاصيل الطلب -->
+<div id="requestPopup" style="display:none; position:fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 10px; padding: 20px; z-index: 3;">
+    <h2>إدخال تفاصيل الطلب</h2>
+    <label for="workTypeInput">نوع العمل:</label>
+    <select id="workTypeInput">
+        <option value="سباكة">سباكة</option>
+        <option value="كهرباء">كهرباء</option>
+        <option value="نقل">نقل</option>
+        <option value="أخرى">أخرى</option>
+    </select>
+    <label for="budgetInput">الميزانية المتاحة:</label>
+    <input type="text" id="budgetInput" placeholder="أدخل الميزانية">
+    <label for="timeInput">الوقت المطلوب:</label>
+    <input type="text" id="timeInput" placeholder="أدخل الزمن المطلوب">
+    <button id="submitRequest">إرسال الطلب</button>
+    <button id="cancelRequest">إلغاء</button>
+</div>
+
 
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.js"></script>
     <script src="https://unpkg.com/@turf/turf"></script>
@@ -209,10 +228,92 @@
             locateControl.trigger();
         });
 
-        // تفعيل زر إضافة علامة عامة
-        document.getElementById('addMarkerButton').addEventListener('click', () => {
-            document.getElementById('confirmationPopup').style.display = 'block';
-        });
+// حدث عند النقر على زر "طلب عامل"
+document.getElementById('requestWorker').addEventListener('click', () => {
+    // الحصول على موقع المستخدم الحالي باستخدام getCenter من الخريطة
+    const userLocation = map.getCenter(); // أو يمكنك استخدام موقع مخصص إذا أردت.
+
+    // عرض نافذة إدخال تفاصيل الطلب
+    document.getElementById('requestPopup').style.display = 'block';
+
+    // حدث عند النقر على زر "إرسال الطلب"
+    document.getElementById('submitRequest').addEventListener('click', () => {
+        const workType = document.getElementById('workTypeInput').value;
+        const budget = document.getElementById('budgetInput').value;
+        const time = document.getElementById('timeInput').value;
+
+        // التأكد من أن جميع الحقول قد تم ملؤها
+        if (workType && budget && time) {
+            const requestData = {
+                workType: workType,
+                budget: budget,
+                time: time,
+                location: {
+                    lng: userLocation.lng,  // إحداثيات الموقع الحالي
+                    lat: userLocation.lat
+                }
+            };
+
+            // إرسال بيانات الطلب إلى Firebase
+            const requestsRef = database.ref('workRequests');
+            requestsRef.push(requestData)
+                .then(() => {
+                    alert('تم إرسال الطلب بنجاح.');
+                    document.getElementById('requestPopup').style.display = 'none';
+                    document.getElementById('workTypeInput').value = '';
+                    document.getElementById('budgetInput').value = '';
+                    document.getElementById('timeInput').value = '';
+                })
+                .catch((error) => {
+                    alert('حدث خطأ: ' + error.message);
+                });
+        } else {
+            alert('يرجى ملء جميع الحقول.');
+        }
+    });
+});
+
+
+
+// إرسال تفاصيل الطلب إلى Firebase
+document.getElementById('submitRequest').addEventListener('click', () => {
+    const workType = document.getElementById('workTypeInput').value;
+    const budget = document.getElementById('budgetInput').value;
+    const time = document.getElementById('timeInput').value;
+
+    if (workType && budget && time) {
+        const requestData = {
+            workType: workType,
+            budget: budget,
+            time: time,
+            location: {
+                lng: map.getCenter().lng,
+                lat: map.getCenter().lat
+            }
+        };
+
+        const requestsRef = database.ref('workRequests');
+        requestsRef.push(requestData)
+            .then(() => {
+                alert('تم إرسال الطلب بنجاح.');
+                document.getElementById('requestPopup').style.display = 'none';
+                document.getElementById('workTypeInput').value = '';
+                document.getElementById('budgetInput').value = '';
+                document.getElementById('timeInput').value = '';
+            })
+            .catch((error) => {
+                alert('حدث خطأ: ' + error.message);
+            });
+    } else {
+        alert('يرجى ملء جميع الحقول.');
+    }
+});
+
+// إلغاء طلب العامل
+document.getElementById('cancelRequest').addEventListener('click', () => {
+    document.getElementById('requestPopup').style.display = 'none';
+});
+
 
         // تأكيد وضع العلامة
         document.getElementById('confirmYes').addEventListener('click', () => {
