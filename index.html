@@ -166,10 +166,37 @@
         };
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
+        function startTracking(workerId) {
+    const workerRef = database.ref(`workers/${workerId}/location`);
+    workerRef.on('value', (snapshot) => {
+        const location = snapshot.val();
+        updateWorkerMarker(location);
+    });
+}
+
+function updateWorkerMarker(location) {
+    if (!window.workerMarker) {
+        window.workerMarker = new mapboxgl.Marker().setLngLat([location.lng, location.lat]).addTo(map);
+    } else {
+        window.workerMarker.setLngLat([location.lng, location.lat]);
+    }
+}
+
 
         // مفتاح Mapbox
         const mapboxToken = "pk.eyJ1IjoiY2hvb3NlbWUiLCJhIjoiY20wZnVpemI2MHpreTJqcjR4ZThuam9pYyJ9.F1CjHrnJ7m-VwM_LHt0Q9Q";
         mapboxgl.accessToken = mapboxToken;
+        function isWithinRadius(workerLocation, targetLocation, radius = 500) {
+    const distance = turf.distance(workerLocation, targetLocation, { units: 'meters' });
+    return distance <= radius;
+}
+function checkProximityAndNotify(workerLocation, clientLocation) {
+    if (isWithinRadius(workerLocation, clientLocation)) {
+        alert('العامل اقترب من الموقع!');
+    }
+}
+
+
 
         // إعداد الأنماط المختلفة للخريطة
         const styles = {
@@ -231,7 +258,7 @@
 // حدث عند النقر على زر "طلب عامل"
 document.getElementById('requestWorker').addEventListener('click', () => {
     // الحصول على موقع المستخدم الحالي باستخدام getCenter من الخريطة
-    const userLocation = map.getCenter(); // أو يمكنك استخدام موقع مخصص إذا أردت.
+    const userLocation = map.getCenter();
 
     // عرض نافذة إدخال تفاصيل الطلب
     document.getElementById('requestPopup').style.display = 'block';
@@ -249,9 +276,9 @@ document.getElementById('requestWorker').addEventListener('click', () => {
                 budget: budget,
                 time: time,
                 location: {
-                    lng: userLocation.lng,  // إحداثيات الموقع الحالي
+                    lng: userLocation.lng,
                     lat: userLocation.lat
-                }
+                },
             };
 
             // إرسال بيانات الطلب إلى Firebase
@@ -273,41 +300,12 @@ document.getElementById('requestWorker').addEventListener('click', () => {
     });
 });
 
-
-
-// إرسال تفاصيل الطلب إلى Firebase
-document.getElementById('submitRequest').addEventListener('click', () => {
-    const workType = document.getElementById('workTypeInput').value;
-    const budget = document.getElementById('budgetInput').value;
-    const time = document.getElementById('timeInput').value;
-
-    if (workType && budget && time) {
-        const requestData = {
-            workType: workType,
-            budget: budget,
-            time: time,
-            location: {
-                lng: map.getCenter().lng,
-                lat: map.getCenter().lat
-            }
-        };
-
-        const requestsRef = database.ref('workRequests');
-        requestsRef.push(requestData)
-            .then(() => {
-                alert('تم إرسال الطلب بنجاح.');
-                document.getElementById('requestPopup').style.display = 'none';
-                document.getElementById('workTypeInput').value = '';
-                document.getElementById('budgetInput').value = '';
-                document.getElementById('timeInput').value = '';
-            })
-            .catch((error) => {
-                alert('حدث خطأ: ' + error.message);
-            });
-    } else {
-        alert('يرجى ملء جميع الحقول.');
-    }
+// إلغاء طلب العامل
+document.getElementById('cancelRequest').addEventListener('click', () => {
+    document.getElementById('requestPopup').style.display = 'none';
 });
+
+
 
 // إلغاء طلب العامل
 document.getElementById('cancelRequest').addEventListener('click', () => {
