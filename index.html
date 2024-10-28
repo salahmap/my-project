@@ -84,6 +84,46 @@
     <h1 id="title" style="display: none;">تطبيق الخريطة المحسن</h1>
     <div id="map"></div>
 
+    <script>
+if ('serviceWorker' in navigator) {
+navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' })
+        .then((registration) => {
+            console.log('Service Worker مسجل بنجاح:', registration);
+
+            // ربط FCM بالـ Service Worker المسجل
+            const messaging = firebase.messaging();
+            messaging.useServiceWorker(registration);
+
+            // طلب إذن الإشعارات
+            messaging.requestPermission()
+    .then(() => messaging.getToken())
+    .then((token) => {
+        if (token) {
+            console.log('تم الحصول على الـ Token:', token);
+            // قم بإرساله إلى السيرفر الخاص بك أو تخزينه
+        } else {
+            console.warn('لم يتم الحصول على التوكن.');
+        }
+    })
+    .catch((error) => {
+        console.error('فشل في الحصول على إذن الإشعارات أو التوكن:', error);
+    });
+
+        })
+        .catch((error) => {
+            console.error('فشل تسجيل Service Worker:', error);
+        });
+} else {
+    console.warn('هذا المتصفح لا يدعم Service Workers.');
+}
+
+
+
+    </script>
+</body>
+
+    
+
     <div class="controls">
         <button id="toggleWeather" class="iconButton">
             <i class="fas fa-cloud-sun icon"></i>
@@ -143,11 +183,13 @@
     <button id="cancelRequest">إلغاء</button>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js"></script>
 
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.js"></script>
     <script src="https://unpkg.com/@turf/turf"></script>
     <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.7.0/mapbox-gl-geocoder.min.js"></script>
     <link href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.7.0/mapbox-gl-geocoder.css" rel="stylesheet" />
@@ -164,8 +206,11 @@
             appId: "1:96260637269:web:e3bc37ab2b41038c254adc",
             measurementId: "G-R0SGBWC3CJ"
         };
-        firebase.initializeApp(firebaseConfig);
-        const database = firebase.database();
+        if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}        const database = firebase.database();
+        
+        
         function startTracking(workerId) {
     const workerRef = database.ref(`workers/${workerId}/location`);
     workerRef.on('value', (snapshot) => {
@@ -174,6 +219,7 @@
     });
 }
 
+
 function updateWorkerMarker(location) {
     if (!window.workerMarker) {
         window.workerMarker = new mapboxgl.Marker().setLngLat([location.lng, location.lat]).addTo(map);
@@ -181,12 +227,80 @@ function updateWorkerMarker(location) {
         window.workerMarker.setLngLat([location.lng, location.lat]);
     }
 }
+function loadWorkers() {
+    const workersRef = database.ref('workers');
+    workersRef.on('child_added', (snapshot) => {
+        const workerData = snapshot.val();
+        startTracking(snapshot.key);
+    });
+}
 
+// استدعاء الدالة بعد تهيئة Firebase
+loadWorkers();
+
+// الدالة submitRequest
+
+document.getElementById('submitRequest').addEventListener('click', () => {
+    const userLocation = map.getCenter();
+    // ... استلام البيانات ...
+
+    const requestsRef = database.ref('workRequests');
+    requestsRef.push(requestData)
+        .then((ref) => {
+            alert('تم إرسال الطلب بنجاح.');
+            // ... إخفاء النافذة وإعادة تعيين المدخلات ...
+
+            // إضافة: حساب المسافة بين العمال وإرسال الإشعار
+            const workersRef = database.ref('workers');
+            workersRef.once('value', (snapshot) => {
+                snapshot.forEach((worker) => {
+                    const workerData = worker.val();
+                    const distance = calculateDistance(userLocation, workerData.location);
+                    if (distance <= 10) { 
+                        alert(`العامل ${workerData.name} يقترب من موقع الطلب!`);
+                        sendPushNotification(workerData.deviceToken, `هناك طلب ${workType} قريب من موقعك.`);
+                    }
+                });
+            });
+        })
+        .catch((error) => {
+            alert('حدث خطأ: ' + error.message);
+        });
+});
 
         // مفتاح Mapbox
         const mapboxToken = "pk.eyJ1IjoiY2hvb3NlbWUiLCJhIjoiY20wZnVpemI2MHpreTJqcjR4ZThuam9pYyJ9.F1CjHrnJ7m-VwM_LHt0Q9Q";
         mapboxgl.accessToken = mapboxToken;
         function isWithinRadius(workerLocation, targetLocation, radius = 500) {
+            function calculateDistance(loc1, loc2) {
+    const R = 6371; // نصف قطر الأرض بالكيلومتر
+    const dLat = (loc2.lat - loc1.lat) * Math.PI / 180;
+    const dLon = (loc2.lng - loc1.lng) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(loc1.lat * Math.PI / 180) * Math.cos(loc2.lat * Math.PI / 180) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c; // المسافة بالكيلومترات
+}
+
+function sendPushNotification(deviceToken, message) {
+    const notificationPayload = {
+        notification: {
+            title: 'طلب جديد!',
+            body: message,
+            icon: 'https://example.com/icon.png' // يمكن استبدال الرابط بأيقونة مناسبة.
+        }
+    };
+
+    firebase.messaging().sendToDevice(deviceToken, notificationPayload)
+        .then(response => {
+            console.log('تم إرسال الإشعار بنجاح:', response);
+        })
+        .catch(error => {
+            console.error('خطأ في إرسال الإشعار:', error);
+        });
+}
+
     const distance = turf.distance(workerLocation, targetLocation, { units: 'meters' });
     return distance <= radius;
 }
@@ -256,49 +370,62 @@ function checkProximityAndNotify(workerLocation, clientLocation) {
         });
 
 // حدث عند النقر على زر "طلب عامل"
-document.getElementById('requestWorker').addEventListener('click', () => {
-    // الحصول على موقع المستخدم الحالي باستخدام getCenter من الخريطة
+// إضافة الحدث لمرة واحدة فقط عند تحميل الصفحة
+// الدالة submitRequest
+document.getElementById('submitRequest').addEventListener('click', () => {
     const userLocation = map.getCenter();
+    const workType = document.getElementById('workTypeInput').value;
+    const budget = document.getElementById('budgetInput').value;
+    const time = document.getElementById('timeInput').value;
 
-    // عرض نافذة إدخال تفاصيل الطلب
-    document.getElementById('requestPopup').style.display = 'block';
+    if (workType && budget && time) {
+        const requestData = {
+            workType: workType,
+            budget: budget,
+            time: time,
+            location: {
+                lng: userLocation.lng,
+                lat: userLocation.lat
+            },
+        };
 
-    // حدث عند النقر على زر "إرسال الطلب"
-    document.getElementById('submitRequest').addEventListener('click', () => {
-        const workType = document.getElementById('workTypeInput').value;
-        const budget = document.getElementById('budgetInput').value;
-        const time = document.getElementById('timeInput').value;
+        const requestsRef = database.ref('workRequests');
+        requestsRef.push(requestData)
+            .then((ref) => {
+                alert('تم إرسال الطلب بنجاح.');
+                document.getElementById('requestPopup').style.display = 'none';
+                document.getElementById('workTypeInput').value = '';
+                document.getElementById('budgetInput').value = '';
+                document.getElementById('timeInput').value = '';
 
-        // التأكد من أن جميع الحقول قد تم ملؤها
-        if (workType && budget && time) {
-            const requestData = {
-                workType: workType,
-                budget: budget,
-                time: time,
-                location: {
-                    lng: userLocation.lng,
-                    lat: userLocation.lat
-                },
-            };
-
-            // إرسال بيانات الطلب إلى Firebase
-            const requestsRef = database.ref('workRequests');
-            requestsRef.push(requestData)
-                .then(() => {
-                    alert('تم إرسال الطلب بنجاح.');
-                    document.getElementById('requestPopup').style.display = 'none';
-                    document.getElementById('workTypeInput').value = '';
-                    document.getElementById('budgetInput').value = '';
-                    document.getElementById('timeInput').value = '';
-                })
-                .catch((error) => {
-                    alert('حدث خطأ: ' + error.message);
+                // إضافة: حساب المسافة بين العمال وإرسال الإشعار
+                const workersRef = database.ref('workers');
+                workersRef.once('value', (snapshot) => {
+                    snapshot.forEach((worker) => {
+                        const workerData = worker.val();
+                        const distance = calculateDistance(userLocation, workerData.location);
+                        if (distance <= 10) {
+                            alert(`العامل ${workerData.name} يقترب من موقع الطلب!`);
+                            sendPushNotification(workerData.deviceToken, `هناك طلب ${workType} قريب من موقعك.`);
+                        }
+                    });
                 });
-        } else {
-            alert('يرجى ملء جميع الحقول.');
-        }
-    });
+            })
+            .catch((error) => {
+                alert('حدث خطأ: ' + error.message);
+            });
+    } else {
+        alert('يرجى ملء جميع الحقول.');
+    }
 });
+
+
+
+// فتح النافذة عند النقر على "طلب عامل"
+document.getElementById('requestWorker').addEventListener('click', () => {
+    document.getElementById('requestPopup').style.display = 'block';
+});
+
 
 // إلغاء طلب العامل
 document.getElementById('cancelRequest').addEventListener('click', () => {
@@ -364,23 +491,51 @@ document.getElementById('cancelRequest').addEventListener('click', () => {
             document.getElementById('inputPopup').style.display = 'none';
         });
 
+// إغلاق النوافذ بالنقر خارجها
+window.addEventListener('click', (event) => {
+    const inputPopup = document.getElementById('inputPopup');
+    const requestPopup = document.getElementById('requestPopup');
+    if (event.target === inputPopup) inputPopup.style.display = 'none';
+    if (event.target === requestPopup) requestPopup.style.display = 'none';
+});
+
+
+
         // التبديل بين حالات الطقس
-        document.getElementById('toggleWeather').addEventListener('click', () => {
-            const weatherInfo = document.getElementById('weatherInfo');
-            if (weatherInfo.style.display === 'none') {
-                weatherInfo.style.display = 'block';
-                weatherInfo.innerText = 'معلومات الطقس هنا...';
-            } else {
-                weatherInfo.style.display = 'none';
-            }
-        });
+        document.getElementById('toggleWeather').addEventListener('click', async () => {
+    const weatherInfo = document.getElementById('weatherInfo');
+    if (weatherInfo.style.display === 'none') {
+        const response = await fetch('https://api.openweathermap.org/data/2.5/weather?q=Tripoli,LY&appid=YOUR_API_KEY&units=metric&lang=ar');
+        const data = await response.json();
+        weatherInfo.innerText = `الطقس في طرابلس: ${data.weather[0].description}, درجة الحرارة: ${data.main.temp}°C`;
+        weatherInfo.style.display = 'block';
+    } else {
+        weatherInfo.style.display = 'none';
+    }
+});
+
 
         // عرض معلومات عن العمال
         document.getElementById('requestWater').addEventListener('click', () => {
-            const workerInfo = document.getElementById('workerInfo');
-            workerInfo.innerText = 'العمال المتاحين هنا...';
-            workerInfo.style.display = workerInfo.style.display === 'block' ? 'none' : 'block';
+    const workerInfo = document.getElementById('workerInfo');
+    const workersRef = database.ref('workers');
+    
+    workersRef.once('value', (snapshot) => {
+        workerInfo.innerHTML = ''; // تفريغ المحتوى السابق
+        snapshot.forEach((worker) => {
+            const workerData = worker.val();
+            const workerElement = document.createElement('div');
+            workerElement.innerHTML = `
+                <p>الاسم: ${workerData.name}</p>
+                <p>رقم الهاتف: ${workerData.phone}</p>
+                <hr>
+            `;
+            workerInfo.appendChild(workerElement);
         });
+    });
+
+    workerInfo.style.display = workerInfo.style.display === 'block' ? 'none' : 'block';
+});
 
         // عرض معلومات عن المساجد
         document.getElementById('toggle3D').addEventListener('click', () => {
