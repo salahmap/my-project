@@ -85,38 +85,28 @@
     <div id="map"></div>
 
     <script>
-if ('serviceWorker' in navigator) {
-navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' })
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/firebase-messaging-sw.js')
         .then((registration) => {
-            console.log('Service Worker مسجل بنجاح:', registration);
+          console.log('Service Worker مسجل بنجاح:', registration);
+          messaging.useServiceWorker(registration);
 
-            // ربط FCM بالـ Service Worker المسجل
-            const messaging = firebase.messaging();
-            messaging.useServiceWorker(registration);
-
-            // طلب إذن الإشعارات
-            messaging.requestPermission()
-    .then(() => messaging.getToken())
-    .then((token) => {
-        if (token) {
-            console.log('تم الحصول على الـ Token:', token);
-            // قم بإرساله إلى السيرفر الخاص بك أو تخزينه
-        } else {
-            console.warn('لم يتم الحصول على التوكن.');
-        }
-    })
-    .catch((error) => {
-        console.error('فشل في الحصول على إذن الإشعارات أو التوكن:', error);
-    });
-
+          // طلب إذن الإشعارات
+          return messaging.requestPermission();
+        })
+        .then(() => {
+          // استرجاع التوكن
+          return messaging.getToken({ vapidKey: BC5AZjNwVnpdJTIpZuCYncnGggugQjxhwdhEos0IpVLKNt_6m9iSbAXzVlNav0MqvVZfMk431Ka_pLZ_BbLNyPA });
+        })
+        .then((token) => {
+          console.log('تم الحصول على التوكن:', token);
         })
         .catch((error) => {
-            console.error('فشل تسجيل Service Worker:', error);
+          console.error('فشل في تسجيل Service Worker أو الحصول على التوكن:', error);
         });
-} else {
-    console.warn('هذا المتصفح لا يدعم Service Workers.');
-}
-
+    } else {
+      console.warn('هذا المتصفح لا يدعم Service Workers.');
+    }
 
 
     </script>
@@ -183,32 +173,53 @@ navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' })
     <button id="cancelRequest">إلغاء</button>
 </div>
 
+<!-- مكتبات Firebase App و Messaging -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
-    <script src="https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.js"></script>
-    <script src="https://unpkg.com/@turf/turf"></script>
-    <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-    <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.7.0/mapbox-gl-geocoder.min.js"></script>
-    <link href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.7.0/mapbox-gl-geocoder.css" rel="stylesheet" />
+<!-- مكتبات إضافية -->
+<script src="https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.js"></script>
+<script src="https://unpkg.com/@turf/turf"></script>
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.js"></script>
+<script src="https://js.pusher.com/beams/latest/beam.min.js"></script>
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.7.0/mapbox-gl-geocoder.min.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.7.0/mapbox-gl-geocoder.css" rel="stylesheet" />
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const beamsClient = new PusherPushNotifications.Client({
+        instanceId: 'c9641070-f290-4aab-9239-18b096e3d8bc'
+      });
+  
+      beamsClient.start()
+        .then(() => beamsClient.addDeviceInterest('general'))
+        .then(() => console.log('Beams جاهز لاستقبال الإشعارات'))
+        .catch(console.error);
+    });
+  </script>
+  
 
     <script>
-        // إعداد Firebase
-        const firebaseConfig = {
-            apiKey: "ce6cae3c0977e051e1924a4ac1ece1aa",
-            authDomain: "adlo-44d1b.firebaseapp.com",
-            databaseURL: "https://adlo-44d1b-default-rtdb.firebaseio.com/",
-            projectId: "adlo-44d1b",
-            storageBucket: "adlo-44d1b.appspot.com",
-            messagingSenderId: "96260637269",
-            appId: "1:96260637269:web:e3bc37ab2b41038c254adc",
-            measurementId: "G-R0SGBWC3CJ"
-        };
-        if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
-}        const database = firebase.database();
+// إعداد Firebase
+const firebaseConfig = {
+    apiKey: "ce6cae3c0977e051e1924a4ac1ece1aa",
+    authDomain: "adlo-44d1b.firebaseapp.com",
+    databaseURL: "https://adlo-44d1b-default-rtdb.firebaseio.com/",
+    projectId: "adlo-44d1b",
+    storageBucket: "adlo-44d1b.appspot.com",
+    messagingSenderId: "96260637269",
+    appId: "1:96260637269:web:e3bc37ab2b41038c254adc",
+    measurementId: "G-R0SGBWC3CJ"
+};
+
+firebase.initializeApp(firebaseConfig);
+
+// تعريف الكائنات بعد التهيئة
+const messaging = firebase.messaging();
+const database = firebase.database();
+
+
         
         
         function startTracking(workerId) {
@@ -217,6 +228,43 @@ navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' })
         const location = snapshot.val();
         updateWorkerMarker(location);
     });
+}
+
+
+function sendNotificationToNearbyWorkers(requestData, userLocation) {
+  const radius = 10;  // نصف قطر البحث بالكيلومترات
+
+
+  
+  // افتراض: `database.ref('workers')` يحتوي على بيانات العمال في Firebase
+  const workersRef = database.ref('workers');
+  workersRef.once('value', (snapshot) => {
+    snapshot.forEach((workerSnapshot) => {
+      const worker = workerSnapshot.val();
+      const distance = calculateDistance(userLocation, worker.location); // حساب المسافة
+      
+      if (distance <= radius) {
+        // إرسال الإشعار فقط للعمال القريبين
+        fetch('https://c9641070-f290-4aab-9239-18b096e3d8bc.pushnotifications.pusher.com/publish_api/v1/instances/c9641070-f290-4aab-9239-18b096e3d8bc/publishes', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer A44776EFA1114922AA2C29739FDB9EEC7E2EDED4707BD6EE5C6C3BB07FD58BF8',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            interests: [workerSnapshot.key], // قناة الإشعار للعامل المحدد
+            notification: {
+              title: "يوجد عمل متاح!",
+              body: `طلب ${requestData.workType} بالقرب منك. اضغط لرؤية التفاصيل.`,
+              deep_link: "https://your-site.com/request-details" // رابط لتفاصيل الطلب
+            }
+          })
+        }).then(response => response.json())
+          .then(data => console.log("تم إرسال الإشعار:", data))
+          .catch(console.error);
+      }
+    });
+  });
 }
 
 
@@ -239,6 +287,31 @@ function loadWorkers() {
 loadWorkers();
 
 // الدالة submitRequest
+
+
+document.getElementById('submitRequest').addEventListener('click', () => {
+  const userLocation = map.getCenter();
+  const requestData = {
+    workType: document.getElementById('workTypeInput').value,
+    budget: document.getElementById('budgetInput').value,
+    time: document.getElementById('timeInput').value,
+    location: {
+      lng: userLocation.lng,
+      lat: userLocation.lat
+    },
+  };
+
+  const requestsRef = database.ref('workRequests');
+  requestsRef.push(requestData)
+    .then(() => {
+      alert('تم إرسال الطلب بنجاح.');
+      sendNotificationToNearbyWorkers(requestData, userLocation); // استدعاء دالة إرسال الإشعار
+    })
+    .catch((error) => {
+      alert('حدث خطأ: ' + error.message);
+    });
+});
+
 
 document.getElementById('submitRequest').addEventListener('click', () => {
     const userLocation = map.getCenter();
@@ -288,18 +361,43 @@ function sendPushNotification(deviceToken, message) {
         notification: {
             title: 'طلب جديد!',
             body: message,
-            icon: 'https://example.com/icon.png' // يمكن استبدال الرابط بأيقونة مناسبة.
+            icon: 'https://example.com/icon.png'
         }
     };
 
-    firebase.messaging().sendToDevice(deviceToken, notificationPayload)
-        .then(response => {
-            console.log('تم إرسال الإشعار بنجاح:', response);
-        })
-        .catch(error => {
-            console.error('خطأ في إرسال الإشعار:', error);
-        });
+    fetch('https://fcm.googleapis.com/fcm/send', {
+        method: 'POST',
+        headers: {
+            'Authorization': {
+  "type": "service_account",
+  "project_id": "adlo-44d1b",
+  "private_key_id": "5781b90d04e91cb10b5294a9f1ff73a6456b8790",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCx8EgjS3+2FJLH\ndYU/BD33kfCtKuFZogiKg7Di3uxLdn731FDXlCrgtuVSlPWxeXEQr3d7wj3TWqEE\nMKi8ANCLeo0CgiLyWhJcKuiWwRyriKsFmWAVdqgFQoHTTaW8KiAiyLgtHbYI9UHY\nomA0o01ApLqgxOYHjbaye/QKSEthx8C8G1304+ZWoz4SQjLsjmRu2UO2GkQuCjpu\nU6FPJjqPIEnf+BsKP/tSc9tz/+/KrLl2+RypQ/beR5Wbx92m6NSoztOnQakuI+Iz\nCx9KK5vz9BhVpXK6WWWfBMG8o7tWOs8j5pdcbWtNLv8RDHyr+a6cQmO20ptPpDXB\n+/mXpzLFAgMBAAECggEACCvKDEDfzPs14E3vv/yQYemEPVd+QLD1pnK0sT5eaHq5\nCuVnjvbBX09WyYuIms1CWWtNV9QMJcQAJ+KaJQP+j6Ehj49tTma/eBcKVj3o9KGS\nhO/Nnz6zKYar0om6xiDDGAXSm1PFc7TbgLi4JUKofgLyhQZ1r7wcuyaBBuXZ/FPt\nmtFlIstHUfmOQZMhXmD3PaV7/bLLb+96uEFZoNI14h28tP/pYIVY/3Dyyke0W7Kv\n6Nde4v3cHxMsD3oVfiHYN/2/z/ocshfRh1conPnzLbpflQ2uIcH+FE7o36e74kuE\nmJ24/6j1+1NhzeLS3wzh6Wvwjv/eoLxIWLCkAy1JwQKBgQD45cHkXJOmA6n7V1rS\nfm5F/088EVjjNPNjWeIVZuTiPuXUx1L1F2qPCvZQ+dYmNyl8B4456AqWUJh0Hb7m\n9YSTULe+ih+WTxyvYcepjhHPd6vSngEIrw1egYWcKH5kP1QYUXlHJcd7bPzgn4aM\n7qquLS6HdCVOHLnr7zkP8xuAoQKBgQC3BCgOhqCggoj04q5Ntx/agKkRBxClmZys\n010ZOfkQ1PXeTN1CJyvjjpDfkHNQPaMAkc1T8bCKyxNIOe3UsQXN7R/9BX3itSIG\nnPnMZ0lg/fU5OBvp0MMseaoWr94Yhb93ZThkzxYU8HRfaNX1tGXYNx49aJ8gqLGg\n+UEAteprpQKBgF0lLrCVbLP+PwjOojCQHBiZ+T8Tht5QnJ0bsB4uSY3Z2A0PIx6R\nytEJWzDmrpvSnPXLphBJpFyogMVDtIOeciTnWjw2WKfZp3SC9UOg5U1tDaJeeyiS\nykAJ3MSZ6uL9SC1poCdeHg80tFYjnSj00G8qfXU3pBZdbb674fD0G+DBAoGATOpj\nR0+PPEX/9yM5bBH1QihmZXCZr28yqHOgIdT6dvd5aXbWWlIKIPWurzaPL/7nfXrJ\nV2kw7/PO48Ds0kGfld79XaIsONY1OaBJX31dGnVA1U5edNK24/8x250H8zhqsmwI\n2l0qA5zW2648lam+T7NCcz5/+gLLvEJk7j6GCb0CgYEAgPzfBg4xfeNM5VaNi/Cd\nNQF5h6VXYNETInXfMCHYeUu0Pmfd12ze6P7xrgGGqGFgIPZdgYv4baui7cKKRld+\n1Kengb384TSmFaA2Zi09w5GyHzL6jaxTrEBb3Kb1JQSlhfmXzbkjPA2YV7zfV1fx\nOvdfA1n1Q8b0b/DKeHYq8uE=\n-----END PRIVATE KEY-----\n",
+  "client_email": "firebase-adminsdk-6kqti@adlo-44d1b.iam.gserviceaccount.com",
+  "client_id": "110338401661879350692",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-6kqti%40adlo-44d1b.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
 }
+, // استبدل YOUR_SERVER_KEY_HERE بمفتاح الخادم الخاص بك
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            to: deviceToken,
+            ...notificationPayload
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('تم إرسال الإشعار بنجاح:', data);
+    })
+    .catch(error => {
+        console.error('خطأ في إرسال الإشعار:', error);
+    });
+}
+
 
     const distance = turf.distance(workerLocation, targetLocation, { units: 'meters' });
     return distance <= radius;
@@ -433,13 +531,6 @@ document.getElementById('cancelRequest').addEventListener('click', () => {
 });
 
 
-
-// إلغاء طلب العامل
-document.getElementById('cancelRequest').addEventListener('click', () => {
-    document.getElementById('requestPopup').style.display = 'none';
-});
-
-
         // تأكيد وضع العلامة
         document.getElementById('confirmYes').addEventListener('click', () => {
             const userLocation = map.getCenter();
@@ -516,6 +607,7 @@ window.addEventListener('click', (event) => {
 
 
         // عرض معلومات عن العمال
+
         document.getElementById('requestWater').addEventListener('click', () => {
     const workerInfo = document.getElementById('workerInfo');
     const workersRef = database.ref('workers');
@@ -533,16 +625,10 @@ window.addEventListener('click', (event) => {
             workerInfo.appendChild(workerElement);
         });
     });
-
+        
     workerInfo.style.display = workerInfo.style.display === 'block' ? 'none' : 'block';
 });
 
-        // عرض معلومات عن المساجد
-        document.getElementById('toggle3D').addEventListener('click', () => {
-            const mosqueInfo = document.getElementById('mosqueInfo');
-            mosqueInfo.innerText = 'معلومات عن المساجد هنا...';
-            mosqueInfo.style.display = mosqueInfo.style.display === 'block' ? 'none' : 'block';
-        });
     </script>
 </body>
 </html>
