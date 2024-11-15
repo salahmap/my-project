@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تطبيق الخريطة المحسن</title>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.css" type="text/css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        #map { height: 100vh; width: 100%; }
+        .controlButton {
+            background-color: rgba(30, 144, 255, 0.8);
+            border: none;
+            border-radius: 10px;
+            padding: 10px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px 0;
+            transition: background-color 0.3s ease;
+            width: 100%;
+            font-size: 14px;
+        }
+        .controlButton:hover {
+            background-color: rgba(30, 144, 255, 1);
+        }
+        .controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1;
+            max-width: 90%;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .iconButton {
+            width: 40px;
+            height: 40px;
+            border: none;
+            cursor: pointer;
+            background: none;
+            margin: 5px;
+            z-index: 2;
+        }
+        .icon {
+            font-size: 20px;
+            color: #ff5722;
+            transition: color 0.3s;
+        }
+        .icon:hover {
+            color: #e64a19;
+        }
+        #locateButtonContainer {
+            position: absolute;
+            bottom: 20px; /* مسافة من الأسفل */
+            right: 20px; /* مسافة من اليمين */
+            z-index: 2;
+        }
+        #locateButton {
+            background-color: rgba(30, 144, 255, 0.8);
+            border: none;
+            border-radius: 10px;
+            padding: 10px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            font-size: 14px;
+        }
+        #locateButton:hover {
+            background-color: rgba(30, 144, 255, 1);
+        }
+    </style>
+</head>
+<body>
+    <h1 id="title" style="display: none;">تطبيق الخريطة المحسن</h1>
+    <div id="map"></div>
+
+    <!-- نافذة عرض تفاصيل العمل -->
+<div id="jobDetailsPopup" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; border-radius:10px; padding:20px; z-index:3;">
+    <h2>تفاصيل العمل</h2>
+    <p id="jobDescription"></p>
+    <p id="jobLocation"></p>
+    <p id="jobDuration"></p>
+    <p id="jobBudget"></p>
+    <button id="acceptJobButton">قبول الطلب</button>
+    <button onclick="document.getElementById('jobDetailsPopup').style.display='none'">إغلاق</button>
+</div>
+
+    <div class="controls">
+        <button id="toggleWeather" class="iconButton">
+            <i class="fas fa-cloud-sun icon"></i>
+        </button>
+        <select id="styleSelector" class="controlButton">
+            <option value="streets">شوارع</option>
+            <option value="satellite">الأقمار الصناعية</option>
+            <option value="outdoors">خارجية</option>
+            <option value="hybrid" selected>هايبرد</option>
+            <option value="dark">الوضع الليلي</option> <!-- إضافة الوضع الليلي هنا -->
+        </select>
+        <button id="requestWater" class="controlButton">طلب ماء</button>
+        <div id="weatherInfo"></div>
+        <div id="workerInfo"></div>
+    </div>
+
+    <div id="locateButtonContainer">
+        <button id="locateButton">تحديد موقعي</button>
+    </div>
+
+    <!-- نافذة التحذير -->
+    <div id="confirmationPopup" style="display:none; position:fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 10px; padding: 20px; z-index: 3;">
+        <h2>تحذير</h2>
+        <p>سيتم وضع العلامة في المكان الذي تقف فيه حاليا. هل أنت موافق؟</p>
+        <button id="confirmYes">نعم</button>
+        <button id="confirmNo">لا</button>
+    </div>
+
+    <!-- نافذة إدخال الاسم ورقم الهاتف -->
+    <div id="inputPopup" style="display:none; position:fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 10px; padding: 20px; z-index: 3;">
+        <h2>إضافة معلومات</h2>
+        <label for="nameInput">اسم:</label>
+        <input type="text" id="nameInput" placeholder="أدخل الاسم">
+        <label for="phoneInput">رقم هاتف:</label>
+        <input type="text" id="phoneInput" placeholder="أدخل رقم الهاتف">
+        <button id="submitInfo">التالي</button>
+        <button id="cancelInput">إلغاء</button>
+    </div>
+
+    <!-- نافذة إدخال تفاصيل الطلب -->
+<div id="requestPopup" style="display:none; position:fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 10px; padding: 20px; z-index: 3;">
+    <h2>إدخال تفاصيل الطلب</h2>
+    <label for="workTypeInput">نوع العمل:</label>
+    <select id="workTypeInput">
+        <option value="سباكة">سباكة</option>
+        <option value="كهرباء">كهرباء</option>
+        <option value="نقل">نقل</option>
+        <option value="أخرى">أخرى</option>
+    </select>
+    <label for="budgetInput">الميزانية المتاحة:</label>
+    <input type="text" id="budgetInput" placeholder="أدخل الميزانية">
+    <label for="timeInput">الوقت المطلوب:</label>
+    <input type="text" id="timeInput" placeholder="أدخل الزمن المطلوب">
+    <button id="submitRequest">إرسال الطلب</button>
+    <button id="cancelRequest">إلغاء</button>
+</div>
+
+
+<!-- مكتبات Firebase App و Messaging -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+<!-- مكتبات إضافية -->
+<script src="https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.js"></script>
+<script src="https://unpkg.com/@turf/turf"></script>
+<script src="https://js.pusher.com/beams/latest/beam.min.js"></script>
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.js"></script>
+<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.7.0/mapbox-gl-geocoder.min.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.7.0/mapbox-gl-geocoder.css" rel="stylesheet" />
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // إعداد متغيرات Pusher Beams
+        const pusherInstanceId = 'c9641070-f290-4aab-9239-18b096e3d8bc';
+        const pusherAuthorization = 'A44776EFA1114922AA2C29739FDB9EEC7E2EDED4707BD6EE5C6C3BB07FD58BF8';
+
+        // إعداد عميل Pusher Beams
+        const beamsClient = new PusherPushNotifications.Client({
+            instanceId: pusherInstanceId
+        });
+
+        beamsClient.start()
+            .then(() => beamsClient.addDeviceInterest('general'))
+            .then(() => console.log('Pusher Beams جاهز لاستقبال الإشعارات'))
+            .catch(console.error);
+
+        // دالة إرسال إشعار باستخدام Pusher Beams
+        function sendPusherNotification(workerId, message) {
+            fetch(`https://${pusherInstanceId}.pushnotifications.pusher.com/publish_api/v1/instances/${pusherInstanceId}/publishes`, {
+    method: 'POST',
+    headers: {
+        'Authorization': `Bearer ${pusherAuthorization}`,
+        'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+        interests: [workerId],
+        fcm: {
+            notification: {
+                title: "إشعار جديد",
+                body: message
+            }
+        }
+    })
+})
+        
+.then(response => {
+    if (!response.ok) {
+        throw new Error(`خطأ في إرسال الإشعار: ${response.statusText}`);
+    }
+    return response.json();
+})
+.then(data => console.log("تم إرسال الإشعار بنجاح:", data))
+.catch(error => {
+    console.error("فشل إرسال الإشعار:", error);
+  
+    alert("حدث خطأ أثناء إرسال الإشعار. يرجى المحاولة لاحقاً.");
+
+});
+        }
+
+         // دالة لإعادة تعيين الحقول في inputPopup عند النقر على زر "إلغاء"
+         document.getElementById('cancelInput').addEventListener('click', () => {
+            document.getElementById('nameInput').value = ''; // إعادة تعيين حقل الاسم
+            document.getElementById('phoneInput').value = ''; // إعادة تعيين حقل الهاتف
+            document.getElementById('inputPopup').style.display = 'none'; // إخفاء النافذة
+        });
+
+        // دالة لإعادة تعيين الحقول في requestPopup عند النقر على زر "إلغاء"
+        document.getElementById('cancelRequest').addEventListener('click', () => {
+            document.getElementById('workTypeInput').value = ''; // إعادة تعيين حقل نوع العمل
+            document.getElementById('budgetInput').value = '';   // إعادة تعيين حقل الميزانية
+            document.getElementById('timeInput').value = '';     // إعادة تعيين حقل الوقت
+            document.getElementById('requestPopup').style.display = 'none'; // إخفاء النافذة
+        });
+
+        });
+    
+
+
+    
+</script>
+
+  
+  <script>
+    // إعداد Firebase
+    const firebaseConfig = {
+        apiKey: "ce6cae3c0977e051e1924a4ac1ece1aa",
+        authDomain: "adlo-44d1b.firebaseapp.com",
+        databaseURL: "https://adlo-44d1b-default-rtdb.firebaseio.com/",
+        projectId: "adlo-44d1b",
+        storageBucket: "adlo-44d1b.appspot.com",
+        messagingSenderId: "96260637269",
+        appId: "1:96260637269:web:e3bc37ab2b41038c254adc",
+        measurementId: "G-R0SGBWC3CJ"
+    };
+    firebase.initializeApp(firebaseConfig);
+
+    // مرجع إلى قاعدة بيانات Firebase حيث سيتم تخزين بيانات العمال
+    const database = firebase.database();
+    const workersRef = database.ref('workers');
+
+    // دالة لإضافة عامل جديد إلى قاعدة البيانات
+    function addWorker(workerId, workerName, lng, lat) {
+      workersRef.child(workerId).set({
+        name: workerName,
+        location: {
+          lng: lng,
+          lat: lat
+        }
+      });
+    }
+
+    
+    // استخدام الدالة لإضافة عمال جدد
+    addWorker("worker1", "العامل 1", 13.1913, 32.8872);
+    addWorker("worker2", "العامل 2", 12.3456, 31.1234);
+
+
+        function sendNotificationToNearbyWorkers(requestData, userLocation) {
+  const radius = 10;  // نصف قطر البحث بالكيلومترات
+
+  // مرجع العمال في Firebase
+  const workersRef = database.ref('workers');
+  workersRef.once('value', (snapshot) => {
+    snapshot.forEach((workerSnapshot) => {
+      const worker = workerSnapshot.val();
+      const distance = calculateDistance(userLocation, worker.location); // حساب المسافة
+      
+      if (distance <= radius) {
+        // إرسال الإشعار فقط للعمال القريبين
+        fetch('https://c9641070-f290-4aab-9239-18b096e3d8bc.pushnotifications.pusher.com/publish_api/v1/instances/c9641070-f290-4aab-9239-18b096e3d8bc/publishes', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer A44776EFA1114922AA2C29739FDB9EEC7E2EDED4707BD6EE5C6C3BB07FD58BF8',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            interests: [workerSnapshot.key], // قناة الإشعار للعامل المحدد
+            notification: {
+              title: "يوجد عمل متاح!",
+              body: `طلب ${requestData.workType} بالقرب منك. اضغط لرؤية التفاصيل.`,
+              deep_link: "https://your-site.com/request-details" // رابط لتفاصيل الطلب
+            }
+          })
+        }).then(response => response.json())
+          .then(data => console.log("تم إرسال الإشعار:", data))
+          .catch(console.error);
+      }
+    });
+  });
+}
+
+ // دالة لتعقب مواقع العمال وتحديث موقعهم على الخريطة
+ function startTracking(workerId) {
+        const workerRef = database.ref(`workers/${workerId}/location`);
+        workerRef.on('value', (snapshot) => {
+            const location = snapshot.val();
+            if (location) {
+                updateWorkerMarker(location, workerId); // تحديث موقع العامل على الخريطة
+            }
+        });
+    }
+
+    // دالة لتحديث العلامة على الخريطة لكل عامل
+    function updateWorkerMarker(location, workerId) {
+        if (!window.workerMarkers) {
+            window.workerMarkers = {};
+        }
+
+        if (!window.workerMarkers[workerId]) {
+            window.workerMarkers[workerId] = new mapboxgl.Marker().setLngLat([location.lng, location.lat]).addTo(map);
+        } else {
+            window.workerMarkers[workerId].setLngLat([location.lng, location.lat]);
+        }
+    }
+
+    // استدعاء startTracking لكل عامل عند إضافته أو تحديثه
+    workersRef.on('child_added', (snapshot) => {
+        startTracking(snapshot.key);
+    });
+
+
+        // مفتاح Mapbox
+        const mapboxToken = "pk.eyJ1IjoiY2hvb3NlbWUiLCJhIjoiY20wZnVpemI2MHpreTJqcjR4ZThuam9pYyJ9.F1CjHrnJ7m-VwM_LHt0Q9Q";
+        mapboxgl.accessToken = mapboxToken;
+
+        // إعداد الأنماط المختلفة للخريطة
+        const styles = {
+            streets: 'mapbox://styles/mapbox/streets-v11',
+            satellite: 'mapbox://styles/mapbox/satellite-v9',
+            outdoors: 'mapbox://styles/mapbox/outdoors-v11',
+            hybrid: 'mapbox://styles/mapbox/satellite-streets-v11',
+            dark: 'mapbox://styles/mapbox/dark-v10' // إضافة نمط الوضع الليلي
+        };
+
+        // إنشاء الخريطة مع زوم منخفض جدًا كأنك ترى الأرض من الفضاء
+        const map = new mapboxgl.Map({
+            container: 'map', 
+            style: styles.hybrid, 
+            center: [13.1913, 32.8872], // إحداثيات طرابلس
+            zoom: 2 // زوم 2 لعرض العالم من بعيد
+        });
+
+        // بعد تحميل الخريطة، قم بالتحرك تدريجيًا نحو طرابلس
+map.on('load', () => {
+    map.flyTo({ center: [13.1913, 32.8872], zoom: 10, speed: 0.2 });
+
+    // الكود الجديد لعرض الطلبات على الخريطة
+    const requestsRef = database.ref('workRequests');
+    requestsRef.on('child_added', (data) => {
+        const request = data.val();
+        const marker = new mapboxgl.Marker()
+            .setLngLat([request.location.lng, request.location.lat]) // استخدم الإحداثيات من الطلب
+            .setPopup(new mapboxgl.Popup().setHTML(`<h3>${request.workType}</h3><p>الميزانية: ${request.budget}</p><p>الوقت: ${request.time}</p>`))
+            .addTo(map); // أضف العلامة إلى الخريطة
+    });
+});
+
+
+        // بعد تحميل الخريطة، قم بالتحرك تدريجيًا نحو طرابلس
+        map.on('load', () => {
+            map.flyTo({ center: [13.1913, 32.8872], zoom: 10, speed: 0.2 });
+        });
+
+        // إعداد التحكم في البحث
+        const geocoder = new MapboxGeocoder({
+            accessToken: mapboxgl.accessToken,
+            language: "ar",
+            marker: true,
+            mapboxgl: mapboxgl
+        });
+
+        map.addControl(geocoder);
+
+        // إعداد التحكم في تحديد الموقع
+        const locateControl = new mapboxgl.GeolocateControl({
+            positionOptions: {
+                enableHighAccuracy: true
+            },
+            trackUserLocation: true,
+            showUserHeading: true,
+            fitBoundsOptions: {
+                maxZoom: 15
+            }
+        });
+
+        map.addControl(locateControl);
+
+        // إضافة الأزرار للتبديل بين الأنماط
+        document.getElementById('styleSelector').addEventListener('change', function () {
+            const selectedStyle = this.value;
+            map.setStyle(styles[selectedStyle]);
+        });
+
+        // تفعيل خاصية تحديد الموقع
+        document.getElementById('locateButton').addEventListener('click', () => {
+            locateControl.trigger();
+        });
+
+        document.getElementById('submitRequest').addEventListener('click', () => {
+  const userLocation = map.getCenter();
+  const requestData = {
+    workType: document.getElementById('workTypeInput').value,
+    budget: document.getElementById('budgetInput').value,
+    time: document.getElementById('timeInput').value,
+    location: {
+      lng: userLocation.lng,
+      lat: userLocation.lat
+    },
+  };
+
+  const requestsRef = database.ref('workRequests');
+  requestsRef.push(requestData)
+    .then(() => {
+      alert('تم إرسال الطلب بنجاح.');
+      sendNotificationToNearbyWorkers(requestData, userLocation); // استدعاء دالة إرسال الإشعار
+    })
+    .catch((error) => {
+      alert('حدث خطأ: ' + error.message);
+    });
+});
+
+
+// حدث عند النقر على زر "طلب عامل"
+document.getElementById('requestWorker').addEventListener('click', () => {
+    // الحصول على موقع المستخدم الحالي باستخدام getCenter من الخريطة
+    const userLocation = map.getCenter(); // أو يمكنك استخدام موقع مخصص إذا أردت.
+
+    // عرض نافذة إدخال تفاصيل الطلب
+    document.getElementById('requestPopup').style.display = 'block';
+
+    // حدث عند النقر على زر "إرسال الطلب"
+    document.getElementById('submitRequest').addEventListener('click', () => {
+        const workType = document.getElementById('workTypeInput').value;
+        const budget = document.getElementById('budgetInput').value;
+        const time = document.getElementById('timeInput').value;
+
+        // التأكد من أن جميع الحقول قد تم ملؤها
+        if (workType && budget && time) {
+            const requestData = {
+                workType: workType,
+                budget: budget,
+                time: time,
+                location: {
+                    lng: userLocation.lng,  // إحداثيات الموقع الحالي
+                    lat: userLocation.lat
+                }
+            };
+
+            // إرسال بيانات الطلب إلى Firebase
+            const requestsRef = database.ref('workRequests');
+            requestsRef.push(requestData)
+                .then(() => {
+                    alert('تم إرسال الطلب بنجاح.');
+                    document.getElementById('requestPopup').style.display = 'none';
+                    document.getElementById('workTypeInput').value = '';
+                    document.getElementById('budgetInput').value = '';
+                    document.getElementById('timeInput').value = '';
+                })
+                .catch((error) => {
+                    alert('حدث خطأ: ' + error.message);
+                });
+        } else {
+            alert('يرجى ملء جميع الحقول.');
+        }
+    });
+
+    // إلغاء طلب العامل
+    document.getElementById('cancelRequest').addEventListener('click', () => {
+        document.getElementById('requestPopup').style.display = 'none';
+    });
+});
+
+
+
+        // تأكيد وضع العلامة
+        document.getElementById('confirmYes').addEventListener('click', () => {
+            const userLocation = map.getCenter();
+            // إضافة العلامة في الموقع الحالي
+            new mapboxgl.Marker()
+                .setLngLat(userLocation)
+                .addTo(map);
+            // عرض نافذة إدخال الاسم ورقم الهاتف
+            document.getElementById('inputPopup').style.display = 'block';
+            document.getElementById('confirmationPopup').style.display = 'none';
+        });
+
+        // إلغاء وضع العلامة
+        document.getElementById('confirmNo').addEventListener('click', () => {
+            document.getElementById('confirmationPopup').style.display = 'none';
+        });
+
+        // إرسال المعلومات المدخلة إلى Firebase
+        document.getElementById('submitInfo').addEventListener('click', () => {
+            const name = document.getElementById('nameInput').value;
+            const phone = document.getElementById('phoneInput').value;
+            if (name && phone) {
+                const markerData = {
+                    name: name,
+                    phone: phone,
+                    location: {
+                        lng: map.getCenter().lng,
+                        lat: map.getCenter().lat
+                    }
+                };
+                const markersRef = database.ref('markers');
+                markersRef.push(markerData)
+                    .then(() => {
+                        alert('تم حفظ العلامة بنجاح.');
+                        document.getElementById('inputPopup').style.display = 'none';
+                        document.getElementById('nameInput').value = '';
+                        document.getElementById('phoneInput').value = '';
+                    })
+                    .catch((error) => {
+                        alert('حدث خطأ: ' + error.message);
+                    });
+            } else {
+                alert('يرجى ملء جميع الحقول.');
+            }
+        });
+
+        // إلغاء نافذة إدخال المعلومات
+        document.getElementById('cancelInput').addEventListener('click', () => {
+            document.getElementById('inputPopup').style.display = 'none';
+        });
+
+
+        // عرض معلومات عن العمال
+        document.getElementById('requestWater').addEventListener('click', () => {
+            const workerInfo = document.getElementById('workerInfo');
+            workerInfo.innerText = 'العمال المتاحين هنا...';
+            workerInfo.style.display = workerInfo.style.display === 'block' ? 'none' : 'block';
+        });
+
+        // دالة لعرض تفاصيل العمل
+function showJobDetails(jobData) {
+    document.getElementById('jobDescription').innerText = `وصف العمل: ${jobData.workType}`;
+    document.getElementById('jobLocation').innerText = `الموقع: (${jobData.location.lat}, ${jobData.location.lng})`;
+    document.getElementById('jobDuration').innerText = `المدة: ${jobData.time}`;
+    document.getElementById('jobBudget').innerText = `المبلغ: ${jobData.budget}`;
+    document.getElementById('jobDetailsPopup').style.display = 'block';
+}
+
+// حدث عند الضغط على زر القبول
+document.getElementById('acceptJobButton').addEventListener('click', () => {
+    alert('تم قبول العمل بنجاح');
+    document.getElementById('jobDetailsPopup').style.display = 'none';
+});
+
+        
+    </script>
+</body>
+</html>
