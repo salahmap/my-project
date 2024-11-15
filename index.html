@@ -220,7 +220,17 @@ const messaging = firebase.messaging();
 const database = firebase.database();
 
 
-        
+function calculateDistance(loc1, loc2) {
+    const R = 6371; // نصف قطر الأرض بالكيلومتر
+    const dLat = (loc2.lat - loc1.lat) * Math.PI / 180;
+    const dLon = (loc2.lng - loc1.lng) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(loc1.lat * Math.PI / 180) * Math.cos(loc2.lat * Math.PI / 180) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c; // المسافة بالكيلومترات
+}
+
         
         function startTracking(workerId) {
     const workerRef = database.ref(`workers/${workerId}/location`);
@@ -230,42 +240,27 @@ const database = firebase.database();
     });
 }
 
-
-function sendNotificationToNearbyWorkers(requestData, userLocation) {
-  const radius = 10;  // نصف قطر البحث بالكيلومترات
-
-
-  
-  // افتراض: `database.ref('workers')` يحتوي على بيانات العمال في Firebase
-  const workersRef = database.ref('workers');
-  workersRef.once('value', (snapshot) => {
-    snapshot.forEach((workerSnapshot) => {
-      const worker = workerSnapshot.val();
-      const distance = calculateDistance(userLocation, worker.location); // حساب المسافة
-      
-      if (distance <= radius) {
-        // إرسال الإشعار فقط للعمال القريبين
-        fetch('https://c9641070-f290-4aab-9239-18b096e3d8bc.pushnotifications.pusher.com/publish_api/v1/instances/c9641070-f290-4aab-9239-18b096e3d8bc/publishes', {
-          method: 'POST',
-          headers: {
-            'Authorization': 'Bearer A44776EFA1114922AA2C29739FDB9EEC7E2EDED4707BD6EE5C6C3BB07FD58BF8',
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            interests: [workerSnapshot.key], // قناة الإشعار للعامل المحدد
-            notification: {
-              title: "يوجد عمل متاح!",
-              body: `طلب ${requestData.workType} بالقرب منك. اضغط لرؤية التفاصيل.`,
-              deep_link: "https://your-site.com/request-details" // رابط لتفاصيل الطلب
-            }
-          })
-        }).then(response => response.json())
-          .then(data => console.log("تم إرسال الإشعار:", data))
-          .catch(console.error);
-      }
-    });
-  });
+function sendNotificationsToNearbyWorkers(requestData, userLocation) {
+    const workersRef = database.ref('workers');
+    
+    workersRef.once('value')
+        .then((snapshot) => {
+            snapshot.forEach((worker) => {
+                const workerData = worker.val();
+                const distance = calculateDistance(userLocation, workerData.location);
+                if (distance <= 10) { // إذا كانت المسافة أقل من 10 كيلومترات
+                    sendPushNotification(workerData.deviceToken, `هناك طلب ${requestData.workType} قريب من موقعك.`);
+                }
+            });
+        })
+        .catch((error) => {
+            console.error('خطأ في تحميل بيانات العمال:', error);
+            alert('حدث خطأ أثناء جلب بيانات العمال. يرجى المحاولة مرة أخرى.');
+        });
 }
+
+
+ 
 
 
 function updateWorkerMarker(location) {
@@ -289,72 +284,68 @@ loadWorkers();
 // الدالة submitRequest
 
 
-document.getElementById('submitRequest').addEventListener('click', () => {
-  const userLocation = map.getCenter();
-  const requestData = {
-    workType: document.getElementById('workTypeInput').value,
-    budget: document.getElementById('budgetInput').value,
-    time: document.getElementById('timeInput').value,
-    location: {
-      lng: userLocation.lng,
-      lat: userLocation.lat
-    },
-  };
-
-  const requestsRef = database.ref('workRequests');
-  requestsRef.push(requestData)
-    .then(() => {
-      alert('تم إرسال الطلب بنجاح.');
-      sendNotificationToNearbyWorkers(requestData, userLocation); // استدعاء دالة إرسال الإشعار
-    })
-    .catch((error) => {
-      alert('حدث خطأ: ' + error.message);
-    });
-});
 
 
-document.getElementById('submitRequest').addEventListener('click', () => {
+// الدالة submitRequest
+function submitRequest() {
     const userLocation = map.getCenter();
-    // ... استلام البيانات ...
+    const workType = document.getElementById('workTypeInput').value;
+    const budget = document.getElementById('budgetInput').value;
+    const time = document.getElementById('timeInput').value;
 
-    const requestsRef = database.ref('workRequests');
-    requestsRef.push(requestData)
-        .then((ref) => {
-            alert('تم إرسال الطلب بنجاح.');
-            // ... إخفاء النافذة وإعادة تعيين المدخلات ...
+    if (workType && budget && time) {
+        const requestData = {
+            workType: workType,
+            budget: budget,
+            time: time,
+            location: {
+                lng: userLocation.lng,
+                lat: userLocation.lat
+            },
+        };
+        const requestsRef = database.ref('workRequests');
+        
+        requestsRef.push(requestData)
+            .then(() => {
+                alert('تم إرسال الطلب بنجاح.');
+                document.getElementById('requestPopup').style.display = 'none';
+                document.getElementById('workTypeInput').value = '';
+                document.getElementById('budgetInput').value = '';
+                document.getElementById('timeInput').value = '';
 
-            // إضافة: حساب المسافة بين العمال وإرسال الإشعار
-            const workersRef = database.ref('workers');
-            workersRef.once('value', (snapshot) => {
-                snapshot.forEach((worker) => {
-                    const workerData = worker.val();
-                    const distance = calculateDistance(userLocation, workerData.location);
-                    if (distance <= 10) { 
-                        alert(`العامل ${workerData.name} يقترب من موقع الطلب!`);
-                        sendPushNotification(workerData.deviceToken, `هناك طلب ${workType} قريب من موقعك.`);
-                    }
-                });
+                // استدعاء دالة لإرسال إشعار للعمال القريبين
+                sendNotificationsToNearbyWorkers(requestData, userLocation);
+            })
+            .catch((error) => {
+                console.error('خطأ في إرسال الطلب إلى Firebase:', error);
+                alert('حدث خطأ أثناء إرسال الطلب. يرجى المحاولة مرة أخرى لاحقًا.');
             });
-        })
-        .catch((error) => {
-            alert('حدث خطأ: ' + error.message);
-        });
-});
+    } else {
+        alert('يرجى ملء جميع الحقول.');
+    }
+}
+
+
+function isWithinRadius(workerLocation, targetLocation, radius = 500) {
+    const distance = calculateDistance(workerLocation, targetLocation);
+    return distance <= radius;
+}
+
+
+
+// إضافة حدث عند النقر على زر "إرسال الطلب"
+document.getElementById('submitRequest').addEventListener('click', submitRequest);
+
+
+
+
+
 
         // مفتاح Mapbox
         const mapboxToken = "pk.eyJ1IjoiY2hvb3NlbWUiLCJhIjoiY20wZnVpemI2MHpreTJqcjR4ZThuam9pYyJ9.F1CjHrnJ7m-VwM_LHt0Q9Q";
         mapboxgl.accessToken = mapboxToken;
         function isWithinRadius(workerLocation, targetLocation, radius = 500) {
-            function calculateDistance(loc1, loc2) {
-    const R = 6371; // نصف قطر الأرض بالكيلومتر
-    const dLat = (loc2.lat - loc1.lat) * Math.PI / 180;
-    const dLon = (loc2.lng - loc1.lng) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-              Math.cos(loc1.lat * Math.PI / 180) * Math.cos(loc2.lat * Math.PI / 180) *
-              Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c; // المسافة بالكيلومترات
-}
+
 
 function sendPushNotification(deviceToken, message) {
     const notificationPayload = {
@@ -469,53 +460,7 @@ function checkProximityAndNotify(workerLocation, clientLocation) {
 
 // حدث عند النقر على زر "طلب عامل"
 // إضافة الحدث لمرة واحدة فقط عند تحميل الصفحة
-// الدالة submitRequest
-document.getElementById('submitRequest').addEventListener('click', () => {
-    const userLocation = map.getCenter();
-    const workType = document.getElementById('workTypeInput').value;
-    const budget = document.getElementById('budgetInput').value;
-    const time = document.getElementById('timeInput').value;
 
-    if (workType && budget && time) {
-        const requestData = {
-            workType: workType,
-            budget: budget,
-            time: time,
-            location: {
-                lng: userLocation.lng,
-                lat: userLocation.lat
-            },
-        };
-
-        const requestsRef = database.ref('workRequests');
-        requestsRef.push(requestData)
-            .then((ref) => {
-                alert('تم إرسال الطلب بنجاح.');
-                document.getElementById('requestPopup').style.display = 'none';
-                document.getElementById('workTypeInput').value = '';
-                document.getElementById('budgetInput').value = '';
-                document.getElementById('timeInput').value = '';
-
-                // إضافة: حساب المسافة بين العمال وإرسال الإشعار
-                const workersRef = database.ref('workers');
-                workersRef.once('value', (snapshot) => {
-                    snapshot.forEach((worker) => {
-                        const workerData = worker.val();
-                        const distance = calculateDistance(userLocation, workerData.location);
-                        if (distance <= 10) {
-                            alert(`العامل ${workerData.name} يقترب من موقع الطلب!`);
-                            sendPushNotification(workerData.deviceToken, `هناك طلب ${workType} قريب من موقعك.`);
-                        }
-                    });
-                });
-            })
-            .catch((error) => {
-                alert('حدث خطأ: ' + error.message);
-            });
-    } else {
-        alert('يرجى ملء جميع الحقول.');
-    }
-});
 
 
 
