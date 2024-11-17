@@ -258,6 +258,53 @@
     const database = firebase.database();
     const workersRef = database.ref('workers');
 
+    // دالة لإنشاء دفعة من المعرّفات
+function generateWorkerIds(batchSize) {
+    for (let i = 0; i < batchSize; i++) {
+        const workerId = `worker_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+        database.ref(`availableWorkerIds/${workerId}`).set({ used: false });
+    }
+    console.log(`${batchSize} معرّفات تم إنشاؤها بنجاح.`);
+}
+
+// إنشاء دفعة من المعرّفات عند الحاجة
+generateWorkerIds(5000); // مثال: إنشاء 5000 معرّف
+
+
+
+// تعريف المراجع
+const workerId = "worker_123"; // معرف العامل (يجب استبداله بمعرف حقيقي)
+const workerRef = database.ref(`workers/${workerId}`);
+
+
+// مستمع لقبول الطلبات الجديدة
+const requestRef = database.ref('workRequests');
+requestRef.on('child_added', (snapshot) => {
+    const requestData = snapshot.val();
+    const requestId = snapshot.key;
+
+    // عرض الطلب للعامل للتأكيد
+    const confirmRequest = confirm(`طلب جديد: ${requestData.workType}. هل تريد قبوله؟`);
+    if (confirmRequest) {
+        // تحديث حالة الطلب إلى accepted
+        requestRef.child(requestId).update({
+            status: 'accepted',
+            workerId: workerId
+        });
+
+        // إرسال موقع العامل
+        updateWorkerLocation();
+    }
+});
+
+// دالة لتحديث موقع العامل
+function updateWorkerLocation(workerId, location) {
+    const workerRef = database.ref(`workers/${workerId}/location`);
+    workerRef.set(location)
+        .then(() => console.log('تم تحديث موقع العامل بنجاح'))
+        .catch((error) => console.error('خطأ في تحديث موقع العامل:', error));
+}
+
     // دالة لإضافة عامل جديد إلى قاعدة البيانات
     function addWorker(workerId, workerName, lng, lat) {
       workersRef.child(workerId).set({
@@ -269,7 +316,55 @@
       });
     }
 
-    
+    // دالة لتخصيص معرّف لعامل معين
+function assignWorkerId(workerName, lng, lat) {
+    database.ref('availableWorkerIds').orderByChild('used').equalTo(false).limitToFirst(1).once('value')
+        .then((snapshot) => {
+            if (snapshot.exists()) {
+                const workerId = Object.keys(snapshot.val())[0]; // أول معرّف غير مستخدم
+
+                // تحديث حالة المعرّف إلى "مستخدم"
+                database.ref(`availableWorkerIds/${workerId}`).update({ used: true });
+
+                // تسجيل العامل في قاعدة البيانات
+                database.ref(`workers/${workerId}`).set({
+                    name: workerName,
+                    assignedAt: new Date().toISOString(),
+                    location: { lng: lng, lat: lat }
+                });
+
+                console.log(`تم تخصيص المعرّف ${workerId} للعامل: ${workerName}`);
+            } else {
+                console.log("لا توجد معرّفات متاحة.");
+            }
+        })
+        .catch((error) => console.error("خطأ أثناء تخصيص المعرّف:", error));
+}
+
+// مثال: تخصيص معرّف لعامل جديد
+assignWorkerId("العامل محمد", 13.1913, 32.8872);
+
+
+// دالة لتسجيل الدخول باستخدام معرّف العامل
+function loginWorker(enteredId) {
+    database.ref(`workers/${enteredId}`).once('value')
+        .then((snapshot) => {
+            if (snapshot.exists()) {
+                const workerData = snapshot.val();
+                console.log(`تم تسجيل الدخول بنجاح: ${workerData.name}`);
+            } else {
+                console.log("المعرّف غير صالح.");
+            }
+        })
+        .catch((error) => console.error("خطأ أثناء تسجيل الدخول:", error));
+}
+
+// مثال: العامل يدخل معرّفه عند تسجيل الدخول
+loginWorker("worker_12345");
+
+
+
+
     // استخدام الدالة لإضافة عمال جدد
     addWorker("worker1", "العامل 1", 13.1913, 32.8872);
     addWorker("worker2", "العامل 2", 12.3456, 31.1234);
@@ -311,14 +406,27 @@
 
  // دالة لتعقب مواقع العمال وتحديث موقعهم على الخريطة
  function startTracking(workerId) {
-        const workerRef = database.ref(`workers/${workerId}/location`);
-        workerRef.on('value', (snapshot) => {
-            const location = snapshot.val();
-            if (location) {
-                updateWorkerMarker(location, workerId); // تحديث موقع العامل على الخريطة
-            }
-        });
+    const workerRef = database.ref(`workers/${workerId}/location`);
+    workerRef.on('value', (snapshot) => {
+        const location = snapshot.val();
+        if (location) {
+            console.log(`تم تحديث موقع العامل ${workerId}:`, location);
+            updateWorkerMarker(location, workerId); // افترض أن لديك وظيفة لتحديث العلامة على الخريطة
+        } else {
+            console.log(`لم يتم العثور على موقع للعامل ${workerId}`);
+        }
+    });
+}
+
+workerRef.child('currentRequest').on('value', (snapshot) => {
+    const requestData = snapshot.val();
+    if (requestData) {
+        console.log(`تم تحديث حالة الطلب للعامل ${workerId}: ${requestData.status}`);
+    } else {
+        console.log(`لا توجد طلبات حاليًا للعامل ${workerId}`);
     }
+});
+
 
     // دالة لتحديث العلامة على الخريطة لكل عامل
     function updateWorkerMarker(location, workerId) {
@@ -335,8 +443,20 @@
 
     // استدعاء startTracking لكل عامل عند إضافته أو تحديثه
     workersRef.on('child_added', (snapshot) => {
-        startTracking(snapshot.key);
+    const workerId = snapshot.key; // معرف العامل
+    startTracking(workerId);
+
+    // إضافة مستمع لتحديث الطلبات
+    const workerRef = database.ref(`workers/${workerId}`);
+    workerRef.child('currentRequest').on('value', (snapshot) => {
+        const requestData = snapshot.val();
+        if (requestData) {
+            console.log(`تم تحديث حالة الطلب للعامل ${workerId}: ${requestData.status}`);
+        } else {
+            console.log(`لا توجد طلبات حاليًا للعامل ${workerId}`);
+        }
     });
+});
 
 
         // مفتاح Mapbox
