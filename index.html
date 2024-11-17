@@ -14,6 +14,22 @@
             padding: 0;
             background-color: #f4f4f4;
         }
+
+
+            /* تصميم الإشعار */
+    .notification {
+        position: fixed;
+        bottom: 10px;
+        right: 10px;
+        background-color: rgba(30, 144, 255, 0.9);
+        color: white;
+        padding: 10px 20px;
+        border-radius: 5px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+        z-index: 1000;
+    }
+
+
         #map { height: 100vh; width: 100%; }
         .controlButton {
             background-color: rgba(30, 144, 255, 0.8);
@@ -219,6 +235,15 @@ firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 const database = firebase.database();
 
+// مراقبة حالة الطلب في Firebase
+const requestRef = database.ref('workRequests/{requestId}');
+requestRef.on('value', (snapshot) => {
+    const requestData = snapshot.val();
+    if (requestData.status === 'accepted') {
+        displayNotification('تم قبول طلبك، العامل في الطريق.');
+        showWorkerLocation(requestData.workerLocation);
+    }
+});
 
 function calculateDistance(loc1, loc2) {
     const R = 6371; // نصف قطر الأرض بالكيلومتر
@@ -278,6 +303,19 @@ function loadWorkers() {
     });
 }
 
+
+// وظيفة عرض موقع العامل على الخريطة
+function showWorkerLocation(workerLocation) {
+    if (window.workerMarker) {
+        window.workerMarker.setLngLat([workerLocation.lng, workerLocation.lat]);
+    } else {
+        window.workerMarker = new mapboxgl.Marker()
+            .setLngLat([workerLocation.lng, workerLocation.lat])
+            .addTo(map);
+    }
+    map.flyTo({ center: [workerLocation.lng, workerLocation.lat], zoom: 15 });
+}
+
 // استدعاء الدالة بعد تهيئة Firebase
 loadWorkers();
 
@@ -309,12 +347,7 @@ function submitRequest() {
             .then(() => {
                 alert('تم إرسال الطلب بنجاح.');
                 document.getElementById('requestPopup').style.display = 'none';
-                document.getElementById('workTypeInput').value = '';
-                document.getElementById('budgetInput').value = '';
-                document.getElementById('timeInput').value = '';
-
-                // استدعاء دالة لإرسال إشعار للعمال القريبين
-                sendNotificationsToNearbyWorkers(requestData, userLocation);
+                sendNotificationsToNearbyWorkers(requestData, userLocation); // إضافة إشعار
             })
             .catch((error) => {
                 console.error('خطأ في إرسال الطلب إلى Firebase:', error);
@@ -324,6 +357,7 @@ function submitRequest() {
         alert('يرجى ملء جميع الحقول.');
     }
 }
+
 
 
 function isWithinRadius(workerLocation, targetLocation, radius = 500) {
@@ -337,7 +371,14 @@ function isWithinRadius(workerLocation, targetLocation, radius = 500) {
 document.getElementById('submitRequest').addEventListener('click', submitRequest);
 
 
-
+// وظيفة عرض الإشعار
+function displayNotification(message) {
+    const notification = document.createElement('div');
+    notification.className = 'notification';
+    notification.innerText = message;
+    document.body.appendChild(notification);
+    setTimeout(() => notification.remove(), 5000); // إزالة الإشعار بعد 5 ثوانٍ
+}
 
 
 
