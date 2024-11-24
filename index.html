@@ -333,14 +333,17 @@ function submitRequest() {
 
     if (workType && budget && time) {
         const requestData = {
-            workType: workType,
-            budget: budget,
-            time: time,
-            location: {
-                lng: userLocation.lng,
-                lat: userLocation.lat
-            },
-        };
+    workType: workType,
+    budget: budget,
+    time: time,
+    location: {
+        lng: userLocation.lng,
+        lat: userLocation.lat
+    },
+    status: "pending", // حالة الطلب
+    workerId: null      // لا يوجد عامل معين بعد
+};
+
         const requestsRef = database.ref('workRequests');
         
         requestsRef.push(requestData)
