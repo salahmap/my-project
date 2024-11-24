@@ -150,6 +150,20 @@
     <input type="text" id="timeInput" placeholder="أدخل الزمن المطلوب">
     <button id="submitRequest">إرسال الطلب</button>
     <button id="cancelRequest">إلغاء</button>
+
+    <!-- تخصيص معرّف لعامل -->
+<div id="assignIdContainer" style="margin: 20px; background: white; padding: 20px; border-radius: 10px; box-shadow: 0px 4px 6px rgba(0,0,0,0.1);">
+    <h3>تخصيص معرّف لعامل</h3>
+    <input type="text" id="workerIdInput" placeholder="معرّف العامل" style="margin-bottom: 10px; width: 100%; padding: 8px;">
+    <input type="text" id="workerNameInput" placeholder="اسم العامل" style="margin-bottom: 10px; width: 100%; padding: 8px;">
+    <button id="assignIdButton" style="padding: 10px; background-color: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer;">تخصيص المعرّف</button>
+
+    <!-- تسجيل الدخول باستخدام المعرّف -->
+    <div id="loginPopup" style="display: flex; flex-direction: column; align-items: center; justify-content: center; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 10px; box-shadow: 0px 4px 6px rgba(0,0,0,0.3); z-index: 10;">
+        <h3>أدخل المعرّف الخاص بك للبدء</h3>
+        <input type="text" id="workerLoginId" placeholder="أدخل معرّف العامل" style="margin-bottom: 10px; width: 200px; padding: 10px; border: 1px solid #ccc; border-radius: 5px;">
+        <button id="loginWorkerButton" style="padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">تسجيل الدخول</button>
+    
 </div>
 
 
@@ -169,6 +183,9 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+       
+        document.getElementById('loginPopup').style.display = 'flex';
+
         // إعداد متغيرات Pusher Beams
         const pusherInstanceId = 'c9641070-f290-4aab-9239-18b096e3d8bc';
         const pusherAuthorization = 'A44776EFA1114922AA2C29739FDB9EEC7E2EDED4707BD6EE5C6C3BB07FD58BF8';
@@ -177,6 +194,16 @@
         const beamsClient = new PusherPushNotifications.Client({
             instanceId: pusherInstanceId
         });
+
+        document.getElementById('loginWorkerButton').addEventListener('click', () => {
+    const workerId = document.getElementById('workerLoginId').value;
+    if (workerId) {
+        loginWorker(workerId);
+    } else {
+        alert('يرجى إدخال معرّف العامل.');
+    }
+});
+
 
         beamsClient.start()
             .then(() => beamsClient.addDeviceInterest('general'))
@@ -232,6 +259,58 @@
             document.getElementById('requestPopup').style.display = 'none'; // إخفاء النافذة
         });
 
+// إخفاء نافذة تسجيل الدخول بعد التحقق من المعرّف
+function hideLoginPopup() {
+    document.getElementById('loginPopup').style.display = 'none';
+}
+
+// دالة تسجيل الدخول باستخدام المعرّف
+function loginWorker(workerId) {
+    database.ref(`availableWorkerIds/${workerId}`).once('value')
+        .then((snapshot) => {
+            if (snapshot.exists() && snapshot.val().used) {
+                alert('تسجيل الدخول ناجح!');
+                console.log(`المعرّف ${workerId} صالح ومستخدم.`);
+
+                // إخفاء نافذة تسجيل الدخول
+                hideLoginPopup();
+
+                // عرض بيانات العامل إذا لزم الأمر
+                database.ref(`workers/${workerId}`).once('value')
+                    .then((workerSnapshot) => {
+                        if (workerSnapshot.exists()) {
+                            const workerData = workerSnapshot.val();
+                            console.log("بيانات العامل:", workerData);
+
+                            // تركيز الخريطة على موقع العامل إذا كانت بيانات الموقع متوفرة
+                            if (workerData.location) {
+                                const { lng, lat } = workerData.location;
+                                new mapboxgl.Marker()
+                                    .setLngLat([lng, lat])
+                                    .addTo(map);
+                                map.flyTo({ center: [lng, lat], zoom: 15 });
+                            }
+                        }
+                    })
+                    .catch((error) => console.error("خطأ أثناء جلب بيانات العامل:", error));
+            } else {
+                alert('المعرّف غير صحيح أو غير مستخدم.');
+            }
+        })
+        .catch((error) => console.error("خطأ أثناء التحقق من المعرّف:", error));
+}
+
+// إضافة حدث النقر على زر تسجيل الدخول
+document.getElementById('loginWorkerButton').addEventListener('click', () => {
+    const workerId = document.getElementById('workerLoginId').value;
+    if (workerId) {
+        loginWorker(workerId);
+    } else {
+        alert('يرجى إدخال معرّف العامل.');
+    }
+});
+
+
         });
     
 
@@ -254,6 +333,7 @@
     };
     firebase.initializeApp(firebaseConfig);
 
+    
     // مرجع إلى قاعدة بيانات Firebase حيث سيتم تخزين بيانات العمال
     const database = firebase.database();
     const workersRef = database.ref('workers');
@@ -317,7 +397,7 @@ function updateWorkerLocation(workerId, location) {
     }
 
     // دالة لتخصيص معرّف لعامل معين
-function assignWorkerId(workerName, lng, lat) {
+    function assignWorkerId(workerName, lng, lat) {
     database.ref('availableWorkerIds').orderByChild('used').equalTo(false).limitToFirst(1).once('value')
         .then((snapshot) => {
             if (snapshot.exists()) {
@@ -340,6 +420,42 @@ function assignWorkerId(workerName, lng, lat) {
         })
         .catch((error) => console.error("خطأ أثناء تخصيص المعرّف:", error));
 }
+
+// دالة لتسجيل الدخول باستخدام معرّف العامل
+function loginWorker(workerId) {
+    database.ref(`availableWorkerIds/${workerId}`).once('value')
+        .then((snapshot) => {
+            if (snapshot.exists() && snapshot.val().used) {
+                alert('تسجيل الدخول ناجح!');
+                console.log(`المعرّف ${workerId} صالح ومستخدم.`);
+                // إخفاء نافذة تسجيل الدخول
+                document.getElementById('loginPopup').style.display = 'none';
+
+                // التركيز على موقع العامل على الخريطة
+                database.ref(`workers/${workerId}`).once('value')
+                    .then((workerSnapshot) => {
+                        if (workerSnapshot.exists()) {
+                            const workerData = workerSnapshot.val();
+                            console.log("بيانات العامل:", workerData);
+
+                            if (workerData.location) {
+                                const { lng, lat } = workerData.location;
+                                new mapboxgl.Marker()
+                                    .setLngLat([lng, lat])
+                                    .addTo(map);
+                                map.flyTo({ center: [lng, lat], zoom: 15 });
+                            }
+                        }
+                    })
+                    .catch((error) => console.error("خطأ أثناء جلب بيانات العامل:", error));
+            } else {
+                alert('المعرّف غير صحيح أو غير مستخدم.');
+            }
+        })
+        .catch((error) => console.error("خطأ أثناء التحقق من المعرّف:", error));
+}
+
+
 
 // مثال: تخصيص معرّف لعامل جديد
 assignWorkerId("العامل محمد", 13.1913, 32.8872);
@@ -536,28 +652,34 @@ map.on('load', () => {
             locateControl.trigger();
         });
 
-        document.getElementById('submitRequest').addEventListener('click', () => {
+        document.getElementById('assignIdButton').addEventListener('click', () => {
+  const workerId = document.getElementById('workerIdInput').value;
+  const workerName = document.getElementById('workerNameInput').value;
   const userLocation = map.getCenter();
-  const requestData = {
-    workType: document.getElementById('workTypeInput').value,
-    budget: document.getElementById('budgetInput').value,
-    time: document.getElementById('timeInput').value,
-    location: {
-      lng: userLocation.lng,
-      lat: userLocation.lat
-    },
-  };
 
-  const requestsRef = database.ref('workRequests');
-  requestsRef.push(requestData)
-    .then(() => {
-      alert('تم إرسال الطلب بنجاح.');
-      sendNotificationToNearbyWorkers(requestData, userLocation); // استدعاء دالة إرسال الإشعار
+  if (workerId && workerName) {
+    fetch('/assign-id', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        workerId: workerId,
+        workerName: workerName,
+        location: { lng: userLocation.lng, lat: userLocation.lat },
+      }),
     })
-    .catch((error) => {
-      alert('حدث خطأ: ' + error.message);
-    });
+      .then((response) => {
+        if (response.ok) {
+          alert('تم تخصيص المعرّف بنجاح!');
+        } else {
+          alert('حدث خطأ أثناء تخصيص المعرّف.');
+        }
+      })
+      .catch((error) => console.error('Error:', error));
+  } else {
+    alert('يرجى ملء جميع الحقول.');
+  }
 });
+
 
 
 // حدث عند النقر على زر "طلب عامل"
@@ -576,15 +698,14 @@ document.getElementById('requestWorker').addEventListener('click', () => {
 
         // التأكد من أن جميع الحقول قد تم ملؤها
         if (workType && budget && time) {
-            const requestData = {
-                workType: workType,
-                budget: budget,
-                time: time,
-                location: {
-                    lng: userLocation.lng,  // إحداثيات الموقع الحالي
-                    lat: userLocation.lat
-                }
-            };
+            const workerData = {
+    name: "اسم العامل", // يجب الحصول عليه من إدخال المستخدم
+    assignedAt: new Date().toISOString(), // وقت الإسناد الحالي
+    location: {
+        lng: userLocation.lng,
+        lat: userLocation.lat
+    }
+};
 
             // إرسال بيانات الطلب إلى Firebase
             const requestsRef = database.ref('workRequests');
