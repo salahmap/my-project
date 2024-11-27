@@ -189,6 +189,21 @@
     <button id="cancelRequest">إلغاء</button>
 </div>
 
+<div id="ratingPopup" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:20px; border-radius:10px;">
+    <h2>تقييم العامل</h2>
+    <label>التقييم:</label>
+    <select id="ratingInput">
+        <option value="5">5 نجوم</option> 
+        <option value="4">4 نجوم</option>
+        <option value="3">3 نجوم</option>
+        <option value="2">2 نجوم</option>
+        <option value="1">1 نجمة</option>
+    </select>
+    <textarea id="reviewInput" placeholder="أضف تعليقك"></textarea>
+    <button id="submitRating">إرسال التقييم</button>
+</div>
+
+
 <!-- مكتبات Firebase App و Messaging -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js"></script>
@@ -242,8 +257,12 @@ requestRef.on('value', (snapshot) => {
     if (requestData.status === 'accepted') {
         displayNotification('تم قبول طلبك، العامل في الطريق.');
         showWorkerLocation(requestData.workerLocation);
+        if (requestData.workerId) {
+            trackWorker(requestData.workerId); // إضافة تتبع العامل
+        }
     }
 });
+
 
 function calculateDistance(loc1, loc2) {
     const R = 6371; // نصف قطر الأرض بالكيلومتر
@@ -255,6 +274,19 @@ function calculateDistance(loc1, loc2) {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c; // المسافة بالكيلومترات
 }
+
+function calculateETA(workerLocation, jobLocation) {
+    const directionsUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${workerLocation.lng},${workerLocation.lat};${jobLocation.lng},${jobLocation.lat}?access_token=${mapboxgl.accessToken}`;
+    fetch(directionsUrl)
+        .then(response => response.json())
+        .then(data => {
+            const duration = data.routes[0].duration; // الوقت بالثواني
+            const etaMinutes = Math.round(duration / 60);
+            displayNotification(`وقت الوصول المتوقع: ${etaMinutes} دقيقة.`);
+        })
+        .catch(console.error);
+}
+
 
         
         function startTracking(workerId) {
@@ -314,6 +346,16 @@ function showWorkerLocation(workerLocation) {
             .addTo(map);
     }
     map.flyTo({ center: [workerLocation.lng, workerLocation.lat], zoom: 15 });
+}
+
+function trackWorker(workerId) {
+    const workerRef = database.ref(`workers/${workerId}/location`);
+    workerRef.on('value', (snapshot) => {
+        const location = snapshot.val();
+        if (location) {
+            showWorkerLocation(location);
+        }
+    });
 }
 
 // استدعاء الدالة بعد تهيئة Firebase
