@@ -226,9 +226,20 @@ document.getElementById('acceptJobButton').addEventListener('click', () => {
         workerId: "worker_123" // استبدل بمعرف العامل
     }).then(() => {
         alert('تم قبول الطلب بنجاح.');
+sendDetailedNotification('worker', 'تم قبول الطلب', `الطلب: ${requestData.workType}`);
         document.getElementById('jobDetailsPopup').style.display = 'none';
+        
+        const workerLocation = { lat: 32.8872, lng: 13.1913 }; // موقع العامل
+        const jobLocation = { lat: 32.9, lng: 13.2 }; // موقع العمل
+        calculateETA(workerLocation, jobLocation)
+    .then(etaMinutes => {
+        monitorWorkerArrival(requestId, etaMinutes);
+    });
+alert('تم قبول الطلب بنجاح.');
+
     });
 });
+
 
         beamsClient.start()
             .then(() => beamsClient.addDeviceInterest('general'))
@@ -376,23 +387,18 @@ document.getElementById('acceptJobButton').addEventListener('click', () => {
     showRoute(workerLocation, jobLocation);
 });
 
-function updateLocationWithGPS(workerId) {
+function updateWorkerLocation(workerId) {
     if (navigator.geolocation) {
         navigator.geolocation.watchPosition((position) => {
             const location = {
                 lat: position.coords.latitude,
                 lng: position.coords.longitude
             };
-            database.ref(`workers/${workerId}/location`).set(location)
-                .then(() => console.log('تم تحديث موقع العامل:', location))
-                .catch(console.error);
-        }, (error) => console.error('خطأ في الحصول على الموقع:', error), {
-            enableHighAccuracy: true
-        });
-    } else {
-        console.warn('المتصفح لا يدعم GPS.');
+            database.ref(`workers/${workerId}/location`).set(location);
+        }, console.error, { enableHighAccuracy: true });
     }
 }
+
 
 // استدعاء الوظيفة عند تسجيل الدخول
 updateLocationWithGPS('worker_123'); // استبدل بـمعرف العامل
@@ -437,12 +443,22 @@ generateWorkerIds(5000); // مثال: إنشاء 5000 معرّف
 const workerId = "worker_123"; // معرف العامل (يجب استبداله بمعرف حقيقي)
 const workerRef = database.ref(`workers/${workerId}`);
 
+database.ref(`workers/${workerId}/reviews`).on('child_added', (snapshot) => {
+    const review = snapshot.val();
+    console.log(`تقييم جديد للعامل ${workerId}:`, review);
+});
+
 
 // مستمع لقبول الطلبات الجديدة
 const requestRef = database.ref('workRequests');
 requestRef.on('child_added', (snapshot) => {
     const requestData = snapshot.val();
     const requestId = snapshot.key;
+
+    // تفعيل المهلة الزمنية لقبول الطلب
+    if (requestData.status === 'pending') {
+        startRequestTimeout(requestId, 10); // مهلة 10 دقائق
+    }
 
     // عرض الطلب للعامل للتأكيد
     const confirmRequest = confirm(`طلب جديد: ${requestData.workType}. هل تريد قبوله؟`);
@@ -458,6 +474,8 @@ requestRef.on('child_added', (snapshot) => {
     }
 });
 
+
+// دالة لتحديث موقع العامل
 // دالة لتحديث موقع العامل
 function updateWorkerLocation(workerId, location) {
     const workerRef = database.ref(`workers/${workerId}/location`);
@@ -465,6 +483,25 @@ function updateWorkerLocation(workerId, location) {
         .then(() => console.log('تم تحديث موقع العامل بنجاح'))
         .catch((error) => console.error('خطأ في تحديث موقع العامل:', error));
 }
+
+// دالة لتحديد مهلة زمنية لقبول الطلب
+function startRequestTimeout(requestId, timeoutMinutes = 10) {
+    const timeoutTime = Date.now() + timeoutMinutes * 60 * 1000; // تحويل الدقائق إلى ملي ثانية
+    const requestRef = database.ref(`workRequests/${requestId}`);
+
+    const timeoutChecker = setInterval(() => {
+        requestRef.once('value').then((snapshot) => {
+            const requestData = snapshot.val();
+            if (Date.now() > timeoutTime && requestData.status === 'pending') {
+                // إذا انتهت المهلة وما زال الطلب معلقًا
+                requestRef.update({ status: 'timeout' });
+                clearInterval(timeoutChecker); // إيقاف المؤقت
+                console.log(`الطلب ${requestId} انتهت مهلة قبوله.`);
+            }
+        });
+    }, 10000); // تحقق كل 10 ثوانٍ
+}
+
 
     // دالة لإضافة عامل جديد إلى قاعدة البيانات
     function addWorker(workerId, workerName, lng, lat) {
