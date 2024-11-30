@@ -251,21 +251,46 @@ const messaging = firebase.messaging();
 const database = firebase.database();
 
 // مراقبة حالة الطلب في Firebase
+// مراقبة حالة الطلب في Firebase
 const requestRef = database.ref('workRequests/{requestId}');
 requestRef.on('value', (snapshot) => {
     const requestData = snapshot.val();
-    if (requestData.status === 'accepted') {
-        displayNotification('تم قبول طلبك، العامل في الطريق.');
-        showWorkerLocation(requestData.workerLocation);
-        if (requestData.workerId) {
-            trackWorker(requestData.workerId); // إضافة تتبع العامل
-        }
+
+    // تحقق من حالة الطلب إذا كانت "completed"
+    if (requestData.status === 'completed') {
+        alert('تم تحديث الطلب.');
+        sendDetailedNotification('client', 'تم تحديث حالة طلبك', `الحالة الحالية: completed`);
+    } 
+    // تحقق إذا كانت الحالة "accepted"
+// تحقق إذا كانت الحالة "accepted"
+else if (requestData.status === 'accepted') {
+    displayNotification('تم قبول طلبك، العامل في الطريق.');
+    showWorkerLocation(requestData.workerLocation);
+    
+    if (requestData.workerId) {
+        trackWorker(requestData.workerId); // إضافة تتبع العامل
     }
+
+    // جلب موقع المستخدم والعامل لعرض المسار
+    const workerLocation = requestData.workerLocation;
+    const userLocation = requestData.location;
+
+    if (workerLocation && userLocation) {
+        showRouteToUser(workerLocation, userLocation); // عرض المسار بين العامل والمستخدم
+        
+        // استدعاء وظيفة مراقبة وصول العامل
+        trackWorkerArrival(requestData.workerId, userLocation);
+    } else {
+        console.error('لا يمكن العثور على المواقع لعرض المسار.');
+    }
+}
+
+
 });
 
 
 function calculateDistance(loc1, loc2) {
-    const R = 6371; // نصف قطر الأرض بالكيلومتر
+    const R = 6371; // نصف قطر الأرض بالكيلومترات
     const dLat = (loc2.lat - loc1.lat) * Math.PI / 180;
     const dLon = (loc2.lng - loc1.lng) * Math.PI / 180;
     const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
@@ -274,6 +299,14 @@ function calculateDistance(loc1, loc2) {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c; // المسافة بالكيلومترات
 }
+
+function monitorWorkerArrival(workerLocation, userLocation, radius = 500) { // نصف قطر 500 متر
+    const distance = calculateDistance(workerLocation, userLocation);
+    if (distance <= radius) {
+        displayNotification('العامل قريب من موقعك!');
+    }
+}
+
 
 function calculateETA(workerLocation, jobLocation) {
     const directionsUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${workerLocation.lng},${workerLocation.lat};${jobLocation.lng},${jobLocation.lat}?access_token=${mapboxgl.accessToken}`;
@@ -286,6 +319,9 @@ function calculateETA(workerLocation, jobLocation) {
         })
         .catch(console.error);
 }
+
+
+
 
 
         
@@ -327,6 +363,37 @@ function updateWorkerMarker(location) {
         window.workerMarker.setLngLat([location.lng, location.lat]);
     }
 }
+
+function showRouteToUser(workerLocation, userLocation) {
+    const directionsUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${workerLocation.lng},${workerLocation.lat};${userLocation.lng},${userLocation.lat}?geometries=geojson&access_token=${mapboxgl.accessToken}`;
+    fetch(directionsUrl)
+        .then(response => response.json())
+        .then(data => {
+            const route = data.routes[0].geometry;
+            map.addLayer({
+                id: `route-${Date.now()}`,
+                type: 'line',
+                source: {
+                    type: 'geojson',
+                    data: {
+                        type: 'Feature',
+                        geometry: route
+                    }
+                },
+                layout: {
+                    'line-join': 'round',
+                    'line-cap': 'round'
+                },
+                paint: {
+                    'line-color': '#3887be',
+                    'line-width': 5
+                }
+            });
+        });
+}
+
+
+
 function loadWorkers() {
     const workersRef = database.ref('workers');
     workersRef.on('child_added', (snapshot) => {
@@ -357,6 +424,17 @@ function trackWorker(workerId) {
         }
     });
 }
+
+function trackWorkerArrival(workerId, userLocation) {
+    const workerRef = database.ref(`workers/${workerId}/location`);
+    workerRef.on('value', (snapshot) => {
+        const workerLocation = snapshot.val();
+        if (workerLocation) {
+            monitorWorkerArrival(workerLocation, userLocation);
+        }
+    });
+}
+
 
 // استدعاء الدالة بعد تهيئة Firebase
 loadWorkers();
@@ -506,8 +584,33 @@ function checkProximityAndNotify(workerLocation, clientLocation) {
 
         // بعد تحميل الخريطة، قم بالتحرك تدريجيًا نحو طرابلس
         map.on('load', () => {
-            map.flyTo({ center: [13.1913, 32.8872], zoom: 10, speed: 0.2 });
+    map.flyTo({ center: [13.1913, 32.8872], zoom: 10, speed: 0.2 });
+
+    // استدعاء دالة عرض العمال
+    showPublicWorkers();
+});
+
+// دالة عرض العمال على الخريطة
+function showPublicWorkers() {
+    const workersRef = database.ref('workers');
+    workersRef.once('value', (snapshot) => {
+        snapshot.forEach((worker) => {
+            const workerData = worker.val();
+            if (workerData.isAvailable) { // فقط العمال المتاحين
+                const distance = calculateDistance(map.getCenter(), workerData.location);
+                new mapboxgl.Marker()
+                    .setLngLat([workerData.location.lng, workerData.location.lat])
+                    .setPopup(new mapboxgl.Popup().setHTML(`
+                        <p>الاسم: ${workerData.name}</p>
+                        <p>المسافة: ${distance.toFixed(2)} كم</p>
+                        <p>المهارة: ${workerData.skill}</p>
+                    `))
+                    .addTo(map);
+            }
         });
+    });
+}
+
 
         // إعداد التحكم في البحث
         const geocoder = new MapboxGeocoder({
