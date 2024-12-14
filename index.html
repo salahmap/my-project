@@ -100,32 +100,7 @@
     <h1 id="title" style="display: none;">تطبيق الخريطة المحسن</h1>
     <div id="map"></div>
 
-    <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/firebase-messaging-sw.js')
-        .then((registration) => {
-          console.log('Service Worker مسجل بنجاح:', registration);
-          messaging.useServiceWorker(registration);
-
-          // طلب إذن الإشعارات
-          return messaging.requestPermission();
-        })
-        .then(() => {
-          // استرجاع التوكن
-          return messaging.getToken({ vapidKey: BC5AZjNwVnpdJTIpZuCYncnGggugQjxhwdhEos0IpVLKNt_6m9iSbAXzVlNav0MqvVZfMk431Ka_pLZ_BbLNyPA });
-        })
-        .then((token) => {
-          console.log('تم الحصول على التوكن:', token);
-        })
-        .catch((error) => {
-          console.error('فشل في تسجيل Service Worker أو الحصول على التوكن:', error);
-        });
-    } else {
-      console.warn('هذا المتصفح لا يدعم Service Workers.');
-    }
-
-
-    </script>
+ 
 </body>
 
     
@@ -207,86 +182,120 @@
 <!-- مكتبات Firebase App و Messaging -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js"></script>
+
+<script src="https://js.pusher.com/beams/1.0/push-notifications-cdn.js"></script>
+
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
 <!-- مكتبات إضافية -->
 <script src="https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.js"></script>
 <script src="https://unpkg.com/@turf/turf"></script>
+
 <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.js"></script>
-<script src="https://js.pusher.com/beams/latest/beam.min.js"></script>
+
 <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.7.0/mapbox-gl-geocoder.min.js"></script>
 <link href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.7.0/mapbox-gl-geocoder.css" rel="stylesheet" />
 
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-      const beamsClient = new PusherPushNotifications.Client({
-        instanceId: 'c9641070-f290-4aab-9239-18b096e3d8bc'
-      });
-  
-      beamsClient.start()
-        .then(() => beamsClient.addDeviceInterest('general'))
-        .then(() => console.log('Beams جاهز لاستقبال الإشعارات'))
-        .catch(console.error);
-    });
-  </script>
-  
 
-    <script>
-// إعداد Firebase
+<script>
+
+        
+// إعداد Firebase بالمفاتيح الصحيحة
 const firebaseConfig = {
-    apiKey: "ce6cae3c0977e051e1924a4ac1ece1aa",
+    apiKey: "AIzaSyAQ2FQL0DvbPx4YnJrrAmal2o-yaH_KP_s",
     authDomain: "adlo-44d1b.firebaseapp.com",
-    databaseURL: "https://adlo-44d1b-default-rtdb.firebaseio.com/",
+    databaseURL: "https://adlo-44d1b-default-rtdb.firebaseio.com",
     projectId: "adlo-44d1b",
-    storageBucket: "adlo-44d1b.appspot.com",
+    storageBucket: "adlo-44d1b.firebasestorage.app",
     messagingSenderId: "96260637269",
     appId: "1:96260637269:web:e3bc37ab2b41038c254adc",
     measurementId: "G-R0SGBWC3CJ"
 };
 
+// تهيئة Firebase
 firebase.initializeApp(firebaseConfig);
+
+// تحقق من تحميل مكتبة Pusher Beams
+if (typeof PusherPushNotifications === 'undefined') {
+    console.error('Pusher Beams لم يتم تحميل المكتبة. تأكد من تضمين المكتبة في HTML.');
+} else {
+    console.log('Pusher Beams تم تحميل المكتبة بنجاح.');
+}
+
+
+// تهيئة Pusher Beams
+document.addEventListener("DOMContentLoaded", () => {
+    const beamsClient = new PusherPushNotifications.Client({
+        instanceId: 'c9641070-f290-4aab-9239-18b096e3d8bc'
+    });
+
+    beamsClient.start()
+        .then(() => beamsClient.addDeviceInterest('new-orders')) // اهتمام عام بجميع الطلبات الجديدة
+        .then(() => console.log('Pusher Beams جاهز لاستقبال إشعارات الطلبات الجديدة'))
+        .catch(console.error);
+
+    beamsClient.onNotificationOpened = (payload) => {
+        alert(`إشعار جديد من Pusher Beams: ${payload.notification.body}`);
+    };
+});
 
 // تعريف الكائنات بعد التهيئة
 const messaging = firebase.messaging();
 const database = firebase.database();
 
-// مراقبة حالة الطلب في Firebase
-// مراقبة حالة الطلب في Firebase
-const requestRef = database.ref('workRequests/{requestId}');
-requestRef.on('value', (snapshot) => {
-    const requestData = snapshot.val();
+// إعداد Service Worker لتسجيل التوكن
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/firebase-messaging-sw.js')
+        .then((registration) => {
+            console.log('Service Worker مسجل بنجاح:', registration);
 
-    // تحقق من حالة الطلب إذا كانت "completed"
-    if (requestData.status === 'completed') {
-        alert('تم تحديث الطلب.');
-        sendDetailedNotification('client', 'تم تحديث حالة طلبك', `الحالة الحالية: completed`);
-    } 
-    // تحقق إذا كانت الحالة "accepted"
-// تحقق إذا كانت الحالة "accepted"
-else if (requestData.status === 'accepted') {
-    displayNotification('تم قبول طلبك، العامل في الطريق.');
-    showWorkerLocation(requestData.workerLocation);
-    
-    if (requestData.workerId) {
-        trackWorker(requestData.workerId); // إضافة تتبع العامل
-    }
+            // ربط Firebase Messaging مع Service Worker
+            messaging.useServiceWorker(registration);
 
-    // جلب موقع المستخدم والعامل لعرض المسار
-    const workerLocation = requestData.workerLocation;
-    const userLocation = requestData.location;
+            // طلب الإذن بالحصول على التوكن
+            return messaging.requestPermission()
+                .then(() => messaging.getToken({ vapidKey: 'BC5AZjNwVnpdJTIpZuCYncnGggugQjxhwdhEos0IpVLKNt_6m9iSbAXzVlNav0MqvVZfMk431Ka_pLZ_BbLNyPA' }));
+        })
+        .then((token) => {
+            console.log('تم الحصول على التوكن:', token);
 
-    if (workerLocation && userLocation) {
-        showRouteToUser(workerLocation, userLocation); // عرض المسار بين العامل والمستخدم
-        
-        // استدعاء وظيفة مراقبة وصول العامل
-        trackWorkerArrival(requestData.workerId, userLocation);
-    } else {
-        console.error('لا يمكن العثور على المواقع لعرض المسار.');
-    }
+            // حفظ التوكن في قاعدة البيانات
+            const userId = "user_123"; // يجب تغيير هذا إلى معرف المستخدم الفعلي
+            const userRef = database.ref(`users/${userId}/notificationToken`);
+            return userRef.set(token);
+        })
+        .catch((error) => {
+            console.error('فشل في تسجيل Service Worker أو الحصول على التوكن:', error);
+        });
+} else {
+    console.warn('هذا المتصفح لا يدعم Service Workers.');
 }
 
 
+// التعامل مع الإشعارات الواردة من Firebase Messaging
+messaging.onMessage((payload) => {
+    console.log('إشعار وارد من Firebase:', payload);
+    alert(`إشعار جديد من Firebase: ${payload.notification.title}\n${payload.notification.body}`);
 });
+
+
+
+
+  // مراقبة حالة الطلب في Firebase
+  const requestRef = database.ref('workRequests/{requestId}');
+  requestRef.on('value', (snapshot) => {
+    const requestData = snapshot.val();
+    if (requestData && requestData.status) {
+        if (requestData.status === 'completed') {
+            alert('تم تحديث الطلب.');
+        } else if (requestData.status === 'accepted') {
+            alert('تم قبول الطلب.');
+        }
+    } else {
+        console.error("بيانات الطلب غير صالحة أو غير موجودة:", requestData);
+    }
+});
+
 
 
 function calculateDistance(loc1, loc2) {
