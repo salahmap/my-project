@@ -215,6 +215,9 @@ const firebaseConfig = {
 // تهيئة Firebase
 firebase.initializeApp(firebaseConfig);
 
+
+
+
 // تحقق من تحميل مكتبة Pusher Beams
 if (typeof PusherPushNotifications === 'undefined') {
     console.error('Pusher Beams لم يتم تحميل المكتبة. تأكد من تضمين المكتبة في HTML.');
@@ -243,11 +246,13 @@ document.addEventListener("DOMContentLoaded", () => {
 const messaging = firebase.messaging();
 const database = firebase.database();
 
+
+
 // إعداد Service Worker لتسجيل التوكن
 if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/firebase-messaging-sw.js')
-        .then((registration) => {
-            console.log('Service Worker مسجل بنجاح:', registration);
+    navigator.serviceWorker.register('/server1/custom-service-worker.js')
+    .then((registration) => {
+        console.log('Custom Service Worker مسجل بنجاح:', registration);
 
             // ربط Firebase Messaging مع Service Worker
             messaging.useServiceWorker(registration);
@@ -264,38 +269,67 @@ if ('serviceWorker' in navigator) {
             const userRef = database.ref(`users/${userId}/notificationToken`);
             return userRef.set(token);
         })
-        .catch((error) => {
-            console.error('فشل في تسجيل Service Worker أو الحصول على التوكن:', error);
-        });
+  .catch((error) => console.error('Failed to register Custom Service Worker:', error));
+
 } else {
     console.warn('هذا المتصفح لا يدعم Service Workers.');
 }
 
 
-// التعامل مع الإشعارات الواردة من Firebase Messaging
-messaging.onMessage((payload) => {
-    console.log('إشعار وارد من Firebase:', payload);
-    alert(`إشعار جديد من Firebase: ${payload.notification.title}\n${payload.notification.body}`);
-});
 
+// تأكد من تمرير معرف الطلب الصحيح
+const requestId = "-OG2RrRJoW4G8hV-iUit"; // مثال على معرف طلب صالح
 
-
-
-  // مراقبة حالة الطلب في Firebase
-  const requestRef = database.ref('workRequests/{requestId}');
-  requestRef.on('value', (snapshot) => {
-    const requestData = snapshot.val();
-    if (requestData && requestData.status) {
-        if (requestData.status === 'completed') {
-            alert('تم تحديث الطلب.');
-        } else if (requestData.status === 'accepted') {
-            alert('تم قبول الطلب.');
+if (!requestId) {
+    console.error("معرف الطلب غير موجود أو غير صالح.");
+} else {
+    const requestRef = database.ref(`workRequests/${requestId}`);
+    
+    // التحقق من وجود الطلب
+    requestRef.once('value', (snapshot) => {
+        if (!snapshot.exists()) {
+            console.error("الطلب غير موجود في قاعدة البيانات:", requestId);
+            return;
         }
-    } else {
-        console.error("بيانات الطلب غير صالحة أو غير موجودة:", requestData);
-    }
-});
 
+        const requestData = snapshot.val();
+        if (!requestData) {
+            console.error("بيانات الطلب غير صالحة أو فارغة:", requestId);
+            return;
+        }
+
+        console.log("بيانات الطلب:", requestData);
+
+        // مراقبة التحديثات
+        requestRef.on('value', (updatedSnapshot) => {
+            const updatedData = updatedSnapshot.val();
+            if (!updatedData) {
+                console.warn("تم تحديث الطلب بدون بيانات صالحة:", requestId);
+                return;
+            }
+
+            if (updatedData.status === 'completed') {
+                alert('تم تحديث الطلب.');
+            } else if (updatedData.status === 'accepted') {
+                alert('تم قبول الطلب.');
+            } else {
+                console.log("حالة الطلب الحالية:", updatedData.status);
+            }
+        });
+    });
+}
+
+
+// إضافة طلب جديد
+const requestsRef = database.ref('workRequests');
+const newRequestRef = requestsRef.push({
+    status: 'pending',
+    description: 'طلب جديد',
+    budget: 100,
+    time: '2 hours'
+});
+const newRequestId = newRequestRef.key;
+console.log("تم إنشاء معرف الطلب:", newRequestId);
 
 
 function calculateDistance(loc1, loc2) {
@@ -308,6 +342,26 @@ function calculateDistance(loc1, loc2) {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c; // المسافة بالكيلومترات
 }
+
+
+function sendPusherNotification(workerId, message) {
+    fetch('http://localhost:7000/send-notification', { // استخدم المنفذ 7000 الخاص بخادمك
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ workerId, message })
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`خطأ في إرسال الإشعار: ${response.statusText}`);
+        }
+        return response.json();
+    })
+    .then(data => console.log("تم إرسال الإشعار بنجاح:", data))
+    .catch(error => console.error("فشل إرسال الإشعار:", error));
+}
+
 
 function monitorWorkerArrival(workerLocation, userLocation, radius = 500) { // نصف قطر 500 متر
     const distance = calculateDistance(workerLocation, userLocation);
@@ -351,7 +405,7 @@ function sendNotificationsToNearbyWorkers(requestData, userLocation) {
                 const workerData = worker.val();
                 const distance = calculateDistance(userLocation, workerData.location);
                 if (distance <= 10) { // إذا كانت المسافة أقل من 10 كيلومترات
-                    sendPushNotification(workerData.deviceToken, `هناك طلب ${requestData.workType} قريب من موقعك.`);
+                    sendPusherNotification(workerData.deviceToken, `هناك طلب ${requestData.workType} قريب من موقعك.`);
                 }
             });
         })
@@ -361,8 +415,73 @@ function sendNotificationsToNearbyWorkers(requestData, userLocation) {
         });
 }
 
+requestsRef.once('value', (snapshot) => {
+    if (snapshot.exists()) {
+        const updates = {}; // لتجميع الطلبات غير الصالحة للإزالة
+        snapshot.forEach((childSnapshot) => {
+            const request = childSnapshot.val();
 
- 
+            // التحقق من صلاحية الطلب
+            if (!request || !request.location || typeof request.location.lat !== 'number' || typeof request.location.lng !== 'number') {
+                console.warn(`طلب غير مكتمل أو فارغ: ${childSnapshot.key}`, request);
+                updates[childSnapshot.key] = null; // تحديد الإزالة
+            } else {
+                console.log(`طلب صالح: ${childSnapshot.key}`, request);
+                // هنا يمكنك متابعة معالجة الطلبات الصالحة
+            }
+        });
+
+        // إزالة الطلبات غير الصالحة دفعة واحدة
+        if (Object.keys(updates).length > 0) {
+            requestsRef.update(updates)
+                .then(() => console.log("تم حذف الطلبات غير الصالحة."))
+                .catch((error) => console.error("خطأ أثناء حذف الطلبات غير الصالحة:", error));
+        } else {
+            console.log("لا توجد طلبات غير صالحة للإزالة.");
+        }
+    } else {
+        console.warn("لم يتم العثور على أي طلبات في قاعدة البيانات.");
+    }
+});
+
+
+
+
+
+function cleanOldRequests() {
+    requestsRef.once('value', (snapshot) => {
+        if (snapshot.exists()) {
+            const updates = {};
+            snapshot.forEach((childSnapshot) => {
+                const request = childSnapshot.val();
+
+                if (!request || !request.location || typeof request.location.lat !== 'number' || typeof request.location.lng !== 'number') {
+                    console.warn(`حذف الطلب بدون موقع أو بيانات غير صالحة: ${childSnapshot.key}`, request);
+                    updates[childSnapshot.key] = null; // حذف الطلب
+                } else {
+                    console.log(`طلب صالح: ${childSnapshot.key}`, request);
+                }
+            });
+
+            if (Object.keys(updates).length > 0) {
+                requestsRef.update(updates)
+                    .then(() => console.log("تم حذف الطلبات غير الصالحة بنجاح."))
+                    .catch((error) => console.error("خطأ أثناء حذف الطلبات غير الصالحة:", error));
+            } else {
+                console.log("لا توجد طلبات غير صالحة للإزالة.");
+            }
+        } else {
+            console.warn("لم يتم العثور على أي طلبات في قاعدة البيانات.");
+        }
+    });
+}
+
+
+
+
+
+// استدعاء الدالة عند تحميل الصفحة
+cleanOldRequests();
 
 
 function updateWorkerMarker(location) {
@@ -460,35 +579,35 @@ function submitRequest() {
     const budget = document.getElementById('budgetInput').value;
     const time = document.getElementById('timeInput').value;
 
-    if (workType && budget && time) {
+    if (workType && budget && time && userLocation.lng && userLocation.lat) {
         const requestData = {
-    workType: workType,
-    budget: budget,
-    time: time,
-    location: {
-        lng: userLocation.lng,
-        lat: userLocation.lat
-    },
-    status: "pending", // حالة الطلب
-    workerId: null      // لا يوجد عامل معين بعد
-};
+            workType: workType,
+            budget: budget,
+            time: time,
+            location: {
+                lng: userLocation.lng,
+                lat: userLocation.lat
+            },
+            status: "pending",
+            workerId: null
+        };
 
         const requestsRef = database.ref('workRequests');
-        
         requestsRef.push(requestData)
             .then(() => {
                 alert('تم إرسال الطلب بنجاح.');
                 document.getElementById('requestPopup').style.display = 'none';
-                sendNotificationsToNearbyWorkers(requestData, userLocation); // إضافة إشعار
+                sendNotificationsToNearbyWorkers(requestData, userLocation);
             })
             .catch((error) => {
                 console.error('خطأ في إرسال الطلب إلى Firebase:', error);
                 alert('حدث خطأ أثناء إرسال الطلب. يرجى المحاولة مرة أخرى لاحقًا.');
             });
     } else {
-        alert('يرجى ملء جميع الحقول.');
+        alert('يرجى ملء جميع الحقول وتحديد موقع صحيح.');
     }
 }
+
 
 
 
