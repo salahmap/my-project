@@ -665,9 +665,14 @@ if (!window.activeListeners) {
     window.activeListeners = {};
 }
 
+if (!window.activeListeners) {
+    window.activeListeners = {}; // التأكد من وجود الكائن لتتبع المستمعين
+}
+
 function startTracking(workerId) {
     const workerRef = database.ref(`workers/${workerId}/location`);
 
+    // تحقق من أن المستمع للعامل غير مكرر
     if (window.activeListeners[workerId]) {
         console.log(`⚠️ المستمع للعامل ${workerId} مضاف بالفعل.`);
         return;
@@ -678,7 +683,8 @@ function startTracking(workerId) {
         if (location && location.lat && location.lng) {
             console.log(`تم تحديث موقع العامل ${workerId}:`, location);
 
-            if (typeof map !== 'undefined' && typeof map.isStyleLoaded === 'function' && map.isStyleLoaded()) {
+            // تحقق من جاهزية الخريطة
+            if (isMapReady && typeof map.isStyleLoaded === 'function' && map.isStyleLoaded()) {
                 updateWorkerMarker(location, workerId);
             } else {
                 console.error("⚠️ الخريطة غير مهيأة أو النمط غير محمل. تأكد من تهيئة الخريطة.");
@@ -687,9 +693,11 @@ function startTracking(workerId) {
             console.error(`🚨 بيانات موقع العامل ${workerId} غير صحيحة:`, location);
         }
     });
-    // تسجيل المستمع في القائمة
+
+    // تسجيل المستمع في القائمة لتجنب التكرار
     window.activeListeners[workerId] = true;
 }
+
 
 
 
@@ -711,30 +719,27 @@ workerRef.child('currentRequest').on('value', (snapshot) => {
         window.workerMarkers = {};
     }
 
-    try {
-        if (typeof map === 'undefined' || !map.isStyleLoaded()) {
-    console.error("الخريطة غير مهيأة أو النمط غير محمل.");
-} else {
-    try {
-    if (!window.workerMarkers[workerId]) {
-        window.workerMarkers[workerId] = new mapboxgl.Marker()
-            .setLngLat([location.lng, location.lat])
-            .addTo(map);
-        console.log(`✔️ تم إضافة العلامة للعامل ${workerId}.`);
-    } else {
-        window.workerMarkers[workerId].setLngLat([location.lng, location.lat]);
-        console.log(`✔️ تم تحديث موقع العلامة للعامل ${workerId}.`);
+    // تحقق من جاهزية الخريطة قبل التحديث
+    if (!isMapReady) {
+        console.error("⚠️ الخريطة غير جاهزة. سيتم تجاهل التحديث.");
+        return;
     }
-} catch (error) {
-    console.error(`🚨 خطأ أثناء تحديث العلامة للعامل ${workerId}:`, error);
-}
 
-}
-
+    try {
+        if (!window.workerMarkers[workerId]) {
+            window.workerMarkers[workerId] = new mapboxgl.Marker()
+                .setLngLat([location.lng, location.lat])
+                .addTo(map);
+            console.log(`✔️ تم إضافة العلامة للعامل ${workerId}.`);
+        } else {
+            window.workerMarkers[workerId].setLngLat([location.lng, location.lat]);
+            console.log(`✔️ تم تحديث موقع العلامة للعامل ${workerId}.`);
+        }
     } catch (error) {
-        console.error(`خطأ أثناء تحديث العلامة للعامل ${workerId}:`, error);
+        console.error(`🚨 خطأ أثناء تحديث العلامة للعامل ${workerId}:`, error);
     }
 }
+
 
 
     // استدعاء startTracking لكل عامل عند إضافته أو تحديثه
@@ -775,7 +780,9 @@ workerRef.child('currentRequest').on('value', (snapshot) => {
         };
 
         // إنشاء الخريطة مع زوم منخفض جدًا كأنك ترى الأرض من الفضاء
-        function initializeMap() {
+        let isMapReady = false; // تعريف متغير لتتبع حالة جاهزية الخريطة
+
+function initializeMap() {
     document.getElementById('map').innerHTML = ''; // تفريغ المحتوى قبل التهيئة
     map = new mapboxgl.Map({
         container: 'map',
@@ -786,12 +793,14 @@ workerRef.child('currentRequest').on('value', (snapshot) => {
 
     map.on('load', () => {
         if (map.isStyleLoaded()) {
+            isMapReady = true; // تحديث حالة جاهزية الخريطة
             console.log("🎉 الخريطة جاهزة والنمط محمل.");
         } else {
             console.error("⚠️ فشل تحميل النمط. تحقق من إعدادات Mapbox.");
         }
     });
 }
+
 
 
 if (typeof mapboxgl === 'undefined' || !mapboxgl.supported()) {
@@ -801,12 +810,14 @@ if (typeof mapboxgl === 'undefined' || !mapboxgl.supported()) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    if (typeof mapboxgl === 'undefined') {
-        console.error("⚠️ مكتبة Mapbox غير محملة.");
+    if (typeof mapboxgl === 'undefined' || !mapboxgl.supported()) {
+        console.error("🚨 مكتبة Mapbox غير مدعومة أو لم يتم تحميلها. تحقق من الروابط والمتصفح المستخدم.");
     } else {
         console.log("✔️ مكتبة Mapbox جاهزة للاستخدام.");
+        initializeMap(); // استدعاء تهيئة الخريطة فقط إذا كانت المكتبة جاهزة.
     }
 });
+
 
 
 if (!isMapInitialized) {
@@ -823,10 +834,7 @@ if (!isMapInitialized) {
 
 
 
-        // استدعاء التهيئة عند تحميل الصفحة
-        document.addEventListener('DOMContentLoaded', () => {
-            initializeMap();
-        });
+
 
         function addMarkersToMap() {
     const requestsRef = database.ref('workRequests');
