@@ -188,17 +188,23 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
 <!-- مكتبات إضافية -->
-<script src="https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.js"></script>
+<script src="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.js"></script>
 <script src="https://unpkg.com/@turf/turf"></script>
 
 <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.js"></script>
 
 <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.7.0/mapbox-gl-geocoder.min.js"></script>
-<link href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.7.0/mapbox-gl-geocoder.css" rel="stylesheet" />
+<link href="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css" rel="stylesheet" />
 
 
 <script>
 
+    // التحقق من تحميل مكتبة Mapbox
+    if (typeof mapboxgl === 'undefined') {
+        console.error("لم يتم تحميل مكتبة Mapbox بنجاح.");
+    } else {
+        console.log("تم تحميل مكتبة Mapbox بنجاح:", mapboxgl);
+    }
         
 // إعداد Firebase بالمفاتيح الصحيحة
 const firebaseConfig = {
