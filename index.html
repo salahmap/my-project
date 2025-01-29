@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>تطبيق الخريطة المحسن</title>
-    <link href="https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.css" rel="stylesheet" />
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.css" type="text/css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
@@ -546,7 +546,8 @@ function showWorkerLocation(workerLocation) {
             .setLngLat([workerLocation.lng, workerLocation.lat])
             .addTo(map);
     }
-    map.flyTo({ center: [workerLocation.lng, workerLocation.lat], zoom: 15 });
+    map.flyTo({ center: [workerLocation.lng, workerLocation.lat], zoom: 15, essential: true });
+console.log("🚀 93 تحريك الخريطة بسرعة إلى موقع العامل:", workerLocation);
 }
 
 function trackWorker(workerId) {
