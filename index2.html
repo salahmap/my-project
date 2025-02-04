@@ -224,7 +224,7 @@ document.addEventListener("DOMContentLoaded", () => {
     beamsClient.start()
         .then(() => beamsClient.addDeviceInterest('new-orders')) // اهتمام عام بجميع الطلبات الجديدة
         .then(() => console.log('✅💭 125 Pusher Beams جاهز لاستقبال إشعارات الطلبات الجديدة'))
-        .catch(console.error);
+        .catch((err) => console.error('🚨 127 خطأ في التسجيل:', err));
 
     beamsClient.onNotificationOpened = (payload) => {
         alert(`إشعار جديد من Pusher Beams: ${payload.notification.body}`);
@@ -1303,18 +1303,21 @@ function showJobDetails(jobData) {
         
     </script>
 
-    <!-- زر اختبار الإشعارات -->
+<!-- زر اختبار الإشعارات -->
 <button id="testNotification">اختبار الإشعارات</button>
-    document.getElementById('testNotification').addEventListener('click', () => {
-        fetch('/send-notification', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: 'اختبار إشعار!' })
-        })
-        .then(res => res.json())
-        .then(data => console.log('نتيجة الاختبار:', data))
-        .catch(err => console.error('فشل اختبار الإشعارات:', err));
-    });
+
+<script>
+  // تأكد من تنفيذ الكود بعد تحميل محتويات الصفحة
+  document.getElementById('testNotification').addEventListener('click', () => {
+      fetch('/send-notification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: 'اختبار إشعار!' })
+      })
+      .then(res => res.json())
+      .then(data => console.log('نتيجة الاختبار:', data))
+      .catch(err => console.error('فشل اختبار الإشعارات:', err));
+  });
 </script>
 
 
