@@ -192,9 +192,9 @@
     
     // التحقق من تحميل مكتبات Firebase و Pusher Beams
 if (typeof firebase === 'undefined' || typeof PusherPushNotifications === 'undefined') {
-    console.error('تأكد من تحميل مكتبات Firebase وPusher قبل استخدامها.');
+    console.error('🚨💭121  تأكد من تحميل مكتبات Firebase وPusher قبل استخدامها.');
 } else {
-    console.log('تم تحميل المكتبات بنجاح.');
+    console.log('✅💭 122 تم تحميل المكتبات بنجاح.');
 }
 
     document.addEventListener('DOMContentLoaded', function() {
@@ -206,67 +206,32 @@ if (typeof firebase === 'undefined' || typeof PusherPushNotifications === 'undef
 
         document.getElementById('loginPopup').style.display = 'flex';
 
+// تحقق من تحميل مكتبة Pusher Beams
+if (typeof PusherPushNotifications === 'undefined') {
+    console.error('🚨💭 123 Pusher Beams لم يتم تحميل المكتبة. تأكد من تضمين المكتبة في HTML.');
+} else {
+    console.log('✅💭 124 Pusher Beams تم تحميل المكتبة بنجاح.');
+}
 
 
 
-
-// إعداد Pusher Beams
-// تحسين الإعداد مع إشعار بالنجاح أو الفشل
-const beamsClient = new PusherPushNotifications.Client({
-    instanceId: 'c9641070-f290-4aab-9239-18b096e3d8bc'
-});
-beamsClient.start()
-    .then(() => {
-        console.log('تم الاشتراك في قناة الإشعارات العامة بنجاح.');
-        return beamsClient.addDeviceInterest('general');
-    })
-    .catch((err) => console.error('فشل إعداد Pusher Beams:', err));
-
-
-
-// التعامل مع فتح الإشعار
-beamsClient.onNotificationOpened = (payload) => {
-    console.log("تم فتح الإشعار:", payload);
-    alert(`إشعار جديد: ${payload.notification.body}`);
-};
-
-console.log("Pusher Beams تم تحميل المكتبة بنجاح.");
-
-
-
-        document.getElementById('loginWorkerButton').addEventListener('click', () => {
-    const workerId = document.getElementById('workerLoginId').value;
-    if (workerId) {
-        loginWorker(workerId);
-    } else {
-        alert('يرجى إدخال معرّف العامل.');
-    }
-});
-
-document.getElementById('readyToGoButton').addEventListener('click', () => {
-    const requestId = "ID الطلب"; // يجب جلب معرف الطلب
-    database.ref(`workRequests/${requestId}`).update({
-        status: 'en route'
-    }).then(() => {
-        alert('تم تحديث الحالة إلى "في الطريق".');
+// تهيئة Pusher Beams
+document.addEventListener("DOMContentLoaded", () => {
+    const beamsClient = new PusherPushNotifications.Client({
+        instanceId: 'c9641070-f290-4aab-9239-18b096e3d8bc'
     });
+
+    beamsClient.start()
+        .then(() => beamsClient.addDeviceInterest('new-orders')) // اهتمام عام بجميع الطلبات الجديدة
+        .then(() => console.log('✅💭 125 Pusher Beams جاهز لاستقبال إشعارات الطلبات الجديدة'))
+        .catch(console.error);
+
+    beamsClient.onNotificationOpened = (payload) => {
+        alert(`إشعار جديد من Pusher Beams: ${payload.notification.body}`);
+    };
 });
 
-
-
-
-
-
-beamsClient.start({ serviceWorkerPath: '/custom-service-worker.js' })
-    .then(() => {
-        console.log('Pusher Beams تم البدء بنجاح. جاري إضافة الاهتمام بالقناة...');
-        return beamsClient.addDeviceInterest('general');
-    })
-    .then(() => console.log('تم الاشتراك في قناة الإشعارات العامة بنجاح'))
-    .catch(err => {
-        console.error('خطأ أثناء بدء Pusher Beams:', err);
-        alert('فشل إعداد Pusher Beams. تحقق من الإعدادات.');
-    });
+console.log("✅💭 126 Pusher Beams تم تحميل المكتبة بنجاح.");
 
 
 
@@ -317,15 +282,7 @@ function hideLoginPopup() {
 
 
 
-// إضافة حدث النقر على زر تسجيل الدخول
-document.getElementById('loginWorkerButton').addEventListener('click', () => {
-    const workerId = document.getElementById('workerLoginId').value;
-    if (workerId) {
-        loginWorker(workerId);
-    } else {
-        alert('يرجى إدخال معرّف العامل.');
-    }
-});
+
 
 
         });
@@ -406,49 +363,54 @@ function updateLocationWithGPS(workerId) {
 // استدعاء الوظيفة عند تسجيل الدخول
 updateLocationWithGPS('worker_123'); // استبدل بمعرف العامل الفعلي
 
-
 let isMapReady = false; // تعريف المتغير لتتبع جاهزية الخريطة.
-console.log("⚙️ 56  تم تعريف isMapReady وقيمته الحالية هي:", isMapReady);
+console.log("⚙️ 56 تم تعريف isMapReady وقيمته الحالية هي:", isMapReady);
 
 /**
  * دالة تتحقق من جاهزية الخريطة للاستخدام.
  * @returns {boolean} هل الخريطة جاهزة للاستخدام؟
  */
- let mapReadyLogged = false; // متغير لتعقب تسجيل الجاهزية
+let mapReadyLogged = false; // متغير لتعقب تسجيل الجاهزية
 
 function isMapReadyToUse() {
-    if (!map || typeof map !== 'object') {
-        console.error("🚨 60 [خطأ] الكائن 'map' غير مهيأ أو ليس كائناً. تأكد من تهيئته بشكل صحيح.");
+    if (typeof map === 'undefined') {
+        console.error("🚨 60 [خطأ] الكائن 'map' غير معرّف بعد. سيتم إعادة تهيئته.");
+        initializeMap(); // إعادة التهيئة عند الحاجة
+        return false;
+    }
+
+    if (!(map instanceof mapboxgl.Map)) {
+        console.error("🚨 61 [خطأ] الكائن 'map' ليس مثيلاً لـ Mapbox. سيتم إعادة تهيئته.");
+        initializeMap(); // إصلاح التهيئة
         return false;
     }
 
     if (!map.isStyleLoaded()) {
-        console.warn("⚠️ 61 [تحذير] النمط الخاص بالخريطة لم يتم تحميله بالكامل بعد.");
+        console.warn("⚠️ 62 [تحذير] النمط الخاص بالخريطة لم يتم تحميله بالكامل بعد.");
         return false;
     }
 
+ 
     if (typeof isMapReady === 'undefined' || !isMapReady) {
-        console.warn("⚠️ 62 [تحذير] حالة isMapReady غير مهيأة أو غير جاهزة.");
+        console.warn("⚠️ 63 [تحذير] حالة isMapReady غير مهيأة أو غير جاهزة.");
         return false;
     }
 
     if (!mapReadyLogged) {
-        console.log("✅ 63 [نجاح] الخريطة جاهزة بالكامل! يمكن الآن تنفيذ العمليات المرتبطة بها.");
+        console.log("✅ 114 [نجاح] الخريطة جاهزة بالكامل! يمكن الآن تنفيذ العمليات المرتبطة بها.");
         mapReadyLogged = true; // منع تسجيل الرسالة مرة أخرى
     }
 
+
     return true;
 }
-
-
-
-
 
 let map; // تعريف متغير الخريطة إذا لم يكن موجودًا بالفعل.
 console.log("⚙️ 57 تم تعريف المتغير map وهو حالياً:", map);
 
 let isMapInitialized = false; // متغير لتتبع حالة تحميل الخريطة.
 console.log("⚙️ 58 تم تعريف isMapInitialized وقيمته الحالية هي:", isMapInitialized);
+
 
 /**
  * دالة التحقق من جاهزية الخريطة
@@ -543,11 +505,18 @@ function processSavedRequests() {
         console.log("⚡ 37 بدء عملية التحقق من الطلبات المحفوظة...");
 
         // التحقق من جاهزية الخريطة باستخدام الدالة الموحدة
-        const mapReady = isMapReadyToUse();
+        if (typeof map === 'undefined' || !(map instanceof mapboxgl.Map)) {
+    console.error("🚨 115 الكائن map غير مهيأ أو غير معرّف. سيتم إعادة تهيئته.");
+    initializeMap(); // إعادة التهيئة إذا لم تكن موجودة
+    return;
+}
+
+const mapReady = isMapReadyToUse();
 if (!mapReady) {
     console.warn("⚠️ 36 الخريطة ليست جاهزة بعد لمعالجة الطلبات المحفوظة. سيتم تأجيلها.");
     return;
 }
+
 
 
         console.log("⚡ 79 الخريطة جاهزة. بدء معالجة الطلبات المحفوظة...");
@@ -610,7 +579,7 @@ requestRef.on('child_added', (snapshot) => {
     }
 
     // التحقق من تعريف isMapReady
-    if (typeof isMapReady === 'undefined') {
+    if (typeof map === 'undefined' || !(map instanceof mapboxgl.Map)) {
         console.error("🚨 77 المتغير isMapReady غير مهيأ. تأكد من تعريفه بشكل صحيح.");
         return;
     }
@@ -680,15 +649,7 @@ function checkMapStyleLoaded() {
 }
 
 
-// التأكد من أن الكود يعمل فقط إذا تم تعريف map
-if (typeof map !== 'undefined' && map instanceof mapboxgl.Map) {
-    map.on('load', () => {
-        console.log("⚡50 تم استدعاء map.on('load').");
-        checkMapStyleLoaded();
-    });
-} else {
-    console.error("🚨 51 الكائن map غير مهيأ أو غير معرّف.");
-}
+
 
 
 
@@ -778,15 +739,7 @@ function loginWorker(workerId) {
         .catch((error) => console.error("❌ 98 خطأ أثناء تسجيل الدخول:", error));
 }
 
-// استدعاء الدالة عند إدخال المعرّف
-document.getElementById('loginWorkerButton').addEventListener('click', () => {
-    const workerId = document.getElementById('workerLoginId').value;
-    if (workerId) {
-        loginWorker(workerId);
-    } else {
-        alert('⚠️ 99يرجى إدخال معرّف العامل.');
-    }
-});
+
 
 
     function sendNotificationToNearbyWorkers(requestData, userLocation) {
@@ -943,57 +896,91 @@ if (!mapReady) {
         };
 
 
-// إنشاء الخريطة مع زوم منخفض جدًا كأنك ترى الأرض من الفضاء
-function initializeMap() {
-    document.getElementById('map').innerHTML = ''; // تفريغ المحتوى قبل التهيئة
-    map = new mapboxgl.Map({
-        container: 'map',
-        style: styles.hybrid,
-        center: [13.1913, 32.8872],
-        zoom: 2
-    });
 
-    let retryCount = 0; // عدد المحاولات
-    const maxRetries = 3; // الحد الأقصى لعدد المحاولات
 
-    function handleMapLoad() {
-        console.log('32 تم تحميل الخريطة باستخدام handleMapLoad.');
+        function initializeMap() {
+    console.log("🔄 110 بدء تهيئة الخريطة...");
 
-        if (map.isStyleLoaded()) {
-            isMapReady = true; // تحديث حالة جاهزية الخريطة
-            console.log("🎉 3 الخريطة جاهزة والنمط محمل. يمكن الآن التعامل مع الطلبات أو العلامات.");
-            addMarkersToMap(); // استدعاء دالة إضافة العلامات بعد التهيئة
-        } else if (retryCount < maxRetries) {
-            console.error(`⚠️ 4 فشل تحميل النمط. إعادة المحاولة (${retryCount + 1}/${maxRetries}) بعد 5 ثوانٍ...`);
-            retryCount++;
-            setTimeout(() => {
-                handleMapLoad(); // إعادة المحاولة
-            }, 5000);
-        } else {
-            console.error("🚨 23 فشل تحميل النمط بعد استنفاد المحاولات.");
-            alert("⚠️ 24 حدثت مشكلة أثناء تحميل الخريطة. يرجى التحقق من اتصالك بالإنترنت أو إعادة تحميل الصفحة.");
+    try {
+        // التحقق مما إذا كانت الخريطة قد تم تهيئتها بالفعل لمنع التكرارات
+        if (typeof map !== 'undefined' && map instanceof mapboxgl.Map) {
+            console.warn("⚠️ 117 الخريطة مهيأة بالفعل. لن يتم إعادة إنشائها.");
+            return;
         }
+
+        // تفريغ محتوى الخريطة قبل إعادة التهيئة لمنع التكرارات
+        const mapContainer = document.getElementById('map');
+        if (mapContainer) {
+            mapContainer.innerHTML = '';
+        } else {
+            console.error("🚨 118 لم يتم العثور على العنصر 'map'. تأكد من وجود العنصر في DOM.");
+            return;
+        }
+
+        // إنشاء الخريطة
+        map = new mapboxgl.Map({
+            container: 'map',
+            style: styles.hybrid,
+            center: [13.1913, 32.8872],
+            zoom: 2
+        });
+
+        let retryCount = 0; // عدد المحاولات
+        const maxRetries = 3; // الحد الأقصى لعدد المحاولات
+
+        function handleMapLoad() {
+            console.log('32 تم تحميل الخريطة باستخدام handleMapLoad.');
+
+            if (map.isStyleLoaded()) {
+                isMapReady = true;
+                console.log("🎉 3 الخريطة جاهزة والنمط محمل. يمكن الآن التعامل مع الطلبات أو العلامات.");
+                addMarkersToMap();
+            } else if (retryCount < maxRetries) {
+                console.warn(`⚠️ 4 فشل تحميل النمط. إعادة المحاولة (${retryCount + 1}/${maxRetries}) بعد 5 ثوانٍ...`);
+                retryCount++;
+                setTimeout(handleMapLoad, 5000);
+            } else {
+                console.error("🚨 23 فشل تحميل النمط بعد استنفاد المحاولات.");
+                alert("⚠️ 24 حدثت مشكلة أثناء تحميل الخريطة. يرجى التحقق من اتصالك بالإنترنت أو إعادة تحميل الصفحة.");
+            }
+        }
+
+        map.on('load', () => {
+            console.log("⚡109 تم استدعاء map.on('load').");
+
+            // التحقق من تعريف المتغير isMapReady
+            if (typeof isMapReady === 'undefined') {
+                console.error("🚨 76 المتغير isMapReady غير مهيأ بشكل صحيح.");
+                return;
+            }
+
+            if (map.isStyleLoaded()) {
+                isMapReady = true;
+                isMapInitialized = true;
+                console.log("🎉 47 الخريطة جاهزة والنمط محمل.");
+                processSavedRequests();
+            } else {
+                console.warn("⚠️ 59 النمط لم يتم تحميله بالكامل. سيتم إعادة المحاولة.");
+                handleMapLoad();
+            }
+
+            console.log("⚙️ 78 جاري تنفيذ الخطوات الأخيرة بعد تحميل الخريطة...");
+        });
+
+        map.on('error', (e) => {
+            console.error("🚨 112 خطأ أثناء تحميل الخريطة:", e);
+        });
+
+    } catch (error) {
+        console.error("🚨 113 خطأ أثناء إنشاء الخريطة:", error);
     }
-
-    map.on('load', () => {
-        // التحقق من تعريف المتغير isMapReady
-        if (typeof isMapReady === 'undefined') {
-            console.error("🚨 76 المتغير isMapReady غير مهيأ بشكل صحيح.");
-            return; // التوقف عن التنفيذ إذا كان المتغير غير مهيأ
-        }
-
-        if (map.isStyleLoaded()) {
-            isMapReady = true; // تحديث حالة جاهزية الخريطة
-            console.log("🎉 47 الخريطة جاهزة والنمط محمل.");
-            processSavedRequests(); // استدعاء معالجة الطلبات المحفوظة
-        } else {
-            console.warn("⚠️ 59 النمط لم يتم تحميله بالكامل. سيتم إعادة المحاولة.");
-            handleMapLoad(); // استدعاء إعادة المحاولة لتحميل النمط
-        }
-
-        console.log("⚙️ 78 جاري تنفيذ الخطوات الأخيرة بعد تحميل الخريطة...");
-    });
 }
+
+
+
+
+
+
 
 function ensureMapInitialized() {
     if (!isMapInitialized) {
@@ -1007,19 +994,51 @@ function ensureMapInitialized() {
 
 
 document.addEventListener('DOMContentLoaded', () => {
+    console.log("✔️ 120 تم تحميل DOM بنجاح. بدء التهيئة...");
+
+    // 1️⃣ التحقق من تحميل مكتبة Mapbox
     if (typeof mapboxgl === 'undefined' || !mapboxgl.supported()) {
         console.error("🚨 27 مكتبة Mapbox غير مدعومة أو لم يتم تحميلها. تحقق من الروابط والمتصفح المستخدم.");
-    } else {
-        console.log("✔️ 26 مكتبة Mapbox جاهزة للاستخدام.");
-        
-        // تحقق من أن الخريطة لم تتم تهيئتها مسبقًا
-        if (!isMapInitialized) {
-            initializeMap(); // استدعاء الدالة لتفعيل الخريطة
-            isMapInitialized = true; // تحديث الحالة بعد التهيئة
-        } else {
-            console.log(" 9 الخريطة مهيأة بالفعل.");
-        }
+        return;
     }
+    console.log("✔️ 26 مكتبة Mapbox جاهزة للاستخدام.");
+
+    // 2️⃣ التحقق من عدم تهيئة الخريطة مسبقًا قبل استدعاء `initializeMap()`
+    if (!isMapInitialized) {
+        console.log("🔄 9 بدء تهيئة الخريطة...");
+        initializeMap();
+        isMapInitialized = true;
+    } else {
+        console.log("✅ 104 الخريطة مهيأة بالفعل.");
+    }
+
+    // 3️⃣ التحقق من وجود زر تسجيل الدخول وإضافة مستمع الحدث عند الحاجة
+    const loginButton = document.getElementById('loginWorkerButton');
+    if (loginButton) {
+        if (!loginButton.dataset.listenerAdded) {
+            loginButton.addEventListener('click', () => {
+                const workerId = document.getElementById('workerLoginId').value;
+                if (workerId) {
+                    console.log(`🔵99 محاولة تسجيل الدخول للعامل: ${workerId}`);
+                    loginWorker(workerId);
+                } else {
+                    console.warn('⚠️ 105 يرجى إدخال معرّف العامل.');
+                    alert('⚠️ 106 يرجى إدخال معرّف العامل.');
+                }
+            });
+
+            // وضع علامة على أن المستمع تمت إضافته
+            loginButton.dataset.listenerAdded = "true";
+            console.log("✅ 107 تمت إضافة مستمع حدث تسجيل الدخول بنجاح.");
+        } else {
+            console.warn("⚠️ 108 مستمع تسجيل الدخول مضاف بالفعل. لم يتم إضافته مرة أخرى.");
+        }
+    } else {
+        console.error("🚨 119 زر تسجيل الدخول غير موجود في DOM.");
+    }
+});
+
+
 
     // إضافة مستمع الزر هنا
     const acceptJobButton = document.getElementById('acceptJobButton');
@@ -1043,19 +1062,8 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
         console.error("🚨 55 الزر 'acceptJobButton' غير موجود في DOM.");
     }
-});
+;
 
-
-
-
-
-
-
-if (typeof mapboxgl === 'undefined' || !mapboxgl.supported()) {
-    console.error("🚨 مكتبة Mapbox غير مدعومة أو لم يتم تحميلها. تحقق من الروابط والمتصفح المستخدم.");
-} else {
-    console.log("تم تحميل مكتبة Mapbox بنجاح وهي مدعومة.");
-}
 
 
 
@@ -1210,7 +1218,15 @@ document.getElementById('styleSelector').addEventListener('change', function () 
   }
 });
 
-
+// التأكد من أن الكود يعمل فقط إذا تم تعريف map
+if (typeof map !== 'undefined' && map instanceof mapboxgl.Map) {
+    map.on('load', () => {
+        console.log("⚡50 تم استدعاء map.on('load').");
+        checkMapStyleLoaded();
+    });
+} else {
+    console.error("🚨 51 الكائن map غير مهيأ أو غير معرّف.");
+}
 
 
         // تأكيد وضع العلامة
@@ -1289,7 +1305,6 @@ function showJobDetails(jobData) {
 
     <!-- زر اختبار الإشعارات -->
 <button id="testNotification">اختبار الإشعارات</button>
-<script>
     document.getElementById('testNotification').addEventListener('click', () => {
         fetch('/send-notification', {
             method: 'POST',
