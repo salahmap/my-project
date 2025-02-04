@@ -1319,7 +1319,20 @@ function showJobDetails(jobData) {
       .catch(err => console.error('فشل اختبار الإشعارات:', err));
   });
 </script>
-
+<!-- كود تسجيل Service Worker -->
+<script>
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('http://localhost:20000/service-worker.js')
+        .then(registration => {
+            console.log('✅ 128 Service Worker مسجل بنجاح:', registration.scope);
+        })
+        .catch(error => {
+            console.error('🚨 129 فشل تسجيل Service Worker:', error);
+        });
+    } else {
+        console.warn('⚠️ 130  المتصفح لا يدعم Service Worker.');
+    }
+  </script>
 
 </body>
 </html>
