@@ -236,6 +236,37 @@ console.log("✅💭 126 Pusher Beams تم تحميل المكتبة بنجاح.
 
 
 
+// إعداد Service Worker لتسجيل التوكن
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('service-worker.js')
+    .then((registration) => {
+        console.log(' 🗝️✅ 131 Service Worker مسجل بنجاح:', registration);
+
+            // ربط Firebase Messaging مع Service Worker
+            messaging.useServiceWorker(registration);
+
+            // طلب الإذن بالحصول على التوكن
+            return messaging.requestPermission()
+                .then(() => messaging.getToken({ vapidKey: 'BC5AZjNwVnpdJTIpZuCYncnGggugQjxhwdhEos0IpVLKNt_6m9iSbAXzVlNav0MqvVZfMk431Ka_pLZ_BbLNyPA' }));
+        })
+        .then((token) => {
+            console.log(' 🗝️✅132 تم الحصول على التوكن:', token);
+
+            // حفظ التوكن في قاعدة البيانات
+            const userId = "user_123"; // يجب تغيير هذا إلى معرف المستخدم الفعلي
+            const userRef = database.ref(`users/${userId}/notificationToken`);
+            return userRef.set(token);
+        })
+  .catch((error) => console.error(' 🗝️⚠️ 133 Failed to register Custom Service Worker:', error));
+
+} else {
+    console.warn(' 🗝️⚠️ 134 هذا المتصفح لا يدعم Service Workers.');
+}
+
+
+
+
+
         // دالة إرسال إشعار باستخدام Pusher Beams
         function sendPusherNotification(interest, message, title = "إشعار جديد") {
     fetch(`https://${pusherInstanceId}.pushnotifications.pusher.com/publish_api/v1/instances/${pusherInstanceId}/publishes`, {
@@ -1324,7 +1355,7 @@ function showJobDetails(jobData) {
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('http://localhost:20000/service-worker.js')
         .then(registration => {
-            console.log('✅ 128 Service Worker مسجل بنجاح:', registration.scope);
+            console.log('✅😘💕 128 Service Worker مسجل بنجاح:', registration.scope);
         })
         .catch(error => {
             console.error('🚨 129 فشل تسجيل Service Worker:', error);
