@@ -112,7 +112,6 @@
         <div id="workerInfo"></div>
     </div>
 
-    <button id="readyToGoButton">مستعد للانطلاق</button>
 
 
     <div id="locateButtonContainer">
@@ -185,18 +184,19 @@
 <script src="https://unpkg.com/@turf/turf"></script>
 <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.js"></script>
 <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.7.0/mapbox-gl-geocoder.min.js"></script>
-<link href="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css" rel="stylesheet" />
 
 <script>
 
     
     // التحقق من تحميل مكتبات Firebase و Pusher Beams
 if (typeof firebase === 'undefined' || typeof PusherPushNotifications === 'undefined') {
-    console.error('🚨💭121  تأكد من تحميل مكتبات Firebase وPusher قبل استخدامها.');
+    console.error('🚨💭 123  تأكد من تحميل مكتبات Firebase وPusher قبل استخدامها.');
 } else {
-    console.log('✅💭 122 تم تحميل المكتبات بنجاح.');
+    console.log('✅💭 124 تم تحميل المكتبات بنجاح.');
+if (!firebase || !PusherPushNotifications) {
+    console.error('🚨 149 فشل تحميل مكتبات Firebase أو Pusher Beams.');
 }
-
+}
     document.addEventListener('DOMContentLoaded', function() {
            // تهيئة Firebase Auth
            const auth = firebase.auth();
@@ -204,71 +204,90 @@ if (typeof firebase === 'undefined' || typeof PusherPushNotifications === 'undef
         // عرض نافذة تسجيل الدخول عند تحميل الصفحة
     document.getElementById('loginPopup').style.display = 'flex';
 
-        document.getElementById('loginPopup').style.display = 'flex';
+
+
+
+
+
+
+
+
+
+
+
 
 // تحقق من تحميل مكتبة Pusher Beams
 if (typeof PusherPushNotifications === 'undefined') {
-    console.error('🚨💭 123 Pusher Beams لم يتم تحميل المكتبة. تأكد من تضمين المكتبة في HTML.');
+    console.error('🚨💭 137 Pusher Beams لم يتم تحميل المكتبة. تأكد من تضمين المكتبة في HTML.');
 } else {
-    console.log('✅💭 124 Pusher Beams تم تحميل المكتبة بنجاح.');
+    console.log('✅💭 141 Pusher Beams تم تحميل المكتبة بنجاح.');
 }
 
-
-
-// تهيئة Pusher Beams
-document.addEventListener("DOMContentLoaded", () => {
+function initBeams() {
+    console.log("🚀 142 DOMContentLoaded تم تنفيذه بنجاح.");
+    
+    // إنشاء كائن Beams Client
     const beamsClient = new PusherPushNotifications.Client({
-        instanceId: 'c9641070-f290-4aab-9239-18b096e3d8bc'
-    });
-
-    beamsClient.start()
-        .then(() => beamsClient.addDeviceInterest('new-orders')) // اهتمام عام بجميع الطلبات الجديدة
-        .then(() => console.log('✅💭 125 Pusher Beams جاهز لاستقبال إشعارات الطلبات الجديدة'))
-        .catch((err) => console.error('🚨 127 خطأ في التسجيل:', err));
-
+    instanceId: '2a17d881-b1a6-4a38-8cd4-de1ab8212f67',
+  });
+    
+    console.log("📝 140 قبل تسجيل Service Worker الخاص بـ Beams.");
+    
+    navigator.serviceWorker.register('http://localhost:20000/service-worker.js')
+        .then((registration) => {
+            console.log("📝 143 تم تسجيل Service Worker الخاص بـ Beams:", registration);
+            return beamsClient.start({ serviceWorkerRegistration: registration });
+        })
+        .then(() => {
+            console.log('🛠️ 136 تم استدعاء start() بنجاح، يتم الآن تنفيذ addDeviceInterest.');
+            beamsClient.addDeviceInterest('debug-new-orderss')
+  .then(() => console.log('تم تسجيل الجهاز للاشتراك في debug-new-orderss'))
+  .catch(err => console.error('فشل تسجيل الجهاز:', err));
+        })
+        .then(() => {
+            console.log('✅💭 125 Pusher Beams جاهز لاستقبال إشعارات الطلبات الجديدة');
+        })
+        .catch((err) => {
+            console.error('🚨 127 خطأ في التسجيل:', err);
+            alert(`⚠️ 150 خطأ في تسجيل Service Worker: ${err.message}`);
+console.error('🚨 151 فشل تسجيل Service Worker:', err);
+        });
+    
     beamsClient.onNotificationOpened = (payload) => {
         alert(`إشعار جديد من Pusher Beams: ${payload.notification.body}`);
     };
-});
+}
+
+// تأكد من تنفيذ الكود سواء حدث DOMContentLoaded أم لا
+if (document.readyState === 'loading') {
+    document.addEventListener("DOMContentLoaded", initBeams);
+} else {
+    initBeams();
+}
 
 console.log("✅💭 126 Pusher Beams تم تحميل المكتبة بنجاح.");
 
-
-
-
-// إعداد Service Worker لتسجيل التوكن
-if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('service-worker.js')
-    .then((registration) => {
-        console.log(' 🗝️✅ 131 Service Worker مسجل بنجاح:', registration);
-
-            // ربط Firebase Messaging مع Service Worker
-            messaging.useServiceWorker(registration);
-
-            // طلب الإذن بالحصول على التوكن
-            return messaging.requestPermission()
-                .then(() => messaging.getToken({ vapidKey: 'BC5AZjNwVnpdJTIpZuCYncnGggugQjxhwdhEos0IpVLKNt_6m9iSbAXzVlNav0MqvVZfMk431Ka_pLZ_BbLNyPA' }));
-        })
-        .then((token) => {
-            console.log(' 🗝️✅132 تم الحصول على التوكن:', token);
-
-            // حفظ التوكن في قاعدة البيانات
-            const userId = "user_123"; // يجب تغيير هذا إلى معرف المستخدم الفعلي
-            const userRef = database.ref(`users/${userId}/notificationToken`);
-            return userRef.set(token);
-        })
-  .catch((error) => console.error(' 🗝️⚠️ 133 Failed to register Custom Service Worker:', error));
-
+if (typeof PusherPushNotifications === 'undefined') {
+    console.error('🚨 134 مكتبة Pusher Beams غير محملة، تأكد من تضمينها في الصفحة.');
 } else {
-    console.warn(' 🗝️⚠️ 134 هذا المتصفح لا يدعم Service Workers.');
+    console.log('✅ 135 مكتبة Pusher Beams تم تحميلها بنجاح.');
 }
 
+// تسجيل Service Worker مرة واحدة (إذا لم يكن ذلك مطلوبًا أكثر من مرة)
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('http://localhost:20000/service-worker.js')
+    .then(registration => {
+        console.log('✅😘💕 128 Service Worker مسجل بنجاح:', registration.scope);
+    })
+    .catch(error => {
+        console.error('🚨 129 فشل تسجيل Service Worker:', error);
+    });
+} else {
+    console.warn('⚠️ 130  المتصفح لا يدعم Service Worker.');
+}
 
-
-
-
-        // دالة إرسال إشعار باستخدام Pusher Beams
-        function sendPusherNotification(interest, message, title = "إشعار جديد") {
+// دالة إرسال إشعار باستخدام Pusher Beams
+function sendPusherNotification(interest, message, title = "إشعار جديد") {
     fetch(`https://${pusherInstanceId}.pushnotifications.pusher.com/publish_api/v1/instances/${pusherInstanceId}/publishes`, {
         method: 'POST',
         headers: {
@@ -289,6 +308,15 @@ if ('serviceWorker' in navigator) {
     .then(data => console.log("تم إرسال الإشعار بنجاح:", data))
     .catch(error => console.error("فشل إرسال الإشعار:", error));
 }
+
+
+
+
+
+
+
+
+
 
 
          // دالة لإعادة تعيين الحقول في inputPopup عند النقر على زر "إلغاء"
@@ -355,15 +383,17 @@ function hideLoginPopup() {
 
 
 function updateWorkerLocation(workerId, newLocation) {
-    const workerRef = database.ref(`workers/${workerId}/location`);
+    const workerLocationRef = database.ref(`workers/${workerId}/location`);
     
-    workerRef.once('value').then((snapshot) => {
-        const currentLocation = snapshot.val();
+    // استخدام المرجع المباشر للعامل بدلاً من المتغير العام workerRef
+    database.ref(`workers/${workerId}`).once('value').then((snapshot) => {
+        const workerData = snapshot.val();
+        const currentLocation = workerData && workerData.location;
         
         if (!currentLocation || currentLocation.lat !== newLocation.lat || currentLocation.lng !== newLocation.lng) {
-            workerRef.set(newLocation)
-                .then(() => console.log("✅ تم تحديث الموقع في Firebase:", newLocation))
-                .catch((error) => console.error("❌ خطأ في تحديث الموقع:", error));
+            workerLocationRef.set(newLocation)
+            .then(() => console.log("✅ 148 تم تحديث الموقع في Firebase:", newLocation))
+            .catch((error) => console.error("❌ 153 خطأ في تحديث الموقع في Firebase:", error));
         } else {
             console.log("🔄 88 لم يتغير الموقع، لا حاجة لتحديث Firebase.");
         }
@@ -372,27 +402,40 @@ function updateWorkerLocation(workerId, newLocation) {
     });
 }
 
+
+// [السطر 180] تعديل دالة تحديث الموقع باستخدام GPS لتحسين سرعة الاستجابة
 function updateLocationWithGPS(workerId) {
     if (navigator.geolocation) {
+        // الحصول على الموقع الأولي بسرعة باستخدام getCurrentPosition
+        navigator.geolocation.getCurrentPosition((position) => {
+            const initialLocation = {
+                lat: position.coords.latitude,
+                lng: position.coords.longitude,
+            };
+            console.log("✅ 90 Pre-cached location:", initialLocation);
+            updateWorkerLocation(workerId, initialLocation);
+        }, (error) => {
+            console.error("🚨 91 Error pre-fetching location:", error);
+        }, { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 });
+        
+        // متابعة تحديث الموقع باستخدام watchPosition
         navigator.geolocation.watchPosition((position) => {
             const newLocation = {
                 lat: position.coords.latitude,
                 lng: position.coords.longitude,
             };
-
-            console.log("📡 90 تحديد الموقع باستخدام GPS:", newLocation);
+            console.log("📡 93 Updating location:", newLocation);
             updateWorkerLocation(workerId, newLocation);
-
         }, (error) => {
-            console.error("🚨 91 خطأ أثناء تحديد الموقع:", error);
-        }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
+            console.error("🚨 197 Error during continuous location tracking:", error);
+        }, { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 });
     } else {
-        console.error("🚨 92 ميزة تحديد الموقع غير مدعومة في هذا المتصفح.");
+        console.error("🚨 198 Geolocation is not supported in this browser.");
     }
 }
 
-// استدعاء الوظيفة عند تسجيل الدخول
-updateLocationWithGPS('worker_123'); // استبدل بمعرف العامل الفعلي
+
+
 
 let isMapReady = false; // تعريف المتغير لتتبع جاهزية الخريطة.
 console.log("⚙️ 56 تم تعريف isMapReady وقيمته الحالية هي:", isMapReady);
@@ -436,6 +479,31 @@ function isMapReadyToUse() {
     return true;
 }
 
+
+// دالة تنتظر تحميل نمط الخريطة قبل المتابعة
+function waitUntilMapReady() {
+    return new Promise((resolve, reject) => {
+        if (map && map.isStyleLoaded()) {
+            console.log("ℹ️: 176 الخريطة جاهزة بالفعل.");
+            resolve();
+        } else {
+            // انتظار حدث تحميل النمط (يعمل لمرة واحدة)
+            map.once('style.load', () => {
+                console.log("ℹ️: 177 تم تحميل النمط – الخريطة جاهزة الآن.");
+                resolve();
+            });
+            // تعيين مهلة انتظار (مثلاً 15 ثانية)
+            setTimeout(() => {
+                if (!map.isStyleLoaded()) {
+                    console.error("🚨:178  انتهى وقت الانتظار لتحميل النمط.");
+                    reject(new Error(" 179 انتهى وقت الانتظار لتحميل النمط."));
+                }
+            }, 15000);
+        }
+    });
+}
+
+
 let map; // تعريف متغير الخريطة إذا لم يكن موجودًا بالفعل.
 console.log("⚙️ 57 تم تعريف المتغير map وهو حالياً:", map);
 
@@ -476,19 +544,69 @@ if (!firebase.apps.length) {
 
 
 
+// دالة لتركيز الخريطة على موقع العامل (تم إضافتها في السطر 255)
+function focusOnWorkerLocation(workerId) {
+    console.log(`🔍 بدء تنفيذ focusOnWorkerLocation للعامل ${workerId}`);
+
+    database.ref(`workers/${workerId}/location`).once('value')
+    .then((snapshot) => {
+        console.log("📡 190 تم استرجاع البيانات من Firebase:", snapshot.val());
+
+        const location = snapshot.val();
+        if (location && location.lng && location.lat) {
+            console.log(`📍 191 موقع العامل: ${location.lng}, ${location.lat}`);
+
+            waitUntilMapReady().then(() => {
+                console.log(`🗺️ 193 سيتم التركيز على موقع العامل ${workerId}`);
+                map.flyTo({ center: [location.lng, location.lat], zoom: 12 });
+            }).catch(err => {
+                console.error("🚨 194 خطأ في تحميل الخريطة:", err);
+            });
+        } else {
+            console.error(`🚨 195 بيانات موقع العامل ${workerId} غير متوفرة.`);
+        }
+    })
+    .catch((error) => {
+        console.error(`🚨 196خطأ أثناء جلب موقع العامل ${workerId}:`, error);
+    });
+}
+
+
+
+
+// دالة لحساب المسافة بين موقعين باستخدام صيغة Haversine (تم إضافتها في السطر 265)
+function calculateDistance(loc1, loc2) {
+    const R = 6371; // نصف قطر الأرض بالكيلومترات
+    const dLat = (loc2.lat - loc1.lat) * Math.PI / 180;
+    const dLng = (loc2.lng - loc1.lng) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(loc1.lat * Math.PI/180) * Math.cos(loc2.lat * Math.PI/180) *
+              Math.sin(dLng/2) * Math.sin(dLng/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const distance = R * c;
+    console.log(`المسافة المحسوبة بين الموقعين: ${distance.toFixed(2)} كم`);
+    return distance;
+}
+
+
+
+
+
+
+
 // إعداد Firebase Messaging للإرسال فقط
 const messaging = firebase.messaging();
 
-// دالة إرسال الإشعارات باستخدام Firebase أو Pusher
-function sendPusherNotification(workerId, message) {
+// تعريف إرسال إشعار بناءً على معرّف العامل
+function sendPusherNotificationByWorker(workerId, message) {
     fetch('http://localhost:7000/send-notification', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ workerId, message })
     })
     .then((response) => response.json())
-    .then((data) => console.log('تم إرسال الإشعار بنجاح:', data))
-    .catch((error) => console.error('فشل الإرسال:', error));
+    .then((data) => console.log(' 188 تم إرسال الإشعار بنجاح:', data))
+    .catch((error) => console.error(' 189 فشل الإرسال:', error));
 }
 
 
@@ -511,18 +629,36 @@ function generateWorkerIds(batchSize) {
 }
 
 // إنشاء دفعة من المعرّفات عند الحاجة
-generateWorkerIds(5000); // مثال: إنشاء 5000 معرّف
+generateWorkerIds(5000); // مثال: إنشاء 5000     // [295] تعريف معرف العامل
 
 
 
-// تعريف المراجع
-const workerId = "worker_123"; // معرف العامل (يجب استبداله بمعرف حقيقي)
-const workerRef = database.ref(`workers/${workerId}`);
 
-database.ref(`workers/${workerId}/reviews`).on('child_added', (snapshot) => {
-    const review = snapshot.val();
-    console.log(`تقييم جديد للعامل ${workerId}:`, review);
-});
+    const workerId = "worker_123"; // تأكد من تعديل المعرف عند الحاجة
+    if (!workerId) {
+        throw new Error("🚨159 workerId غير معرف بشكل صحيح.");
+    }
+    console.log("✅ 160 workerId معرف بنجاح:", workerId);
+
+    // [297] تعريف workerRef
+    const workerRef = database.ref(`workers/${workerId}`);
+    if (!workerRef) {
+        console.error("🚨 161 لم يتم تعريف workerRef بشكل صحيح.");
+    } else {
+        console.log("✅ 162 workerRef معرف بنجاح:", workerRef.toString());
+    }
+
+    // [301] تعريف workerReviewsRef باستخدام workerRef.child
+    const workerReviewsRef = workerRef.child('reviews');
+    if (!workerReviewsRef) {
+        console.error("🚨 163 لم يتم تعريف workerReviewsRef بشكل صحيح.");
+    } else {
+        console.log("✅ 164 workerReviewsRef معرف بنجاح:", workerReviewsRef.toString());
+    }
+
+
+ 
+
 
 
 
@@ -542,11 +678,17 @@ function processSavedRequests() {
     return;
 }
 
-const mapReady = isMapReadyToUse();
-if (!mapReady) {
-    console.warn("⚠️ 36 الخريطة ليست جاهزة بعد لمعالجة الطلبات المحفوظة. سيتم تأجيلها.");
-    return;
-}
+// [السطر 35-42] باستخدام waitUntilMapReady()
+waitUntilMapReady()
+    .then(() => {
+        // هنا تكتب الكود الذي يتابع معالجة الطلبات المحفوظة
+        // مثلاً: processSavedRequests();
+    })
+    .catch((err) => {
+        console.warn("⚠️ 36: الخريطة ليست جاهزة بعد لمعالجة الطلبات المحفوظة. سيتم تأجيلها.", err);
+        return;
+    });
+
 
 
 
@@ -559,7 +701,9 @@ if (!mapReady) {
             // التحقق من صحة بيانات الطلب
             if (!request || !request.requestData || !request.requestId) {
                 console.error("🚨 41 بيانات غير صحيحة في الطلب:", request);
-                continue; // تجاوز الطلب إذا كان غير صحيح
+if (!request) {
+    console.error("🚨 155 الطلب غير موجود أو تم حذفه من Firebase.");
+}      continue; // تجاوز الطلب إذا كان غير صحيح
             }
 
             const { requestData, requestId } = request;
@@ -616,12 +760,18 @@ requestRef.on('child_added', (snapshot) => {
     }
 
     // التحقق من جاهزية الخريطة
-    const mapReady = isMapReadyToUse();
-if (!mapReady) {
-    console.warn(`⚠️ 39 الخريطة ليست جاهزة بعد. سيتم تأجيل التعامل مع الطلب ${requestId}.`);
-    saveRequestForLater(requestData, requestId); // حفظ الطلب للتعامل لاحقًا
-    return;
-}
+// [السطر 37-45] باستخدام waitUntilMapReady()
+waitUntilMapReady()
+    .then(() => {
+        // هنا يتم متابعة التعامل مع الطلب، مثلاً:
+        // processRequest(requestData, requestId);
+    })
+    .catch((err) => {
+        console.warn(`⚠️ 39: الخريطة ليست جاهزة بعد. سيتم تأجيل التعامل مع الطلب ${requestId}.`, err);
+        saveRequestForLater(requestData, requestId);
+        return;
+    });
+
 
 
     console.log(`🎉 40 الخريطة جاهزة لمعالجة الطلب ${requestId}.`);
@@ -642,15 +792,7 @@ if (!mapReady) {
 
 
 
-// دالة لحفظ الطلبات إذا لم تكن الخريطة جاهزة
-function saveRequestForLater(requestData, requestId) {
-    if (!requestData || !requestId) {
-        console.error("🚨 45 بيانات الطلب غير صحيحة. لا يمكن حفظ الطلب:", { requestData, requestId });
-        return;
-    }
-    console.log(`📋 46 تم حفظ الطلب ${requestId} للتعامل لاحقًا:`, requestData);
-    savedRequests.push({ requestData, requestId });
-}
+
 
 // إضافة إعادة محاولة عند فشل تحميل النمط
 let retryCount = 0; // عدد المحاولات
@@ -664,7 +806,7 @@ function checkMapStyleLoaded() {
 
     if (map.isStyleLoaded()) {
     isMapReady = true;
-    console.log("🎉 47 الخريطة جاهزة.");
+    console.log("🎉 157 الخريطة جاهزة.");
     processSavedRequests(); // معالجة الطلبات المحفوظة
 } else if (retryCount < maxRetries) {
     retryCount++;
@@ -675,6 +817,7 @@ function checkMapStyleLoaded() {
 } else {
     console.error("🚨 49 فشل تحميل النمط بعد عدة محاولات. يرجى التحقق من إعدادات الخريطة أو اتصال الشبكة.");
     alert("⚠️ 86 حدثت مشكلة أثناء تحميل النمط. حاول إعادة تحميل الصفحة.");
+console.error("🚨 156 فشل تحميل النمط بعد عدة محاولات. تأكد من اتصال الشبكة.");
 }
 
 }
@@ -760,7 +903,7 @@ function loginWorker(workerId) {
                 // إخفاء نافذة تسجيل الدخول
                 document.getElementById('loginPopup').style.display = 'none';
 
-                // التركيز على موقع العامل في الخريطة
+                // 🔍 استدعاء التركيز على موقع العامل
                 focusOnWorkerLocation(workerId);
             } else {
                 console.warn("⚠️ 97 المعرّف غير صالح أو غير موجود في قاعدة البيانات.");
@@ -769,6 +912,7 @@ function loginWorker(workerId) {
         })
         .catch((error) => console.error("❌ 98 خطأ أثناء تسجيل الدخول:", error));
 }
+
 
 
 
@@ -799,45 +943,39 @@ function loginWorker(workerId) {
 
 
 if (!window.activeListeners) {
-    window.activeListeners = {};
-}
-
-if (!window.activeListeners) {
     window.activeListeners = {}; // التأكد من وجود الكائن لتتبع المستمعين
 }
 
 
 function startTracking(workerId) {
-    const workerRef = database.ref(`workers/${workerId}/location`);
-
-    // تحقق من أن المستمع للعامل غير مكرر
+    const workerLocationRef = database.ref(`workers/${workerId}/location`);
     if (window.activeListeners[workerId]) {
-        console.log(`⚠️ المستمع للعامل ${workerId} مضاف بالفعل.`);
+        console.warn(`⚠️ المستمع للعامل ${workerId} مضاف بالفعل.`);
         return;
     }
-
-    workerRef.on('value', (snapshot) => {
-        const location = snapshot.val();
+    
+    // إنشاء مرجع خاص لكل عامل باستخدام workerId
+    const currentWorkerRef = database.ref(`workers/${workerId}`);
+    currentWorkerRef.on('value', (snapshot) => {
+        const data = snapshot.val();
+        const location = data && data.location;
         if (location && location.lat && location.lng) {
-            console.log(`تم تحديث موقع العامل ${workerId}:`, location);
-
-// تحقق من جاهزية الخريطة
-const mapReady = isMapReadyToUse();
-if (mapReady) {
-    updateWorkerMarker(location, workerId);
-} else {
-    console.error("⚠️ 2 الخريطة غير مهيأة أو النمط غير محمل. تأكد من تهيئة الخريطة.");
-}
-
-} else {
-    console.error(`🚨 83 بيانات موقع العامل ${workerId} غير صحيحة:`, location);
-}
-});
-
-
-    // تسجيل المستمع في القائمة لتجنب التكرار
+            console.log(`🤷‍♂️تم تحديث موقع العامل ${workerId}:`, location);
+            waitUntilMapReady()
+                .then(() => {
+                    updateWorkerMarker(location, workerId);
+                })
+                .catch((err) => {
+                    console.error("⚠️ 2: الخريطة غير مهيأة أو النمط غير محمل.", err);
+                });
+        } else {
+            console.error(`🚨 83 بيانات موقع العامل ${workerId} غير صحيحة:`, location);
+        }
+    });
+    
     window.activeListeners[workerId] = true;
 }
+
 
 
 
@@ -856,35 +994,32 @@ workerRef.child('currentRequest').on('value', (snapshot) => {
 
     // دالة لتحديث العلامة على الخريطة لكل عامل
     function updateWorkerMarker(location, workerId) {
-    // التأكد من أن قائمة العلامات موجودة
-    if (!window.workerMarkers) {
-        window.workerMarkers = {};
-    }
-
-    // تحقق من جاهزية الخريطة والنمط
-    const mapReady = isMapReadyToUse();
-if (!mapReady) {
-    console.error("⚠️ 18 الخريطة غير جاهزة أو النمط غير محمل. سيتم تجاهل تحديث العلامة.");
-    return;
+    waitUntilMapReady()
+        .then(() => {
+            // التأكد من أن قائمة العلامات موجودة
+            if (!window.workerMarkers) {
+                window.workerMarkers = {};
+            }
+            try {
+                // إضافة أو تحديث العلامة على الخريطة
+                if (!window.workerMarkers[workerId]) {
+                    window.workerMarkers[workerId] = new mapboxgl.Marker()
+                        .setLngLat([location.lng, location.lat])
+                        .addTo(map);
+                    console.log(`✔️ 17 تم إضافة العلامة للعامل ${workerId}.`);
+                } else {
+                    window.workerMarkers[workerId].setLngLat([location.lng, location.lat]);
+                    console.log(`✔️ 15 تم تحديث موقع العلامة للعامل ${workerId}.`);
+                }
+            } catch (error) {
+                console.error(`🚨 16 خطأ أثناء تحديث العلامة للعامل ${workerId}:`, error);
+            }
+        })
+        .catch((err) => {
+            console.error("⚠️ 18 لا يمكن تحديث العلامة لأن الخريطة لم تجهز بعد:", err);
+        });
 }
 
-
-
-    try {
-        // إضافة أو تحديث العلامة على الخريطة
-        if (!window.workerMarkers[workerId]) {
-            window.workerMarkers[workerId] = new mapboxgl.Marker()
-                .setLngLat([location.lng, location.lat])
-                .addTo(map);
-            console.log(`✔️ 17 تم إضافة العلامة للعامل ${workerId}.`);
-        } else {
-            window.workerMarkers[workerId].setLngLat([location.lng, location.lat]);
-            console.log(`✔️ 15 تم تحديث موقع العلامة للعامل ${workerId}.`);
-        }
-    } catch (error) {
-        console.error(`🚨 16 خطأ أثناء تحديث العلامة للعامل ${workerId}:`, error);
-    }
-}
 
 
 
@@ -895,7 +1030,7 @@ if (!mapReady) {
     startTracking(workerId);
 
     // إضافة مستمع لتحديث الطلبات
-    const workerRef = database.ref(`workers/${workerId}`);
+    const workerRequestsRef = database.ref(`workers/${workerId}/currentRequest`); // ✅ استخدام اسم واضح
     workerRef.child('currentRequest').on('value', (snapshot) => {
         const requestData = snapshot.val();
         if (requestData) {
@@ -989,6 +1124,10 @@ if (!mapReady) {
                 isMapReady = true;
                 isMapInitialized = true;
                 console.log("🎉 47 الخريطة جاهزة والنمط محمل.");
+               
+         // هنا نضيف console.log لعرض القيم المحدثة
+        console.log("✅ 158 isMapReady:", isMapReady, "isMapInitialized:", isMapInitialized);
+
                 processSavedRequests();
             } else {
                 console.warn("⚠️ 59 النمط لم يتم تحميله بالكامل. سيتم إعادة المحاولة.");
@@ -1024,50 +1163,74 @@ function ensureMapInitialized() {
 }
 
 
+
 document.addEventListener('DOMContentLoaded', () => {
     console.log("✔️ 120 تم تحميل DOM بنجاح. بدء التهيئة...");
 
-    // 1️⃣ التحقق من تحميل مكتبة Mapbox
-    if (typeof mapboxgl === 'undefined' || !mapboxgl.supported()) {
-        console.error("🚨 27 مكتبة Mapbox غير مدعومة أو لم يتم تحميلها. تحقق من الروابط والمتصفح المستخدم.");
+    // ✅ تحقق من تحميل Firebase و Mapbox قبل استخدامها
+    if (typeof firebase === 'undefined' || typeof mapboxgl === 'undefined') {
+        console.error("🚨 165 لم يتم تحميل Firebase أو Mapbox. يرجى التحقق من الروابط.");
         return;
     }
-    console.log("✔️ 26 مكتبة Mapbox جاهزة للاستخدام.");
+    
+    // ★ إضافة: بدء تتبع الموقع مبكرًا
+    console.log("🔄 بدء تتبع الموقع مبكرًا");
+    updateLocationWithGPS('worker_123'); // استبدل 'worker_123' بمعرف العامل الفعلي
 
-    // 2️⃣ التحقق من عدم تهيئة الخريطة مسبقًا قبل استدعاء `initializeMap()`
+    // ✅ تهيئة الخريطة فقط إذا لم تكن مهيأة
     if (!isMapInitialized) {
-        console.log("🔄 9 بدء تهيئة الخريطة...");
+        console.log("🔄 168 بدء تهيئة الخريطة...");
         initializeMap();
         isMapInitialized = true;
     } else {
-        console.log("✅ 104 الخريطة مهيأة بالفعل.");
+        console.log("✅ 169 الخريطة مهيأة بالفعل.");
     }
 
-    // 3️⃣ التحقق من وجود زر تسجيل الدخول وإضافة مستمع الحدث عند الحاجة
+    // ✅ تأكيد تحميل جميع العناصر قبل إضافة الأحداث
+    const acceptJobButton = document.getElementById('acceptJobButton');
+    const locateButton = document.getElementById('locateButton');
+    const styleSelector = document.getElementById('styleSelector');
     const loginButton = document.getElementById('loginWorkerButton');
-    if (loginButton) {
-        if (!loginButton.dataset.listenerAdded) {
-            loginButton.addEventListener('click', () => {
-                const workerId = document.getElementById('workerLoginId').value;
-                if (workerId) {
-                    console.log(`🔵99 محاولة تسجيل الدخول للعامل: ${workerId}`);
-                    loginWorker(workerId);
-                } else {
-                    console.warn('⚠️ 105 يرجى إدخال معرّف العامل.');
-                    alert('⚠️ 106 يرجى إدخال معرّف العامل.');
-                }
-            });
 
-            // وضع علامة على أن المستمع تمت إضافته
-            loginButton.dataset.listenerAdded = "true";
-            console.log("✅ 107 تمت إضافة مستمع حدث تسجيل الدخول بنجاح.");
-        } else {
-            console.warn("⚠️ 108 مستمع تسجيل الدخول مضاف بالفعل. لم يتم إضافته مرة أخرى.");
-        }
-    } else {
-        console.error("🚨 119 زر تسجيل الدخول غير موجود في DOM.");
+    if (!acceptJobButton || !locateButton || !styleSelector || !loginButton) {
+        console.error("🚨 170 بعض العناصر غير موجودة في DOM. تأكد من تحميل الصفحة بالكامل.");
+        return;
     }
+
+    // ✅ إضافة المستمعين بعد التأكد من تحميل العناصر
+    acceptJobButton.addEventListener('click', () => {
+        alert('تم قبول العمل بنجاح');
+        document.getElementById('jobDetailsPopup').style.display = 'none';
+    });
+
+    locateButton.addEventListener('click', () => {
+        locateControl.trigger();
+    });
+
+    styleSelector.addEventListener('change', function () {
+        const selectedStyle = this.value;
+        if (styles[selectedStyle]) {
+            map.setStyle(styles[selectedStyle]);
+            console.log(`✔️ 171 تم تغيير النمط إلى: ${selectedStyle}`);
+        } else {
+            console.error(`⚠️ 172 النمط "${selectedStyle}" غير معروف.`);
+        }
+    });
+
+    loginButton.addEventListener('click', () => {
+        const workerId = document.getElementById('workerLoginId').value;
+        if (workerId) {
+            console.log(`🔵 173 محاولة تسجيل الدخول للعامل: ${workerId}`);
+            loginWorker(workerId);
+        } else {
+            console.warn('⚠️ 174 يرجى إدخال معرّف العامل.');
+            alert('⚠️ 175 يرجى إدخال معرّف العامل.');
+        }
+    });
 });
+
+
+
 
 
 
@@ -1101,11 +1264,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 if (!isMapInitialized) {
-    console.log("تهيئة الخريطة لأول مرة.");
+    console.log(" 146 تهيئة الخريطة لأول مرة.");
     initializeMap();
     isMapInitialized = true;
 } else {
-    console.log("الخريطة مهيأة بالفعل.");
+    console.log(" 147 الخريطة مهيأة بالفعل.");
 }
 
 
@@ -1116,11 +1279,17 @@ function addMarkersToMap() {
     const requestsRef = database.ref('workRequests');
     requestsRef.on('child_added', (data) => {
         // التحقق من جاهزية الخريطة قبل محاولة إضافة العلامات
-        const mapReady = isMapReadyToUse();
-if (!mapReady) {
-    console.error("⚠️ 19 الخريطة غير جاهزة أو النمط غير محمل. سيتم تجاهل إضافة العلامة.");
-    return;
-}
+// [السطر 189-197] باستخدام waitUntilMapReady()
+waitUntilMapReady()
+    .then(() => {
+        // هنا يتم متابعة إضافة العلامة على الخريطة
+        // مثلاً: addMarkerToMap(...);
+    })
+    .catch((err) => {
+        console.error("⚠️ 19: الخريطة غير جاهزة أو النمط غير محمل. سيتم تجاهل إضافة العلامة.", err);
+        return;
+    });
+
 
 
 
@@ -1172,6 +1341,15 @@ const locateControl = new mapboxgl.GeolocateControl({
     fitBoundsOptions: {
         maxZoom: 15
     }
+});
+
+locateControl.on('geolocate', function(e) {
+    console.log("تم تحديد الموقع: ", e.coords);
+    map.flyTo({
+         center: [e.coords.longitude, e.coords.latitude],
+         zoom: 18,
+         speed: 1.0
+    });
 });
 
 map.on('load', () => {
@@ -1352,17 +1530,7 @@ function showJobDetails(jobData) {
 </script>
 <!-- كود تسجيل Service Worker -->
 <script>
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('http://localhost:20000/service-worker.js')
-        .then(registration => {
-            console.log('✅😘💕 128 Service Worker مسجل بنجاح:', registration.scope);
-        })
-        .catch(error => {
-            console.error('🚨 129 فشل تسجيل Service Worker:', error);
-        });
-    } else {
-        console.warn('⚠️ 130  المتصفح لا يدعم Service Worker.');
-    }
+
   </script>
 
 </body>
