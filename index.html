@@ -830,14 +830,37 @@ function showPublicWorkers() {
             }
         });
 
-        locateControl.on('geolocate', function(e) {
-    console.log("تم تحديد الموقع: ", e.coords);
-    map.flyTo({
-         center: [e.coords.longitude, e.coords.latitude],
-         zoom: 18,
-         speed: 1.0
-    });
+// متغير للتحكم في إعادة التمركز
+let autoCenterEnabled = false;
+
+// عند الضغط على زر "تحديد موقعي" نفعّل إعادة التمركز
+locateButton.addEventListener('click', () => {
+    autoCenterEnabled = true; // تمكين إعادة التمركز عند الحصول على الموقع
+    locateControl.trigger();
 });
+
+// عند سحب الخريطة يدويًا، نوقف إعادة التمركز التلقائي
+map.on('dragstart', () => {
+    if (autoCenterEnabled) {
+        console.log("تم تعطيل إعادة التمركز تلقائيًا بسبب سحب الخريطة يدويًا.");
+    }
+    autoCenterEnabled = false;
+});
+
+// عند الحصول على الموقع من locateControl، نُعيد التمركز فقط إذا كان autoCenterEnabled true
+locateControl.on('geolocate', (e) => {
+    console.log("تم تحديد الموقع: ", e.coords);
+    if (autoCenterEnabled) {
+        map.flyTo({
+            center: [e.coords.longitude, e.coords.latitude],
+            zoom: 18,    // قيمة التكبير المطلوبة؛ يمكنك تعديلها حسب الحاجة
+            speed: 1.0   // سرعة الانتقال (اختيارية)
+        });
+    } else {
+        console.log("إعادة التمركز معطلة؛ المستخدم تحكم يدويًا في موقع العرض.");
+    }
+});
+
 
         map.addControl(locateControl);
 
