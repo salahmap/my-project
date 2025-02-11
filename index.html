@@ -179,6 +179,8 @@
 </div>
 
 
+
+
 <!-- مكتبات Firebase App و Messaging -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js"></script>
@@ -194,7 +196,6 @@
 <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.js"></script>
 
 <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.7.0/mapbox-gl-geocoder.min.js"></script>
-<link href="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css" rel="stylesheet" />
 
 
 <script>
@@ -239,14 +240,25 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     beamsClient.start()
-        .then(() => beamsClient.addDeviceInterest('new-orders')) // اهتمام عام بجميع الطلبات الجديدة
-        .then(() => console.log('Pusher Beams جاهز لاستقبال إشعارات الطلبات الجديدة'))
-        .catch(console.error);
+        .then(() => {
+            // تسجيل الجهاز في قناة debug-new-orders
+            return beamsClient.addDeviceInterest('debug-new-orders');
+        })
+        .then(() => {
+            console.log('Pusher Beams جاهز لاستقبال إشعارات الطلبات الجديدة');
+            // تسجيل الجهاز في قناة إضافية debug-new-orderss
+            return beamsClient.addDeviceInterest('debug-new-orders');
+        })
+        .then(() => {
+            console.log('تم تسجيل الجهاز للاشتراك في debug-new-orders');
+        })
+        .catch(err => console.error('فشل تسجيل الجهاز:', err));
 
     beamsClient.onNotificationOpened = (payload) => {
         alert(`إشعار جديد من Pusher Beams: ${payload.notification.body}`);
     };
 });
+
 
 // تعريف الكائنات بعد التهيئة
 const messaging = firebase.messaging();
@@ -287,8 +299,11 @@ if ('serviceWorker' in navigator) {
 const requestId = "-OG2RrRJoW4G8hV-iUit"; // مثال على معرف طلب صالح
 
 if (!requestId) {
-    console.error("معرف الطلب غير موجود أو غير صالح.");
+    console.error("❌ معرف الطلب غير موجود أو غير صالح. تأكد من تمرير معرف صالح.");
 } else {
+    console.log("✅ معرف الطلب صالح، المتابعة مع قاعدة البيانات:", requestId);
+}
+ {
     const requestRef = database.ref(`workRequests/${requestId}`);
     
     // التحقق من وجود الطلب
@@ -413,6 +428,8 @@ function sendNotificationsToNearbyWorkers(requestData, userLocation) {
                 if (distance <= 10) { // إذا كانت المسافة أقل من 10 كيلومترات
                     sendPusherNotification(workerData.deviceToken, `هناك طلب ${requestData.workType} قريب من موقعك.`);
                 }
+                console.log("✅ تم تحميل بيانات العامل بنجاح:", workerData);
+
             });
         })
         .catch((error) => {
@@ -539,13 +556,20 @@ function loadWorkers() {
 
 // وظيفة عرض موقع العامل على الخريطة
 function showWorkerLocation(workerLocation) {
-    if (window.workerMarker) {
-        window.workerMarker.setLngLat([workerLocation.lng, workerLocation.lat]);
-    } else {
-        window.workerMarker = new mapboxgl.Marker()
-            .setLngLat([workerLocation.lng, workerLocation.lat])
-            .addTo(map);
-    }
+    waitUntilMapReady()
+    .then(() => {
+        if (window.workerMarker) {
+            window.workerMarker.setLngLat([workerLocation.lng, workerLocation.lat]);
+        } else {
+            window.workerMarker = new mapboxgl.Marker()
+                .setLngLat([workerLocation.lng, workerLocation.lat])
+                .addTo(map);
+        }
+    })
+    .catch((err) => {
+        console.error("⚠️: 184 تعذر عرض موقع العامل لأن الخريطة ليست جاهزة.", err);
+    });
+
     map.flyTo({ center: [workerLocation.lng, workerLocation.lat], zoom: 15, essential: true });
 console.log("🚀 93 تحريك الخريطة بسرعة إلى موقع العامل:", workerLocation);
 }
@@ -719,32 +743,69 @@ function checkProximityAndNotify(workerLocation, clientLocation) {
 
         // بعد تحميل الخريطة، قم بالتحرك تدريجيًا نحو طرابلس
         map.on('load', () => {
-    map.flyTo({ center: [13.1913, 32.8872], zoom: 10, speed: 0.2 });
+            waitUntilMapReady()
+    .then(() => {
+        map.flyTo({ center: [13.1913, 32.8872], zoom: 10, speed: 0.2 });
+    })
+    .catch((err) => {
+        console.error("⚠️: 186 تعذر التحرك إلى الموقع لأن الخريطة ليست جاهزة.", err);
+    });
 
     // استدعاء دالة عرض العمال
     showPublicWorkers();
 });
 
-// دالة عرض العمال على الخريطة
-function showPublicWorkers() {
-    const workersRef = database.ref('workers');
-    workersRef.once('value', (snapshot) => {
-        snapshot.forEach((worker) => {
-            const workerData = worker.val();
-            if (workerData.isAvailable) { // فقط العمال المتاحين
-                const distance = calculateDistance(map.getCenter(), workerData.location);
-                new mapboxgl.Marker()
-                    .setLngLat([workerData.location.lng, workerData.location.lat])
-                    .setPopup(new mapboxgl.Popup().setHTML(`
-                        <p>الاسم: ${workerData.name}</p>
-                        <p>المسافة: ${distance.toFixed(2)} كم</p>
-                        <p>المهارة: ${workerData.skill}</p>
-                    `))
-                    .addTo(map);
-            }
-        });
+
+// دالة تنتظر تحميل نمط الخريطة قبل المتابعة
+function waitUntilMapReady() {
+    return new Promise((resolve, reject) => {
+        if (map && map.isStyleLoaded()) {
+            console.log("ℹ️: 180 الخريطة جاهزة بالفعل.");
+            resolve();
+        } else {
+            // انتظار حدث تحميل النمط (يعمل لمرة واحدة)
+            map.once('style.load', () => {
+                console.log("ℹ️: 181 تم تحميل النمط – الخريطة جاهزة الآن.");
+                resolve();
+            });
+            // تعيين مهلة انتظار (15 ثانية)
+            setTimeout(() => {
+                if (!map.isStyleLoaded()) {
+                    console.error("🚨: 182 انتهى وقت الانتظار لتحميل النمط.");
+                    reject(new Error(" 183 انتهى وقت الانتظار لتحميل النمط."));
+                }
+            }, 15000);
+        }
     });
 }
+
+// دالة عرض العمال على الخريطة (مع انتظار تحميل النمط)
+function showPublicWorkers() {
+    waitUntilMapReady()
+    .then(() => {
+        const workersRef = database.ref('workers');
+        workersRef.once('value', (snapshot) => {
+            snapshot.forEach((worker) => {
+                const workerData = worker.val();
+                if (workerData.isAvailable) { // فقط العمال المتاحين
+                    const distance = calculateDistance(map.getCenter(), workerData.location);
+                    new mapboxgl.Marker()
+                        .setLngLat([workerData.location.lng, workerData.location.lat])
+                        .setPopup(new mapboxgl.Popup().setHTML(`
+                            <p>الاسم: ${workerData.name}</p>
+                            <p>المسافة: ${distance.toFixed(2)} كم</p>
+                            <p>المهارة: ${workerData.skill}</p>
+                        `))
+                        .addTo(map);
+                }
+            });
+        });
+    })
+    .catch((err) => {
+        console.error("⚠️: 186 تعذر عرض العمال لأن الخريطة ليست جاهزة.", err);
+    });
+}
+
 
 
         // إعداد التحكم في البحث
@@ -768,6 +829,15 @@ function showPublicWorkers() {
                 maxZoom: 15
             }
         });
+
+        locateControl.on('geolocate', function(e) {
+    console.log("تم تحديد الموقع: ", e.coords);
+    map.flyTo({
+         center: [e.coords.longitude, e.coords.latitude],
+         zoom: 18,
+         speed: 1.0
+    });
+});
 
         map.addControl(locateControl);
 
@@ -800,17 +870,24 @@ document.getElementById('cancelRequest').addEventListener('click', () => {
 });
 
 
-        // تأكيد وضع العلامة
-        document.getElementById('confirmYes').addEventListener('click', () => {
-            const userLocation = map.getCenter();
-            // إضافة العلامة في الموقع الحالي
-            new mapboxgl.Marker()
-                .setLngLat(userLocation)
-                .addTo(map);
-            // عرض نافذة إدخال الاسم ورقم الهاتف
-            document.getElementById('inputPopup').style.display = 'block';
-            document.getElementById('confirmationPopup').style.display = 'none';
-        });
+// تأكيد وضع العلامة مع انتظار تحميل الخريطة
+document.getElementById('confirmYes').addEventListener('click', () => {
+    waitUntilMapReady()
+    .then(() => {
+        const userLocation = map.getCenter();
+        // إضافة العلامة في الموقع الحالي
+        new mapboxgl.Marker()
+            .setLngLat(userLocation)
+            .addTo(map);
+        // عرض نافذة إدخال الاسم ورقم الهاتف
+        document.getElementById('inputPopup').style.display = 'block';
+        document.getElementById('confirmationPopup').style.display = 'none';
+    })
+    .catch((err) => {
+        console.error("⚠️: 187 تعذر تأكيد وضع العلامة لأن الخريطة ليست جاهزة.", err);
+    });
+});
+
 
         // إلغاء وضع العلامة
         document.getElementById('confirmNo').addEventListener('click', () => {
