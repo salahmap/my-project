@@ -558,7 +558,7 @@ function focusOnWorkerLocation(workerId) {
 
             waitUntilMapReady().then(() => {
                 console.log(`🗺️ 193 سيتم التركيز على موقع العامل ${workerId}`);
-                map.flyTo({ center: [location.lng, location.lat], zoom: 12 });
+                map.flyTo({ center: [location.lng, location.lat], zoom: 15 });
             }).catch(err => {
                 console.error("🚨 194 خطأ في تحميل الخريطة:", err);
             });
