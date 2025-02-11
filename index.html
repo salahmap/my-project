@@ -853,7 +853,7 @@ locateControl.on('geolocate', (e) => {
     if (autoCenterEnabled) {
         map.flyTo({
             center: [e.coords.longitude, e.coords.latitude],
-            zoom: 18,    // قيمة التكبير المطلوبة؛ يمكنك تعديلها حسب الحاجة
+            zoom: 15,    // قيمة التكبير المطلوبة؛ يمكنك تعديلها حسب الحاجة
             speed: 1.0   // سرعة الانتقال (اختيارية)
         });
     } else {
