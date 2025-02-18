@@ -834,10 +834,17 @@ function showPublicWorkers() {
 let autoCenterEnabled = false;
 
 // عند الضغط على زر "تحديد موقعي" نفعّل إعادة التمركز
-locateButton.addEventListener('click', () => {
-    autoCenterEnabled = true; // تمكين إعادة التمركز عند الحصول على الموقع
-    locateControl.trigger();
-});
+const locateBtn = document.getElementById('locateButton');
+if (!locateBtn) {
+    console.error("عنصر locateButton غير موجود.");
+} else {
+    locateBtn.addEventListener('click', () => {
+        autoCenterEnabled = true; // تفعيل إعادة التمركز عند الضغط على الزر
+        locateControl.trigger();
+        console.log("تم الضغط على زر تحديد موقعي وتفعيل إعادة التمركز.");
+    });
+}
+
 
 // عند سحب الخريطة يدويًا، نوقف إعادة التمركز التلقائي
 map.on('dragstart', () => {
@@ -853,7 +860,7 @@ locateControl.on('geolocate', (e) => {
     if (autoCenterEnabled) {
         map.flyTo({
             center: [e.coords.longitude, e.coords.latitude],
-            zoom: 25,    // قيمة التكبير المطلوبة؛ يمكنك تعديلها حسب الحاجة
+            zoom: 18,    // قيمة التكبير المطلوبة؛ يمكنك تعديلها حسب الحاجة
             speed: 1.0   // سرعة الانتقال (اختيارية)
         });
     } else {
@@ -870,10 +877,7 @@ locateControl.on('geolocate', (e) => {
             map.setStyle(styles[selectedStyle]);
         });
 
-        // تفعيل خاصية تحديد الموقع
-        document.getElementById('locateButton').addEventListener('click', () => {
-            locateControl.trigger();
-        });
+
 
 // حدث عند النقر على زر "طلب عامل"
 // إضافة الحدث لمرة واحدة فقط عند تحميل الصفحة
