@@ -544,32 +544,44 @@ if (!firebase.apps.length) {
 
 
 
-// دالة لتركيز الخريطة على موقع العامل (تم إضافتها في السطر 255)
 function focusOnWorkerLocation(workerId) {
-    console.log(`🔍 بدء تنفيذ focusOnWorkerLocation للعامل ${workerId}`);
+  // التأكد من تمرير معرّف العامل 547
+  if (!workerId) {
+    console.error("🚨 190 لم يتم تمرير معرّف العامل.");
+    return;
+  }
+  console.log(`🔍 191 بدء تنفيذ focusOnWorkerLocation للعامل ${workerId}`);
 
-    database.ref(`workers/${workerId}/location`).once('value')
+  // استرجاع بيانات الموقع من Firebase
+  database.ref(`workers/${workerId}/location`).once('value')
     .then((snapshot) => {
-        console.log("📡 190 تم استرجاع البيانات من Firebase:", snapshot.val());
+      const location = snapshot.val();
+      console.log("📡 193 تم استرجاع البيانات من Firebase:", location);
 
-        const location = snapshot.val();
-        if (location && location.lng && location.lat) {
-            console.log(`📍 191 موقع العامل: ${location.lng}, ${location.lat}`);
+      // التحقق من وجود بيانات الموقع وصحتها
+      if (location && location.lat && location.lng) {
+        console.log(`📍 194 موقع العامل: ${location.lng}, ${location.lat}`);
 
-            waitUntilMapReady().then(() => {
-                console.log(`🗺️ 193 سيتم التركيز على موقع العامل ${workerId}`);
-                map.flyTo({ center: [location.lng, location.lat], zoom: 15 });
-            }).catch(err => {
-                console.error("🚨 194 خطأ في تحميل الخريطة:", err);
-            });
-        } else {
-            console.error(`🚨 195 بيانات موقع العامل ${workerId} غير متوفرة.`);
-        }
+        // الانتظار حتى تكون الخريطة جاهزة للاستخدام
+        waitUntilMapReady().then(() => {
+          console.log(`🗺️ 195 سيتم تركيز الخريطة على موقع العامل ${workerId}`);
+          map.flyTo({
+            center: [location.lng, location.lat],
+            zoom: 15,
+            speed: 0.8 // سرعة الانتقال (يمكنك تعديلها)
+          });
+        }).catch(err => {
+          console.error("🚨 196 خطأ أثناء انتظار جاهزية الخريطة:", err);
+        });
+      } else {
+        console.error(`🚨 199 بيانات موقع العامل ${workerId} غير متوفرة أو غير صحيحة.`);
+      }
     })
     .catch((error) => {
-        console.error(`🚨 196خطأ أثناء جلب موقع العامل ${workerId}:`, error);
+      console.error(`🚨 200 خطأ أثناء جلب موقع العامل ${workerId}:`, error);
     });
 }
+
 
 
 
@@ -1203,9 +1215,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('jobDetailsPopup').style.display = 'none';
     });
 
-    locateButton.addEventListener('click', () => {
-        locateControl.trigger();
-    });
 
     styleSelector.addEventListener('change', function () {
         const selectedStyle = this.value;
@@ -1347,17 +1356,37 @@ const locateControl = new mapboxgl.GeolocateControl({
 let autoCenterEnabled = false;
 
 // عند الضغط على زر "تحديد موقعي" نفعّل إعادة التمركز
-locateButton.addEventListener('click', () => {
-    autoCenterEnabled = true; // تمكين إعادة التمركز عند الحصول على الموقع
-    locateControl.trigger();
-});
+const locateBtn = document.getElementById('locateButton');
+if (!locateBtn) {
+    console.error(" 🔻 201 عنصر locateButton غير موجود.");
+} else {
+    locateBtn.addEventListener('click', () => {
+        autoCenterEnabled = true; // تفعيل إعادة التمركز عند الضغط على الزر
+        locateControl.trigger();
+        console.log(" 🔻 202 تم الضغط على زر تحديد موقعي وتفعيل إعادة التمركز.");
+    });
+}
+
 
 // عند سحب الخريطة يدويًا، نوقف إعادة التمركز التلقائي
 map.on('dragstart', () => {
     if (autoCenterEnabled) {
-        console.log("تم تعطيل إعادة التمركز تلقائيًا بسبب سحب الخريطة يدويًا.");
+        console.log(" 🔻203 تم تعطيل إعادة التمركز تلقائيًا بسبب سحب الخريطة يدويًا.");
     }
     autoCenterEnabled = false;
+});
+
+locateControl.on('geolocate', (e) => {
+    console.log(" 🔻 204 تم تحديد الموقع: ", e.coords);
+    if (autoCenterEnabled) {
+        map.flyTo({
+            center: [e.coords.longitude, e.coords.latitude],
+            zoom: 18,    // قيمة التكبير المطلوبة؛ يمكنك تعديلها حسب الحاجة
+            speed: 1.0   // سرعة الانتقال (اختيارية)
+        });
+    } else {
+        console.log(" 🔻 205 إعادة التمركز معطلة؛ المستخدم تحكم يدويًا في موقع العرض.");
+    }
 });
 
 // عند الحصول على الموقع من locateControl، نُعيد التمركز فقط إذا كان autoCenterEnabled true
@@ -1366,7 +1395,7 @@ locateControl.on('geolocate', (e) => {
     if (autoCenterEnabled) {
         map.flyTo({
             center: [e.coords.longitude, e.coords.latitude],
-            zoom: 25,    // قيمة التكبير المطلوبة؛ يمكنك تعديلها حسب الحاجة
+            zoom: 18,    // قيمة التكبير المطلوبة؛ يمكنك تعديلها حسب الحاجة
             speed: 1.0   // سرعة الانتقال (اختيارية)
         });
     } else {
@@ -1416,10 +1445,7 @@ document.getElementById('styleSelector').addEventListener('change', function () 
 });
 
 
-        // تفعيل خاصية تحديد الموقع
-        document.getElementById('locateButton').addEventListener('click', () => {
-            locateControl.trigger();
-        });
+
 
         document.getElementById('assignIdButton').addEventListener('click', () => {
   const workerId = document.getElementById('workerIdInput').value;
