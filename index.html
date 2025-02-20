@@ -295,50 +295,38 @@ if ('serviceWorker' in navigator) {
 
 
 
+// دالة مراقبة حالة الطلب
+function monitorRequestStatus(requestId) {
+    const requestRef = database.ref(`workRequests/${requestId}`);
+    requestRef.on('value', (snapshot) => {
+        const requestData = snapshot.val();
+        if (!requestData) {
+            console.warn(`⚠️ لا توجد بيانات محدثة للطلب ${requestId}`);
+            return;
+        }
+        if (requestData.status === 'accepted') {
+            alert(`✅ تم قبول طلبك من قبل العامل: ${requestData.acceptedBy}`);
+            console.log(`✅ تم قبول الطلب ${requestId} من العامل ${requestData.acceptedBy}`);
+        } else if (requestData.status === 'completed') {
+            alert('🎉 تم إكمال الطلب.');
+        } else {
+            console.log(`🔄 حالة الطلب الحالية: ${requestData.status}`);
+        }
+    });
+}
+
 // تأكد من تمرير معرف الطلب الصحيح
-const requestId = "-OG2RrRJoW4G8hV-iUit"; // مثال على معرف طلب صالح
+const requestId = "-OJW3lQJkUloCCdISSY9"; // مثال على معرف طلب صالح
 
 if (!requestId) {
     console.error("❌ معرف الطلب غير موجود أو غير صالح. تأكد من تمرير معرف صالح.");
 } else {
     console.log("✅ معرف الطلب صالح، المتابعة مع قاعدة البيانات:", requestId);
 }
- {
-    const requestRef = database.ref(`workRequests/${requestId}`);
-    
-    // التحقق من وجود الطلب
-    requestRef.once('value', (snapshot) => {
-        if (!snapshot.exists()) {
-            console.error("الطلب غير موجود في قاعدة البيانات:", requestId);
-            return;
-        }
 
-        const requestData = snapshot.val();
-        if (!requestData) {
-            console.error("بيانات الطلب غير صالحة أو فارغة:", requestId);
-            return;
-        }
+// بدء مراقبة حالة الطلب بعد الإرسال
+monitorRequestStatus(requestId);
 
-        console.log("بيانات الطلب:", requestData);
-
-        // مراقبة التحديثات
-        requestRef.on('value', (updatedSnapshot) => {
-            const updatedData = updatedSnapshot.val();
-            if (!updatedData) {
-                console.warn("تم تحديث الطلب بدون بيانات صالحة:", requestId);
-                return;
-            }
-
-            if (updatedData.status === 'completed') {
-                alert('تم تحديث الطلب.');
-            } else if (updatedData.status === 'accepted') {
-                alert('تم قبول الطلب.');
-            } else {
-                console.log("حالة الطلب الحالية:", updatedData.status);
-            }
-        });
-    });
-}
 
 
 // إضافة طلب جديد
