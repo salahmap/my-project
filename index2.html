@@ -86,15 +86,18 @@
     <div id="map"></div>
 
     <!-- نافذة عرض تفاصيل العمل -->
-<div id="jobDetailsPopup" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; border-radius:10px; padding:20px; z-index:3;">
-    <h2>تفاصيل العمل</h2>
-    <p id="jobDescription"></p>
-    <p id="jobLocation"></p>
-    <p id="jobDuration"></p>
-    <p id="jobBudget"></p>
-    <button id="acceptJobButton">قبول الطلب</button>
-    <button onclick="document.getElementById('jobDetailsPopup').style.display='none'">إغلاق</button>
-</div>
+    <div id="jobDetailsPopup" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; border-radius:10px; padding:20px; z-index:3;">
+        <h2>تفاصيل العمل</h2>
+        <p id="jobDescription"></p>
+        <p id="jobLocation"></p>
+        <p id="jobDuration"></p>
+        <p id="jobBudget"></p>
+        <p id="jobDistance"></p>  <!-- إضافة عنصر عرض المسافة -->
+        <button id="acceptJobButton">قبول الطلب</button>
+        <button onclick="document.getElementById('jobDetailsPopup').style.display='none'">إغلاق</button>
+    </div>
+    
+
 
     <div class="controls">
         <button id="toggleWeather" class="iconButton">
@@ -406,7 +409,7 @@ function updateWorkerLocation(workerId, newLocation) {
 // [السطر 180] تعديل دالة تحديث الموقع باستخدام GPS لتحسين سرعة الاستجابة
 function updateLocationWithGPS(workerId) {
     if (navigator.geolocation) {
-        // الحصول على الموقع الأولي بسرعة باستخدام getCurrentPosition
+        // الحصول على الموقع الأولي باستخدام getCurrentPosition مع دقة عالية
         navigator.geolocation.getCurrentPosition((position) => {
             const initialLocation = {
                 lat: position.coords.latitude,
@@ -416,23 +419,27 @@ function updateLocationWithGPS(workerId) {
             updateWorkerLocation(workerId, initialLocation);
         }, (error) => {
             console.error("🚨 91 Error pre-fetching location:", error);
-        }, { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 });
+        }, { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+        );
         
-        // متابعة تحديث الموقع باستخدام watchPosition
+        // متابعة تحديث الموقع باستخدام watchPosition مع دقة عالية
         navigator.geolocation.watchPosition((position) => {
             const newLocation = {
                 lat: position.coords.latitude,
                 lng: position.coords.longitude,
             };
-            console.log("📡 93 Updating location:", newLocation);
+            console.log("📡 93 Updating location with watchPosition:", newLocation);
+            window.currentWorkerLocation = newLocation;
             updateWorkerLocation(workerId, newLocation);
         }, (error) => {
             console.error("🚨 197 Error during continuous location tracking:", error);
-        }, { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 });
+        }, { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+        );
     } else {
         console.error("🚨 198 Geolocation is not supported in this browser.");
     }
 }
+
 
 
 
@@ -588,17 +595,27 @@ function focusOnWorkerLocation(workerId) {
 
 // دالة لحساب المسافة بين موقعين باستخدام صيغة Haversine (تم إضافتها في السطر 265)
 function calculateDistance(loc1, loc2) {
+    if (!loc1 || !loc2) {
+        console.error("بيانات الموقع غير متوفرة لحساب المسافة");
+        return 0;
+    }
+    const lat1 = parseFloat(loc1.lat);
+    const lng1 = parseFloat(loc1.lng);
+    const lat2 = parseFloat(loc2.lat);
+    const lng2 = parseFloat(loc2.lng);
     const R = 6371; // نصف قطر الأرض بالكيلومترات
-    const dLat = (loc2.lat - loc1.lat) * Math.PI / 180;
-    const dLng = (loc2.lng - loc1.lng) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-              Math.cos(loc1.lat * Math.PI/180) * Math.cos(loc2.lat * Math.PI/180) *
-              Math.sin(dLng/2) * Math.sin(dLng/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const distance = R * c;
     console.log(`المسافة المحسوبة بين الموقعين: ${distance.toFixed(2)} كم`);
     return distance;
 }
+
+
 
 
 
@@ -671,6 +688,33 @@ generateWorkerIds(5000); // مثال: إنشاء 5000     // [295] تعريف م
 
  
 
+        // دالة لعرض تفاصيل العمل
+        // دالة لعرض تفاصيل العمل مع حساب المسافة
+        function showJobDetails(jobData) {
+            document.getElementById('jobDescription').innerText = `وصف العمل: ${jobData.workType}`;
+            document.getElementById('jobLocation').innerText = `الموقع: (${jobData.location.lat}, ${jobData.location.lng})`;
+            document.getElementById('jobDuration').innerText = `المدة: ${jobData.time}`;
+            document.getElementById('jobBudget').innerText = `المبلغ: ${jobData.budget}`;
+            
+// إضافة: حفظ موقع الطلب في متغير عام لاستخدامه لاحقاً
+window.jobLocation = jobData.location;
+
+// التحقق من وجود موقع العامل لحساب المسافة
+if (typeof currentWorkerLocation === 'undefined') {
+    console.error(" 206 currentWorkerLocation غير معرف لحساب المسافة");
+} else {
+    const distance = calculateDistance(currentWorkerLocation, jobData.location);
+    console.log(` 207 المسافة المحسوبة: ${distance.toFixed(2)} كم`);
+    const distanceElem = document.getElementById('jobDistance');
+    if (distanceElem) {
+        distanceElem.innerText = `المسافة: ${distance.toFixed(2)} كم`;
+    } else {
+        console.error(" 208 عنصر عرض المسافة 'jobDistance' غير موجود في الصفحة");
+    }
+}
+document.getElementById('jobDetailsPopup').style.display = 'block';
+
+        }
 
 
 
@@ -750,6 +794,9 @@ function saveRequestForLater(requestData, requestId) {
     console.log(`📋 81 تم حفظ الطلب ${requestId} للتعامل لاحقًا:`, requestData);
     savedRequests.push({ requestData, requestId });
 }
+
+
+
 
 
 
@@ -928,27 +975,34 @@ function loginWorker(workerId) {
 
 
 
-
-    function sendNotificationToNearbyWorkers(requestData, userLocation) {
-    const radius = 10;  // نصف قطر البحث بالكيلومترات
-
+function sendNotificationToNearbyWorkers(requestData, userLocation) {
+    const radius = 15;  // تم تعديل نصف القطر إلى 15 كم
+    console.log("تم ضبط نصف القطر على:", radius, "كم");
     // مرجع العمال في Firebase
     const workersRef = database.ref('workers');
     workersRef.once('value', (snapshot) => {
         snapshot.forEach((workerSnapshot) => {
             const worker = workerSnapshot.val();
-            const distance = calculateDistance(userLocation, worker.location); // حساب المسافة
-
+            if (!worker || !worker.location) {
+                console.error("🚨 بيانات العامل غير متوفرة أو الموقع غير صالح:", workerSnapshot.key);
+                return;
+            }
+            const distance = calculateDistance(userLocation, worker.location);
+            console.log(`المسافة للعامل ${workerSnapshot.key}: ${distance.toFixed(2)} كم`);
+            console.log("الموقع المُرسل:", userLocation, "وموقع العامل:", worker.location);
+    
             if (distance <= radius) {
+                console.log(`📢 العامل ${workerSnapshot.key} داخل النطاق وسيتم إرسال إشعار.`);
                 // إرسال الإشعار باستخدام Pusher Beams
-                if (distance <= radius) {
-    sendPusherNotification(workerSnapshot.key, `طلب ${requestData.workType} في منطقتك.`, "طلب جديد متاح!");
-}
-
+                sendPusherNotification(workerSnapshot.key, `طلب ${requestData.workType} في منطقتك.`, "طلب جديد متاح!");
+            } else {
+                console.warn(`⚠️ العامل ${workerSnapshot.key} خارج نطاق الـ 15 كم.`);
             }
         });
     });
 }
+
+
 
 
 
@@ -1209,12 +1263,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    // ✅ إضافة المستمعين بعد التأكد من تحميل العناصر
-    acceptJobButton.addEventListener('click', () => {
-        alert('تم قبول العمل بنجاح');
-        document.getElementById('jobDetailsPopup').style.display = 'none';
-    });
-
+    
 
     styleSelector.addEventListener('change', function () {
         const selectedStyle = this.value;
@@ -1254,8 +1303,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // منطق القبول: عرض التنبيه وإغلاق النافذة
-            alert(' 53 تم قبول العمل بنجاح');
-            document.getElementById(' 54 jobDetailsPopup').style.display = 'none';
+            alert(' تم قبول العمل بنجاح');
+            document.getElementById('jobDetailsPopup').style.display = 'none';
 
             // منطق عرض المسار: استبدل القيم بقيم ديناميكية عند الحاجة
             const workerLocation = { lng: 13.1913, lat: 32.8872 }; // موقع العامل
@@ -1445,6 +1494,25 @@ document.getElementById('styleSelector').addEventListener('change', function () 
 });
 
 
+document.getElementById('acceptJobButton').addEventListener('click', function() {
+    console.log("تم قبول الطلب بنجاح");
+    
+// التحقق من توفر بيانات المواقع المطلوبة؛ تأكد من أن currentWorkerLocation و jobLocation معرفان
+if (typeof currentWorkerLocation === "undefined" || typeof jobLocation === "undefined") {
+    console.error(" 209 بيانات الموقع للعامل أو الطلب غير متوفرة.");
+    return;
+}
+
+if (typeof showRoute === "function") {
+    showRoute(currentWorkerLocation, jobLocation);
+    console.log(" 210 تم استدعاء دالة showRoute لعرض الاتجاه والمسافة على الخريطة");
+} else {
+    console.error(" 211 وظيفة showRoute غير معرفة");
+}
+document.getElementById('jobDetailsPopup').style.display = 'none';
+
+});
+
 
 
         document.getElementById('assignIdButton').addEventListener('click', () => {
@@ -1545,14 +1613,7 @@ if (typeof map !== 'undefined' && map instanceof mapboxgl.Map) {
             workerInfo.style.display = workerInfo.style.display === 'block' ? 'none' : 'block';
         });
 
-        // دالة لعرض تفاصيل العمل
-function showJobDetails(jobData) {
-    document.getElementById('jobDescription').innerText = `وصف العمل: ${jobData.workType}`;
-    document.getElementById('jobLocation').innerText = `الموقع: (${jobData.location.lat}, ${jobData.location.lng})`;
-    document.getElementById('jobDuration').innerText = `المدة: ${jobData.time}`;
-    document.getElementById('jobBudget').innerText = `المبلغ: ${jobData.budget}`;
-    document.getElementById('jobDetailsPopup').style.display = 'block';
-}
+
 
 
 
