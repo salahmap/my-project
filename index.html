@@ -295,11 +295,16 @@ if ('serviceWorker' in navigator) {
 
 
 
-// دالة مراقبة حالة الطلب
+// تعريف متغيرات عامة
+var currentRequestId;
+const requestsRef = database.ref('workRequests'); // تأكد من تعريف هذا المتغير
+
+// دالة مراقبة حالة الطلب (لا حاجة لتعديلها)
 function monitorRequestStatus(requestId) {
     const requestRef = database.ref(`workRequests/${requestId}`);
     requestRef.on('value', (snapshot) => {
         const requestData = snapshot.val();
+        console.log("تحديث بيانات الطلب: ", requestData);
         if (!requestData) {
             console.warn(`⚠️ لا توجد بيانات محدثة للطلب ${requestId}`);
             return;
@@ -315,30 +320,68 @@ function monitorRequestStatus(requestId) {
     });
 }
 
-// تأكد من تمرير معرف الطلب الصحيح
-const requestId = "-OJW3lQJkUloCCdISSY9"; // مثال على معرف طلب صالح
+// دالة إرسال الطلب وتخزين معرف الطلب في currentRequestId
+function submitRequest() {
+    navigator.geolocation.getCurrentPosition(
+        (position) => {
+            const userLocation = {
+                lat: position.coords.latitude,
+                lng: position.coords.longitude
+            };
+            console.log("تم الحصول على موقع المستخدم:", userLocation);
 
-if (!requestId) {
-    console.error("❌ معرف الطلب غير موجود أو غير صالح. تأكد من تمرير معرف صالح.");
-} else {
-    console.log("✅ معرف الطلب صالح، المتابعة مع قاعدة البيانات:", requestId);
+            const workType = document.getElementById('workTypeInput').value;
+            const budget = document.getElementById('budgetInput').value;
+            const time = document.getElementById('timeInput').value;
+
+            if (workType && budget && time && userLocation.lng && userLocation.lat) {
+                const requestData = {
+                    workType: workType,
+                    budget: budget,
+                    time: time,
+                    location: {
+                        lng: parseFloat(userLocation.lng),
+                        lat: parseFloat(userLocation.lat)
+                    },
+                    status: "pending",
+                    workerId: null
+                };
+
+                // إنشاء الطلب باستخدام requestsRef المُعرف في النطاق العام
+                requestsRef.push(requestData)
+                    .then((newRequestRef) => {
+                        // حفظ معرف الطلب في متغير عام
+                        currentRequestId = newRequestRef.key;
+                        console.log("تم إنشاء معرف الطلب:", currentRequestId);
+                        alert('تم إرسال الطلب بنجاح.');
+                        document.getElementById('requestPopup').style.display = 'none';
+
+                        // بدء مراقبة حالة الطلب باستخدام المعرف الجديد
+                        monitorRequestStatus(currentRequestId);
+
+                        // إرسال الإشعارات للعمال
+                        sendNotificationsToNearbyWorkers(requestData, {
+                            lng: parseFloat(userLocation.lng),
+                            lat: parseFloat(userLocation.lat)
+                        });
+                    })
+                    .catch((error) => {
+                        console.error('خطأ في إرسال الطلب إلى Firebase:', error);
+                        alert('حدث خطأ أثناء إرسال الطلب. يرجى المحاولة مرة أخرى لاحقًا.');
+                    });
+            } else {
+                alert('يرجى ملء جميع الحقول وتحديد موقع صحيح.');
+            }
+        },
+        (error) => {
+            console.error("فشل الحصول على موقع المستخدم:", error);
+            alert("تعذر الحصول على موقعك الحالي. يرجى المحاولة مرة أخرى.");
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
 }
 
-// بدء مراقبة حالة الطلب بعد الإرسال
-monitorRequestStatus(requestId);
-
-
-
-// إضافة طلب جديد
-const requestsRef = database.ref('workRequests');
-const newRequestRef = requestsRef.push({
-    status: 'pending',
-    description: 'طلب جديد',
-    budget: 100,
-    time: '2 hours'
-});
-const newRequestId = newRequestRef.key;
-console.log("تم إنشاء معرف الطلب:", newRequestId);
+document.getElementById('submitRequest').addEventListener('click', submitRequest);
 
 
 function calculateDistance(loc1, loc2) {
@@ -604,68 +647,6 @@ function trackWorkerArrival(workerId, userLocation) {
 }
 
 
-// استدعاء الدالة بعد تهيئة Firebase
-loadWorkers();
-
-// الدالة submitRequest
-
-
-
-
-// الدالة submitRequest
-function submitRequest() {
-    navigator.geolocation.getCurrentPosition(
-        (position) => {
-            const userLocation = {
-                lat: position.coords.latitude,
-                lng: position.coords.longitude
-            };
-
-            console.log("تم الحصول على موقع المستخدم:", userLocation);
-
-            const workType = document.getElementById('workTypeInput').value;
-            const budget = document.getElementById('budgetInput').value;
-            const time = document.getElementById('timeInput').value;
-
-            if (workType && budget && time && userLocation.lng && userLocation.lat) {
-                const requestData = {
-                    workType: workType,
-                    budget: budget,
-                    time: time,
-                    location: {
-                        lng: parseFloat(userLocation.lng),
-                        lat: parseFloat(userLocation.lat)
-                    },
-                    status: "pending",
-                    workerId: null
-                };
-
-                const requestsRef = database.ref('workRequests');
-
-                requestsRef.push(requestData)
-                    .then(() => {
-                        alert('تم إرسال الطلب بنجاح.');
-                        document.getElementById('requestPopup').style.display = 'none';
-                        sendNotificationsToNearbyWorkers(requestData, {
-                            lng: parseFloat(userLocation.lng),
-                            lat: parseFloat(userLocation.lat)
-                        });
-                    })
-                    .catch((error) => {
-                        console.error('خطأ في إرسال الطلب إلى Firebase:', error);
-                        alert('حدث خطأ أثناء إرسال الطلب. يرجى المحاولة مرة أخرى لاحقًا.');
-                    });
-            } else {
-                alert('يرجى ملء جميع الحقول وتحديد موقع صحيح.');
-            }
-        },
-        (error) => {
-            console.error("فشل الحصول على موقع المستخدم:", error);
-            alert("تعذر الحصول على موقعك الحالي. يرجى المحاولة مرة أخرى.");
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
-}
 
 
 
