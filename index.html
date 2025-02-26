@@ -127,6 +127,11 @@
         <button id="locateButton">تحديد موقعي</button>
     </div>
 
+    <!-- نافذة تتبع العامل تظهر عند قبول الطلب -->
+<div id="trackingPanel" style="position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%); background: white; padding: 10px; border-radius: 5px; z-index: 1000; display: none;">
+    <p id="trackingInfo"></p>
+</div>
+
     <!-- نافذة التحذير -->
     <div id="confirmationPopup" style="display:none; position:fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 10px; padding: 20px; z-index: 3;">
         <h2>تحذير</h2>
@@ -310,8 +315,34 @@ function monitorRequestStatus(requestId) {
             return;
         }
         if (requestData.status === 'accepted') {
-            alert(`✅ تم قبول طلبك من قبل العامل: ${requestData.acceptedBy}`);
-            console.log(`✅ تم قبول الطلب ${requestId} من العامل ${requestData.acceptedBy}`);
+            const acceptedWorkerId = requestData.acceptedBy;
+            // استرجاع موقع العامل من قاعدة البيانات
+            database.ref(`workers/${acceptedWorkerId}/location`).once('value')
+                .then((workerSnap) => {
+                    const workerLocation = workerSnap.val();
+                    if (!workerLocation) {
+                        console.error("لا يوجد موقع للعامل:", acceptedWorkerId);
+                        return;
+                    }
+                    const userLocation = requestData.location;
+                    const distance = calculateDistance(userLocation, workerLocation);
+                    // حساب الوقت المقدر باستخدام دالة جديدة ترجع وعداً (Promise)
+                    calculateETAWithPromise(workerLocation, userLocation)
+                        .then((etaMinutes) => {
+                            alert(`✅ تم قبول طلبك من قبل العامل: ${acceptedWorkerId}\nو تم اعطائه مهلة 3 ساعات للوصول\nالمسافة: ${distance.toFixed(2)} كم\nالوقت المقدر للوصول: ${etaMinutes} دقيقة`);
+                            console.log(`✅ تم قبول الطلب ${requestId} من العامل ${acceptedWorkerId}، المسافة: ${distance.toFixed(2)} كم، ETA: ${etaMinutes} دقيقة`);
+                            // تفعيل نافذة تتبع العامل وتحديثها في الوقت الحقيقي
+                            const trackingPanel = document.getElementById('trackingPanel');
+                            trackingPanel.style.display = 'block';
+                            startWorkerTracking(acceptedWorkerId, userLocation);
+                        })
+                        .catch((err) => {
+                            console.error("خطأ في حساب ETA:", err);
+                        });
+                })
+                .catch((error) => {
+                    console.error("خطأ في الحصول على موقع العامل:", error);
+                });
         } else if (requestData.status === 'completed') {
             alert('🎉 تم إكمال الطلب.');
         } else {
@@ -319,6 +350,7 @@ function monitorRequestStatus(requestId) {
         }
     });
 }
+
 
 // دالة إرسال الطلب وتخزين معرف الطلب في currentRequestId
 function submitRequest() {
@@ -405,6 +437,51 @@ function calculateDistance(loc1, loc2) {
     return distance;
 }
 
+
+function calculateETAWithPromise(workerLocation, userLocation) {
+    return new Promise((resolve, reject) => {
+        const directionsUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${workerLocation.lng},${workerLocation.lat};${userLocation.lng},${userLocation.lat}?access_token=${mapboxgl.accessToken}`;
+        fetch(directionsUrl)
+            .then(response => response.json())
+            .then(data => {
+                if (!data.routes || data.routes.length === 0) {
+                    console.error("لم يتم استرجاع بيانات الطريق من API");
+                    return reject("No routes found");
+                }
+                const duration = data.routes[0].duration; // بالثواني
+                const etaMinutes = Math.round(duration / 60);
+                console.log("تم حساب ETA بنجاح", { etaMinutes });
+                resolve(etaMinutes);
+            })
+            .catch(err => {
+                console.error("خطأ في استدعاء API لحساب ETA:", err);
+                reject(err);
+            });
+    });
+}
+
+function startWorkerTracking(workerId, userLocation) {
+    const trackingPanel = document.getElementById('trackingPanel');
+    const trackingInfo = document.getElementById('trackingInfo');
+    const workerRef = database.ref(`workers/${workerId}/location`);
+    workerRef.on('value', (snapshot) => {
+        const workerLocation = snapshot.val();
+        if (!workerLocation) {
+            console.error("لا يوجد موقع محدث للعامل:", workerId);
+            return;
+        }
+        const distance = calculateDistance(userLocation, workerLocation);
+        calculateETAWithPromise(workerLocation, userLocation)
+            .then((etaMinutes) => {
+                trackingInfo.innerText = `العامل: ${workerId}\nالمسافة: ${distance.toFixed(2)} كم\nETA: ${etaMinutes} دقيقة`;
+                // تحديث المسار على الخريطة للمستخدم (إذا رغبت)
+                showRouteToUser(workerLocation, userLocation);
+            })
+            .catch((err) => {
+                console.error("خطأ في حساب ETA أثناء التتبع:", err);
+            });
+    });
+}
 
 
 function sendPusherNotification(workerId, message) {
@@ -573,27 +650,36 @@ function showRouteToUser(workerLocation, userLocation) {
         .then(response => response.json())
         .then(data => {
             const route = data.routes[0].geometry;
-            map.addLayer({
-                id: `route-${Date.now()}`,
-                type: 'line',
-                source: {
-                    type: 'geojson',
-                    data: {
-                        type: 'Feature',
-                        geometry: route
+            // حفظ بيانات المسار في متغير عام
+            window.currentRouteToUserData = {
+                type: 'Feature',
+                geometry: route
+            };
+            // التحقق من وجود المصدر وتحديثه أو إضافته باستخدام معرف ثابت
+            if (map.getSource('route-user')) {
+                map.getSource('route-user').setData(window.currentRouteToUserData);
+            } else {
+                map.addLayer({
+                    id: 'route-user',
+                    type: 'line',
+                    source: {
+                        type: 'geojson',
+                        data: window.currentRouteToUserData
+                    },
+                    layout: {
+                        'line-join': 'round',
+                        'line-cap': 'round'
+                    },
+                    paint: {
+                        'line-color': '#3887be',
+                        'line-width': 5
                     }
-                },
-                layout: {
-                    'line-join': 'round',
-                    'line-cap': 'round'
-                },
-                paint: {
-                    'line-color': '#3887be',
-                    'line-width': 5
-                }
-            });
-        });
+                });
+            }
+        })
+        .catch(console.error);
 }
+
 
 
 
@@ -888,6 +974,31 @@ locateControl.on('geolocate', (e) => {
             map.setStyle(styles[selectedStyle]);
         });
 
+        map.on('style.load', function() {
+    if (window.currentRouteToUserData) {
+        // إذا لم يكن مصدر "route-user" موجوداً، أضفه مرة أخرى
+        if (!map.getSource('route-user')) {
+            map.addSource('route-user', {
+                type: 'geojson',
+                data: window.currentRouteToUserData
+            });
+            map.addLayer({
+                id: 'route-user',
+                type: 'line',
+                source: 'route-user',
+                layout: {
+                    'line-join': 'round',
+                    'line-cap': 'round'
+                },
+                paint: {
+                    'line-color': '#3887be',
+                    'line-width': 5
+                }
+            });
+            console.log("✔️ تمت إعادة إضافة طبقة المسار للمستخدم بعد تغيير النمط.");
+        }
+    }
+});
 
 
 // حدث عند النقر على زر "طلب عامل"
