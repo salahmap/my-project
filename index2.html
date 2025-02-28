@@ -79,23 +79,34 @@
         #locateButton:hover {
             background-color: rgba(30, 144, 255, 1);
         }
+        #etaPanel p {
+    display: inline-block;
+    margin: 0 10px;
+    font-size: 16px;
+}
+
     </style>
 </head>
 <body>
     <h1 id="title" style="display: none;">تطبيق الخريطة المحسن</h1>
     <div id="map"></div>
 
-    <!-- نافذة عرض تفاصيل العمل -->
-    <div id="jobDetailsPopup" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; border-radius:10px; padding:20px; z-index:3;">
-        <h2>تفاصيل العمل</h2>
-        <p id="jobDescription"></p>
-        <p id="jobLocation"></p>
-        <p id="jobDuration"></p>
-        <p id="jobBudget"></p>
-        <p id="jobDistance"></p>  <!-- إضافة عنصر عرض المسافة -->
-        <button id="acceptJobButton">قبول الطلب</button>
-        <button onclick="document.getElementById('jobDetailsPopup').style.display='none'">إغلاق</button>
-    </div>
+<!-- نافذة تفاصيل العمل بعد التعديل -->
+<div id="jobDetailsPopup" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; border-radius:10px; padding:20px; z-index:3;">
+    <h2>تفاصيل العمل</h2>
+    <p id="jobDescription"></p>
+    <p id="userPhone"></p>
+    <!-- عنصر عرض الصورة -->
+    <img id="jobImage" src="" alt="صورة العمل" style="max-width:100%; height:auto; display:none;">
+    <p id="jobLocation"></p>
+    <p id="jobDuration"></p>
+    <p id="jobBudget"></p>
+    <p id="jobDistance"></p>
+    <p id="estimatedArrivalTime"></p>
+    <button id="acceptJobButton">قبول الطلب</button>
+    <button onclick="document.getElementById('jobDetailsPopup').style.display='none'">إغلاق</button>
+</div>
+
     
 
 
@@ -108,8 +119,10 @@
             <option value="satellite">الأقمار الصناعية</option>
             <option value="outdoors">خارجية</option>
             <option value="hybrid" selected>هايبرد</option>
-            <option value="dark">الوضع الليلي</option> <!-- إضافة الوضع الليلي هنا -->
+            <option value="dark">الوضع الليلي</option>
+            <option value="light">الوضع الفاتح</option>
         </select>
+        
         <button id="requestWater" class="controlButton">طلب ماء</button>
         <div id="weatherInfo"></div>
         <div id="workerInfo"></div>
@@ -120,6 +133,19 @@
     <div id="locateButtonContainer">
         <button id="locateButton">تحديد موقعي</button>
     </div>
+
+<!-- حاوية عرض معلومات ETA تبقى في الأسفل -->
+<div id="etaPanel" style="position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%); background: white; padding: 10px; border-radius: 5px; z-index: 4;">
+    <p id="etaDisplay"></p>
+</div>
+
+<!-- حاوية العد التنازلي تظهر في أعلى الصفحة بحجم خط أصغر -->
+<div id="countdownPanel" style="position: fixed; top: 10px; left: 50%; transform: translateX(-50%); background: #fff; padding: 5px 8px; border-radius: 5px; z-index: 4; font-size: 12px;">
+    <p id="countdownTimer"></p>
+</div>
+
+    
+    
 
     <!-- نافذة التحذير -->
     <div id="confirmationPopup" style="display:none; position:fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 10px; padding: 20px; z-index: 3;">
@@ -344,31 +370,32 @@ function hideLoginPopup() {
 });
     
 
-        function showRoute(workerLocation, jobLocation) {
-            const directionsRequest = `https://api.mapbox.com/directions/v5/mapbox/driving/${workerLocation.lng},${workerLocation.lat};${jobLocation.lng},${jobLocation.lat}?steps=true&geometries=geojson&access_token=${mapboxgl.accessToken}`;
-        console.log(' 30 طلب الاتجاهات:', directionsRequest);
+function showRoute(workerLocation, jobLocation) {
+    const directionsRequest = `https://api.mapbox.com/directions/v5/mapbox/driving/${workerLocation.lng},${workerLocation.lat};${jobLocation.lng},${jobLocation.lat}?steps=true&geometries=geojson&access_token=${mapboxgl.accessToken}`;
+    console.log('30 طلب الاتجاهات:', directionsRequest);
 
     fetch(directionsRequest)
         .then(response => response.json())
         .then(data => {
             const route = data.routes[0].geometry;
-            const routeLine = {
-                type: 'geojson',
-                data: {
-                    type: 'Feature',
-                    geometry: route
-                }
+            // حفظ بيانات المسار في متغير عام
+            window.currentRouteData = {
+                type: 'Feature',
+                geometry: route
             };
 
+            // استخدم بيانات المسار من المتغير العام
             if (map.getSource('route')) {
-    console.log(' 31 تم العثور على المصدر route:', map.getSource('route'));
-    map.getSource('route').setData(routeLine.data);
-        }
-          else {
+                console.log('31 تم العثور على المصدر route:', map.getSource('route'));
+                map.getSource('route').setData(window.currentRouteData);
+            } else {
                 map.addLayer({
                     id: 'route',
                     type: 'line',
-                    source: routeLine,
+                    source: {
+                        type: 'geojson',
+                        data: window.currentRouteData
+                    },
                     layout: { 'line-join': 'round', 'line-cap': 'round' },
                     paint: { 'line-color': '#3887be', 'line-width': 5 }
                 });
@@ -376,6 +403,7 @@ function hideLoginPopup() {
         })
         .catch(console.error);
 }
+
 
 
 function updateWorkerLocation(workerId, newLocation) {
@@ -610,8 +638,82 @@ function calculateDistance(loc1, loc2) {
 
 
 
+function calculateETA(workerLocation, jobLocation, callback) {
+    const directionsRequest = `https://api.mapbox.com/directions/v5/mapbox/driving/${workerLocation.lng},${workerLocation.lat};${jobLocation.lng},${jobLocation.lat}?steps=true&geometries=geojson&access_token=${mapboxgl.accessToken}`;
+    fetch(directionsRequest)
+        .then(response => response.json())
+        .then(data => {
+            if (!data.routes || !data.routes[0]) {
+                console.error("لم يتم استرجاع بيانات الطريق من API");
+                return;
+            }
+            const durationInSeconds = data.routes[0].duration;
+            const distanceInMeters = data.routes[0].distance;
+            console.log("تم حساب ETA بنجاح", { duration: durationInSeconds, distance: distanceInMeters });
+            callback(null, { duration: durationInSeconds, distance: distanceInMeters, route: data.routes[0].geometry });
+        })
+        .catch(err => {
+            console.error("خطأ في استدعاء API لحساب ETA:", err);
+            callback(err);
+        });
+}
+
+function updateETADisplay(duration, distance, targetElement) {
+    const minutes = Math.round(duration / 60);
+    const kilometers = (distance / 1000).toFixed(2);
+    targetElement.innerText = `الوقت المقدر: ${minutes} دقيقة | المسافة: ${kilometers} كم`;
+    console.log("تم تحديث واجهة المستخدم للوقت المقدر", { minutes, kilometers });
+}
 
 
+function startRealTimeETATracking(workerLocation, jobLocation) {
+    const etaDisplay = document.getElementById('etaDisplay');
+    if (!etaDisplay) {
+        console.error("عنصر etaDisplay غير موجود في الصفحة لتحديث ETA");
+        return;
+    }
+    const intervalId = setInterval(() => {
+        calculateETA(workerLocation, jobLocation, (err, data) => {
+            if (err) {
+                console.error("خطأ في حساب ETA:", err);
+                return;
+            }
+            // يتم تحديث العنصر الخاص بعرض ETA فقط
+            updateETADisplay(data.duration, data.distance, etaDisplay);
+        });
+    }, 15000); // التحديث كل 15 ثانية
+    console.log("تم بدء تتبع ETA في الوقت الحقيقي");
+    return intervalId;
+}
+
+
+
+// دوال العد التنازلي
+function formatTime(ms) {
+    const totalSeconds = Math.floor(ms / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${hours} ساعة ${minutes} دقيقة ${seconds} ثانية`;
+}
+
+function startCountdown(duration, targetElement, onComplete) {
+    let remaining = duration;
+    targetElement.innerText = formatTime(remaining);
+    const countdownInterval = setInterval(() => {
+        remaining -= 1000;
+        if (remaining <= 0) {
+            clearInterval(countdownInterval);
+            targetElement.innerText = "انتهى الوقت";
+            console.log("تم انتهاء العد التنازلي بنجاح");
+            onComplete();  // تنفيذ الإجراء عند انتهاء الوقت
+        } else {
+            targetElement.innerText = formatTime(remaining);
+        }
+    }, 1000);
+    console.log("تم بدء العد التنازلي");
+    return countdownInterval;
+}
 
 
 
@@ -684,30 +786,58 @@ generateWorkerIds(5000); // مثال: إنشاء 5000     // [295] تعريف م
         // دالة لعرض تفاصيل العمل
         // دالة لعرض تفاصيل العمل مع حساب المسافة
         function showJobDetails(jobData) {
-            document.getElementById('jobDescription').innerText = `وصف العمل: ${jobData.workType}`;
-            document.getElementById('jobLocation').innerText = `الموقع: (${jobData.location.lat}, ${jobData.location.lng})`;
-            document.getElementById('jobDuration').innerText = `المدة: ${jobData.time}`;
-            document.getElementById('jobBudget').innerText = `المبلغ: ${jobData.budget}`;
-            
-// إضافة: حفظ موقع الطلب في متغير عام لاستخدامه لاحقاً
-window.jobLocation = jobData.location;
-
-// التحقق من وجود موقع العامل لحساب المسافة
-if (typeof currentWorkerLocation === 'undefined') {
-    console.error(" 206 currentWorkerLocation غير معرف لحساب المسافة");
-} else {
-    const distance = calculateDistance(currentWorkerLocation, jobData.location);
-    console.log(` 207 المسافة المحسوبة: ${distance.toFixed(2)} كم`);
-    const distanceElem = document.getElementById('jobDistance');
-    if (distanceElem) {
-        distanceElem.innerText = `المسافة: ${distance.toFixed(2)} كم`;
+    // عرض الوصف التفصيلي؛ إذا لم يكن الوصف موجودًا، يتم عرض نوع العمل كبديل
+    document.getElementById('jobDescription').innerText = `وصف العمل: ${jobData.description || jobData.workType}`;
+    
+    // عرض رقم الهاتف في حال توفره
+    document.getElementById('userPhone').innerText = `رقم الهاتف: ${jobData.phone || "غير متوفر"}`;
+    
+    // عرض صورة العمل إذا كانت موجودة، وإخفاؤها إذا لم تكن كذلك
+    if (jobData.imageUrl) {
+        const jobImage = document.getElementById('jobImage');
+        jobImage.src = jobData.imageUrl;
+        jobImage.style.display = 'block';
     } else {
-        console.error(" 208 عنصر عرض المسافة 'jobDistance' غير موجود في الصفحة");
+        document.getElementById('jobImage').style.display = 'none';
     }
-}
-document.getElementById('jobDetailsPopup').style.display = 'block';
-
+    
+    document.getElementById('jobLocation').innerText = `الموقع: (${jobData.location.lat}, ${jobData.location.lng})`;
+    document.getElementById('jobDuration').innerText = `المدة: ${jobData.time}`;
+    document.getElementById('jobBudget').innerText = `المبلغ: ${jobData.budget}`;
+    
+    window.jobLocation = jobData.location;
+    
+    if (typeof currentWorkerLocation === 'undefined') {
+        console.error("currentWorkerLocation غير معرف لحساب المسافة");
+    } else {
+        const distance = calculateDistance(currentWorkerLocation, jobData.location);
+        console.log(`المسافة المحسوبة: ${distance.toFixed(2)} كم`);
+        const distanceElem = document.getElementById('jobDistance');
+        if (distanceElem) {
+            distanceElem.innerText = `المسافة: ${distance.toFixed(2)} كم`;
+        } else {
+            console.error("عنصر عرض المسافة 'jobDistance' غير موجود في الصفحة");
         }
+        // استدعاء حساب ETA وتحديث العرض
+        calculateETA(currentWorkerLocation, jobData.location, (err, data) => {
+            if (err) {
+                console.error("خطأ في حساب ETA أثناء عرض تفاصيل العمل", err);
+                return;
+            }
+            const etaElem = document.getElementById('estimatedArrivalTime');
+            if (etaElem) {
+                const minutes = Math.round(data.duration / 60);
+                etaElem.innerText = `الوقت المقدر: ${minutes} دقيقة`;
+                console.log("تم تحديث ETA في نافذة تفاصيل العمل");
+            } else {
+                console.error("عنصر 'estimatedArrivalTime' غير موجود");
+            }
+        });
+    }
+    document.getElementById('jobDetailsPopup').style.display = 'block';
+}
+
+
 
 
 
@@ -1152,12 +1282,14 @@ workerRef.child('currentRequest').on('value', (snapshot) => {
 
         // إعداد الأنماط المختلفة للخريطة
         const styles = {
-            streets: 'mapbox://styles/mapbox/streets-v11',
-            satellite: 'mapbox://styles/mapbox/satellite-v9',
-            outdoors: 'mapbox://styles/mapbox/outdoors-v11',
-            hybrid: 'mapbox://styles/mapbox/satellite-streets-v11',
-            dark: 'mapbox://styles/mapbox/dark-v10' // إضافة نمط الوضع الليلي
-        };
+    streets: 'mapbox://styles/mapbox/streets-v11',
+    satellite: 'mapbox://styles/mapbox/satellite-v9',
+    outdoors: 'mapbox://styles/mapbox/outdoors-v11',
+    hybrid: 'mapbox://styles/mapbox/satellite-streets-v11',
+    dark: 'mapbox://styles/mapbox/dark-v10',
+    light: 'mapbox://styles/mapbox/light-v10'
+};
+
 
 
 
@@ -1522,6 +1654,28 @@ document.getElementById('styleSelector').addEventListener('change', function () 
     }
 });
 
+
+
+// إعادة إضافة طبقة المسار بعد تحميل النمط الجديد
+map.on('style.load', () => {
+    if (window.currentRouteData) {
+        if (!map.getSource('route')) {
+            map.addLayer({
+                id: 'route',
+                type: 'line',
+                source: {
+                    type: 'geojson',
+                    data: window.currentRouteData
+                },
+                layout: { 'line-join': 'round', 'line-cap': 'round' },
+                paint: { 'line-color': '#3887be', 'line-width': 5 }
+            });
+            console.log("✔️ تم إعادة إضافة طبقة المسار بعد تغيير النمط.");
+        }
+    }
+});
+
+
 // تعريف المتغيرات العامة (يجب أن تُحدد في مكان مناسب من الكود، مثل بداية الملف)
 // تعريف المتغيرات العامة
 var currentRequestId = null;
@@ -1531,41 +1685,48 @@ var currentWorkerId = "worker_123"; // تعيين معرف عامل ثابت ل�
 document.getElementById('acceptJobButton').addEventListener('click', function() {
     console.log("بدء عملية قبول الطلب...");
     
-    // التحقق من توفر معرّف الطلب
     if (!currentRequestId) {
-        console.error("🚨 معرف الطلب غير متوفر. يرجى التأكد من وجود طلب نشط.");
+        console.error("معرّف الطلب غير متوفر. يرجى التأكد من وجود طلب نشط.");
         return;
     }
     
-    // التحقق من توفر معرّف العامل
     if (!currentWorkerId) {
-        console.error("🚨 معرف العامل غير متوفر. يرجى تسجيل الدخول أولاً.");
+        console.error("معرّف العامل غير متوفر. يرجى تسجيل الدخول أولاً.");
         alert("يرجى تسجيل الدخول قبل قبول الطلب.");
         return;
     }
     
-    console.log("✅ بيانات الطلب ومعرف العامل متوفرة. جاري استدعاء دالة acceptRequest مع المعرف:", currentRequestId, currentWorkerId);
-    
-    // استدعاء دالة قبول الطلب لتحديث حالة الطلب في Firebase
+    console.log("بيانات الطلب ومعرف العامل متوفرة. جاري استدعاء دالة acceptRequest...");
     acceptRequest(currentRequestId, currentWorkerId);
     
-    // التحقق من توفر بيانات المواقع المطلوبة
     if (!currentWorkerLocation || !jobLocation) {
-        console.error("🚨 بيانات الموقع للعامل أو الطلب غير متوفرة.");
+        console.error("بيانات الموقع للعامل أو الطلب غير متوفرة.");
         return;
     }
     
-    // عرض المسار على الخريطة باستخدام دالة showRoute
     if (typeof showRoute === "function") {
         showRoute(currentWorkerLocation, jobLocation);
-        console.log("✅ تم استدعاء دالة showRoute لعرض الاتجاه والمسافة على الخريطة");
+        console.log("تم استدعاء دالة showRoute لعرض الاتجاه والمسافة على الخريطة");
     } else {
-        console.error("🚨 وظيفة showRoute غير معرفة");
+        console.error("وظيفة showRoute غير معرفة");
     }
     
-    // إخفاء نافذة تفاصيل الطلب
+    // بدء تتبع ETA في الوقت الحقيقي وتحديث لوحة etaPanel
+    startRealTimeETATracking(currentWorkerLocation, jobLocation);
+    
+    // بدء العد التنازلي لمدة 3 ساعات (3 * 60 * 60 * 1000 ملّي ثانية)
+    const countdownElement = document.getElementById('countdownTimer');
+    if (countdownElement) {
+        startCountdown(3 * 60 * 60 * 1000, countdownElement, function() {
+            cancelRequestDueToTimeout(currentRequestId);
+        });
+    } else {
+        console.error("عنصر 'countdownTimer' غير موجود في الصفحة");
+    }
+    
     document.getElementById('jobDetailsPopup').style.display = 'none';
 });
+
 
 
 
@@ -1670,6 +1831,17 @@ if (typeof map !== 'undefined' && map instanceof mapboxgl.Map) {
         });
 
 
+        function cancelRequestDueToTimeout(requestId) {
+    const requestRef = database.ref(`workRequests/${requestId}`);
+    requestRef.update({ status: 'cancelled' })  // أو 'timeout' حسب منطق التطبيق
+        .then(() => {
+            console.log(`تم إلغاء الطلب ${requestId} بسبب انتهاء وقت الوصول.`);
+            alert("انتهى الوقت المسموح للوصول، تم إلغاء الطلب.");
+        })
+        .catch((error) => {
+            console.error(`خطأ أثناء إلغاء الطلب ${requestId}:`, error);
+        });
+}
 
 
 
