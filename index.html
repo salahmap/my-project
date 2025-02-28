@@ -114,8 +114,10 @@
             <option value="satellite">الأقمار الصناعية</option>
             <option value="outdoors">خارجية</option>
             <option value="hybrid" selected>هايبرد</option>
-            <option value="dark">الوضع الليلي</option> <!-- إضافة الوضع الليلي هنا -->
+            <option value="dark">الوضع الليلي</option>
+            <option value="light">الوضع الفاتح</option> <!-- الخيار الجديد -->
         </select>
+        
         <button id="requestWater" class="controlButton">طلب ماء</button>
         <button id="requestWorker" class="controlButton">طلب عامل</button>
         <div id="weatherInfo"></div>
@@ -151,8 +153,8 @@
         <button id="cancelInput">إلغاء</button>
     </div>
 
-    <!-- نافذة إدخال تفاصيل الطلب -->
-<div id="requestPopup" style="display:none; position:fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 10px; padding: 20px; z-index: 3;">
+<!-- نموذج تقديم الطلب بعد التعديل -->
+<div id="requestPopup" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; border-radius:10px; padding:20px; z-index:3;">
     <h2>إدخال تفاصيل الطلب</h2>
     <label for="workTypeInput">نوع العمل:</label>
     <select id="workTypeInput">
@@ -165,9 +167,16 @@
     <input type="text" id="budgetInput" placeholder="أدخل الميزانية">
     <label for="timeInput">الوقت المطلوب:</label>
     <input type="text" id="timeInput" placeholder="أدخل الزمن المطلوب">
+    <!-- الحقل الجديد للوصف -->
+    <label for="descriptionInput">وصف العمل:</label>
+    <textarea id="descriptionInput" placeholder="أدخل وصف العمل"></textarea>
+    <!-- الحقل الجديد لرفع صورة العمل -->
+    <label for="imageInput">صورة العمل:</label>
+    <input type="file" id="imageInput">
     <button id="submitRequest">إرسال الطلب</button>
     <button id="cancelRequest">إلغاء</button>
 </div>
+
 
 <div id="ratingPopup" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:20px; border-radius:10px;">
     <h2>تقييم العامل</h2>
@@ -201,6 +210,7 @@
 <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.js"></script>
 
 <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.7.0/mapbox-gl-geocoder.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
 
 
 <script>
@@ -335,6 +345,9 @@ function monitorRequestStatus(requestId) {
                             const trackingPanel = document.getElementById('trackingPanel');
                             trackingPanel.style.display = 'block';
                             startWorkerTracking(acceptedWorkerId, userLocation);
+                                // إضافة مراقبة وصول العامل إلى نطاق 500 متر
+                            trackWorkerArrival(acceptedWorkerId, userLocation);
+                             console.log("تم استدعاء trackWorkerArrival لمراقبة وصول العامل");
                         })
                         .catch((err) => {
                             console.error("خطأ في حساب ETA:", err);
@@ -351,8 +364,70 @@ function monitorRequestStatus(requestId) {
     });
 }
 
+// تعريف دالة رفع الصورة باستخدام Firebase Storage
+function uploadImage(file) {
+    return new Promise((resolve, reject) => {
+        if (!file) {
+            return reject("No file provided");
+        }
+        // إنشاء مرجع إلى Firebase Storage
+        const storageRef = firebase.storage().ref();
+        // إنشاء مسار فريد للملف
+        const fileRef = storageRef.child('images/' + Date.now() + '_' + file.name);
+        // بدء رفع الملف
+        const uploadTask = fileRef.put(file);
+        uploadTask.on('state_changed',
+            (snapshot) => {
+                // يمكنك متابعة تقدم الرفع هنا إذا رغبت
+            },
+            (error) => {
+                reject(error);
+            },
+            () => {
+                // عند اكتمال الرفع، استرجاع رابط التنزيل
+                uploadTask.snapshot.ref.getDownloadURL()
+                    .then((downloadURL) => {
+                        resolve(downloadURL);
+                    })
+                    .catch(reject);
+            }
+        );
+    });
+}
 
 // دالة إرسال الطلب وتخزين معرف الطلب في currentRequestId
+// تعريف دالة رفع الصورة باستخدام Firebase Storage
+function uploadImage(file) {
+    return new Promise((resolve, reject) => {
+        if (!file) {
+            return reject("No file provided");
+        }
+        // إنشاء مرجع إلى Firebase Storage
+        const storageRef = firebase.storage().ref();
+        // إنشاء مسار فريد للملف
+        const fileRef = storageRef.child('images/' + Date.now() + '_' + file.name);
+        // بدء رفع الملف
+        const uploadTask = fileRef.put(file);
+        uploadTask.on('state_changed',
+            (snapshot) => {
+                // يمكنك متابعة تقدم الرفع هنا إذا رغبت
+            },
+            (error) => {
+                reject(error);
+            },
+            () => {
+                // عند اكتمال الرفع، استرجاع رابط التنزيل
+                uploadTask.snapshot.ref.getDownloadURL()
+                    .then((downloadURL) => {
+                        resolve(downloadURL);
+                    })
+                    .catch(reject);
+            }
+        );
+    });
+}
+
+// دالة إرسال الطلب مع الحقول الجديدة (الوصف، رقم الهاتف، صورة العمل)
 function submitRequest() {
     navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -365,42 +440,83 @@ function submitRequest() {
             const workType = document.getElementById('workTypeInput').value;
             const budget = document.getElementById('budgetInput').value;
             const time = document.getElementById('timeInput').value;
+            // الحقول الجديدة:
+            const description = document.getElementById('descriptionInput').value;
+            const phone = document.getElementById('phoneInput') ? document.getElementById('phoneInput').value : "";
+            const imageFile = document.getElementById('imageInput').files[0];
 
             if (workType && budget && time && userLocation.lng && userLocation.lat) {
-                const requestData = {
-                    workType: workType,
-                    budget: budget,
-                    time: time,
-                    location: {
-                        lng: parseFloat(userLocation.lng),
-                        lat: parseFloat(userLocation.lat)
-                    },
-                    status: "pending",
-                    workerId: null
-                };
+                if (imageFile) {
+                    uploadImage(imageFile).then((imageUrl) => {
+                        const requestData = {
+                            workType: workType,
+                            budget: budget,
+                            time: time,
+                            description: description,  // الحقل الجديد للوصف
+                            phone: phone,              // الحقل الجديد لرقم الهاتف
+                            imageUrl: imageUrl,        // الحقل الجديد لرابط الصورة
+                            location: {
+                                lng: parseFloat(userLocation.lng),
+                                lat: parseFloat(userLocation.lat)
+                            },
+                            status: "pending",
+                            workerId: null
+                        };
 
-                // إنشاء الطلب باستخدام requestsRef المُعرف في النطاق العام
-                requestsRef.push(requestData)
-                    .then((newRequestRef) => {
-                        // حفظ معرف الطلب في متغير عام
-                        currentRequestId = newRequestRef.key;
-                        console.log("تم إنشاء معرف الطلب:", currentRequestId);
-                        alert('تم إرسال الطلب بنجاح.');
-                        document.getElementById('requestPopup').style.display = 'none';
-
-                        // بدء مراقبة حالة الطلب باستخدام المعرف الجديد
-                        monitorRequestStatus(currentRequestId);
-
-                        // إرسال الإشعارات للعمال
-                        sendNotificationsToNearbyWorkers(requestData, {
+                        requestsRef.push(requestData)
+                            .then((newRequestRef) => {
+                                currentRequestId = newRequestRef.key;
+                                console.log("تم إنشاء معرف الطلب:", currentRequestId);
+                                alert('تم إرسال الطلب بنجاح.');
+                                document.getElementById('requestPopup').style.display = 'none';
+                                monitorRequestStatus(currentRequestId);
+                                sendNotificationsToNearbyWorkers(requestData, {
+                                    lng: parseFloat(userLocation.lng),
+                                    lat: parseFloat(userLocation.lat)
+                                });
+                            })
+                            .catch((error) => {
+                                console.error('خطأ في إرسال الطلب إلى Firebase:', error);
+                                alert('حدث خطأ أثناء إرسال الطلب. يرجى المحاولة مرة أخرى لاحقًا.');
+                            });
+                    }).catch((error) => {
+                        console.error('خطأ في رفع الصورة:', error);
+                        alert('حدث خطأ أثناء رفع الصورة.');
+                    });
+                } else {
+                    // إذا لم يتم اختيار صورة، نستخدم قيمة فارغة لحقل imageUrl
+                    const requestData = {
+                        workType: workType,
+                        budget: budget,
+                        time: time,
+                        description: description,
+                        phone: phone,
+                        imageUrl: "",
+                        location: {
                             lng: parseFloat(userLocation.lng),
                             lat: parseFloat(userLocation.lat)
+                        },
+                        status: "pending",
+                        workerId: null
+                    };
+
+                    requestsRef.push(requestData)
+                        .then((newRequestRef) => {
+                            currentRequestId = newRequestRef.key;
+                            console.log("تم إنشاء معرف الطلب:", currentRequestId);
+                            alert('تم إرسال الطلب بنجاح.');
+                            document.getElementById('requestPopup').style.display = 'none';
+                            monitorRequestStatus(currentRequestId);
+                            sendNotificationsToNearbyWorkers(requestData, {
+                                lng: parseFloat(userLocation.lng),
+                                lat: parseFloat(userLocation.lat)
+                            });
+                        })
+                        .catch((error) => {
+                            console.error('خطأ في إرسال الطلب إلى Firebase:', error);
+                            alert('حدث خطأ أثناء إرسال الطلب. يرجى المحاولة مرة أخرى لاحقًا.');
                         });
-                    })
-                    .catch((error) => {
-                        console.error('خطأ في إرسال الطلب إلى Firebase:', error);
-                        alert('حدث خطأ أثناء إرسال الطلب. يرجى المحاولة مرة أخرى لاحقًا.');
-                    });
+                }
             } else {
                 alert('يرجى ملء جميع الحقول وتحديد موقع صحيح.');
             }
@@ -822,13 +938,16 @@ function checkProximityAndNotify(workerLocation, clientLocation) {
 
 
         // إعداد الأنماط المختلفة للخريطة
-        const styles = {
-            streets: 'mapbox://styles/mapbox/streets-v11',
-            satellite: 'mapbox://styles/mapbox/satellite-v9',
-            outdoors: 'mapbox://styles/mapbox/outdoors-v11',
-            hybrid: 'mapbox://styles/mapbox/satellite-streets-v11',
-            dark: 'mapbox://styles/mapbox/dark-v10' // إضافة نمط الوضع الليلي
-        };
+// إعداد الأنماط المختلفة للخريطة مع نمط إضافي (light)
+const styles = {
+    streets: 'mapbox://styles/mapbox/streets-v11',
+    satellite: 'mapbox://styles/mapbox/satellite-v9',
+    outdoors: 'mapbox://styles/mapbox/outdoors-v11',
+    hybrid: 'mapbox://styles/mapbox/satellite-streets-v11',
+    dark: 'mapbox://styles/mapbox/dark-v10',
+    light: 'mapbox://styles/mapbox/light-v10' // الوضع الفاتح
+};
+
 
         // إنشاء الخريطة مع زوم منخفض جدًا كأنك ترى الأرض من الفضاء
         const map = new mapboxgl.Map({
