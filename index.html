@@ -143,15 +143,18 @@
     </div>
 
     <!-- نافذة إدخال الاسم ورقم الهاتف -->
-    <div id="inputPopup" style="display:none; position:fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 10px; padding: 20px; z-index: 3;">
+    <div id="inputPopup" style="display:none;">
         <h2>إضافة معلومات</h2>
         <label for="nameInput">اسم:</label>
         <input type="text" id="nameInput" placeholder="أدخل الاسم">
-        <label for="phoneInput">رقم هاتف:</label>
+        
+        <label for="phoneInput">رقم الهاتف:</label>
         <input type="text" id="phoneInput" placeholder="أدخل رقم الهاتف">
+        
         <button id="submitInfo">التالي</button>
         <button id="cancelInput">إلغاء</button>
     </div>
+    
 
 <!-- نموذج تقديم الطلب بعد التعديل -->
 <div id="requestPopup" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; border-radius:10px; padding:20px; z-index:3;">
@@ -170,12 +173,17 @@
     <!-- الحقل الجديد للوصف -->
     <label for="descriptionInput">وصف العمل:</label>
     <textarea id="descriptionInput" placeholder="أدخل وصف العمل"></textarea>
+    <!-- تم تغيير معرف رقم الهاتف هنا -->
+    <label for="phoneInputRequest">رقم الهاتف:</label>
+    <input type="text" id="phoneInputRequest" placeholder="أدخل رقم الهاتف">
     <!-- الحقل الجديد لرفع صورة العمل -->
     <label for="imageInput">صورة العمل:</label>
     <input type="file" id="imageInput">
     <button id="submitRequest">إرسال الطلب</button>
     <button id="cancelRequest">إلغاء</button>
 </div>
+
+
 
 
 <div id="ratingPopup" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:20px; border-radius:10px;">
@@ -440,83 +448,91 @@ function submitRequest() {
             const workType = document.getElementById('workTypeInput').value;
             const budget = document.getElementById('budgetInput').value;
             const time = document.getElementById('timeInput').value;
-            // الحقول الجديدة:
             const description = document.getElementById('descriptionInput').value;
-            const phone = document.getElementById('phoneInput') ? document.getElementById('phoneInput').value : "";
+            const phone = document.getElementById('phoneInputRequest') ? document.getElementById('phoneInputRequest').value : "";
             const imageFile = document.getElementById('imageInput').files[0];
 
             if (workType && budget && time && userLocation.lng && userLocation.lat) {
-                if (imageFile) {
-                    uploadImage(imageFile).then((imageUrl) => {
-                        const requestData = {
-                            workType: workType,
-                            budget: budget,
-                            time: time,
-                            description: description,  // الحقل الجديد للوصف
-                            phone: phone,              // الحقل الجديد لرقم الهاتف
-                            imageUrl: imageUrl,        // الحقل الجديد لرابط الصورة
-                            location: {
-                                lng: parseFloat(userLocation.lng),
-                                lat: parseFloat(userLocation.lat)
-                            },
-                            status: "pending",
-                            workerId: null
-                        };
+                // استدعاء خدمة عكس التكويد للحصول على اسم المنطقة
+                const reverseGeocodeUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${userLocation.lng},${userLocation.lat}.json?access_token=${mapboxgl.accessToken}&types=region&language=ar`;
+                fetch(reverseGeocodeUrl)
+                    .then(response => response.json())
+                    .then(geoData => {
+                        let regionName = "";
+                        if (geoData.features && geoData.features.length > 0) {
+                            regionName = geoData.features[0].place_name;
+                        }
+                        if (imageFile) {
+                            uploadImage(imageFile).then((imageUrl) => {
+                                const requestData = {
+                                    workType: workType,
+                                    budget: budget,
+                                    time: time,
+                                    description: description,
+                                    phone: phone,
+                                    imageUrl: imageUrl,
+                                    location: {
+                                        lng: parseFloat(userLocation.lng),
+                                        lat: parseFloat(userLocation.lat)
+                                    },
+                                    region: regionName, // إضافة اسم المنطقة هنا
+                                    status: "pending",
+                                    workerId: null
+                                };
 
-                        requestsRef.push(requestData)
-                            .then((newRequestRef) => {
-                                currentRequestId = newRequestRef.key;
-                                console.log("تم إنشاء معرف الطلب:", currentRequestId);
-                                alert('تم إرسال الطلب بنجاح.');
-                                document.getElementById('requestPopup').style.display = 'none';
-                                monitorRequestStatus(currentRequestId);
-                                sendNotificationsToNearbyWorkers(requestData, {
+                                requestsRef.push(requestData)
+                                    .then((newRequestRef) => {
+                                        currentRequestId = newRequestRef.key;
+                                        console.log("تم إنشاء معرف الطلب:", currentRequestId);
+                                        alert('تم إرسال الطلب بنجاح.');
+                                        document.getElementById('requestPopup').style.display = 'none';
+                                        monitorRequestStatus(currentRequestId);
+                                        sendNotificationsToNearbyWorkers(requestData, userLocation);
+                                    })
+                                    .catch((error) => {
+                                        console.error('خطأ في إرسال الطلب إلى Firebase:', error);
+                                        alert('حدث خطأ أثناء إرسال الطلب. يرجى المحاولة مرة أخرى لاحقًا.');
+                                    });
+                            }).catch((error) => {
+                                console.error('خطأ في رفع الصورة:', error);
+                                alert('حدث خطأ أثناء رفع الصورة.');
+                            });
+                        } else {
+                            const requestData = {
+                                workType: workType,
+                                budget: budget,
+                                time: time,
+                                description: description,
+                                phone: phone,
+                                imageUrl: "",
+                                location: {
                                     lng: parseFloat(userLocation.lng),
                                     lat: parseFloat(userLocation.lat)
-                                });
-                            })
-                            .catch((error) => {
-                                console.error('خطأ في إرسال الطلب إلى Firebase:', error);
-                                alert('حدث خطأ أثناء إرسال الطلب. يرجى المحاولة مرة أخرى لاحقًا.');
-                            });
-                    }).catch((error) => {
-                        console.error('خطأ في رفع الصورة:', error);
-                        alert('حدث خطأ أثناء رفع الصورة.');
-                    });
-                } else {
-                    // إذا لم يتم اختيار صورة، نستخدم قيمة فارغة لحقل imageUrl
-                    const requestData = {
-                        workType: workType,
-                        budget: budget,
-                        time: time,
-                        description: description,
-                        phone: phone,
-                        imageUrl: "",
-                        location: {
-                            lng: parseFloat(userLocation.lng),
-                            lat: parseFloat(userLocation.lat)
-                        },
-                        status: "pending",
-                        workerId: null
-                    };
+                                },
+                                region: regionName, // إضافة اسم المنطقة هنا
+                                status: "pending",
+                                workerId: null
+                            };
 
-                    requestsRef.push(requestData)
-                        .then((newRequestRef) => {
-                            currentRequestId = newRequestRef.key;
-                            console.log("تم إنشاء معرف الطلب:", currentRequestId);
-                            alert('تم إرسال الطلب بنجاح.');
-                            document.getElementById('requestPopup').style.display = 'none';
-                            monitorRequestStatus(currentRequestId);
-                            sendNotificationsToNearbyWorkers(requestData, {
-                                lng: parseFloat(userLocation.lng),
-                                lat: parseFloat(userLocation.lat)
-                            });
-                        })
-                        .catch((error) => {
-                            console.error('خطأ في إرسال الطلب إلى Firebase:', error);
-                            alert('حدث خطأ أثناء إرسال الطلب. يرجى المحاولة مرة أخرى لاحقًا.');
-                        });
-                }
+                            requestsRef.push(requestData)
+                                .then((newRequestRef) => {
+                                    currentRequestId = newRequestRef.key;
+                                    console.log("تم إنشاء معرف الطلب:", currentRequestId);
+                                    alert('تم إرسال الطلب بنجاح.');
+                                    document.getElementById('requestPopup').style.display = 'none';
+                                    monitorRequestStatus(currentRequestId);
+                                    sendNotificationsToNearbyWorkers(requestData, userLocation);
+                                })
+                                .catch((error) => {
+                                    console.error('خطأ في إرسال الطلب إلى Firebase:', error);
+                                    alert('حدث خطأ أثناء إرسال الطلب. يرجى المحاولة مرة أخرى لاحقًا.');
+                                });
+                        }
+                    })
+                    .catch(err => {
+                        console.error("خطأ في استرجاع اسم المنطقة:", err);
+                        alert("حدث خطأ أثناء تحديد المنطقة.");
+                    });
             } else {
                 alert('يرجى ملء جميع الحقول وتحديد موقع صحيح.');
             }
