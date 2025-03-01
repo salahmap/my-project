@@ -462,71 +462,34 @@ function submitRequest() {
                         if (geoData.features && geoData.features.length > 0) {
                             regionName = geoData.features[0].place_name;
                         }
+                        // إعداد بيانات الطلب مع تضمين معرف العامل المختار (إذا وُجد)
+                        const requestData = {
+                            workType: workType,
+                            budget: budget,
+                            time: time,
+                            description: description,
+                            phone: phone,
+                            imageUrl: "",
+                            location: {
+                                lng: parseFloat(userLocation.lng),
+                                lat: parseFloat(userLocation.lat)
+                            },
+                            region: regionName, // إضافة اسم المنطقة هنا
+                            status: "pending",
+                            workerId: window.selectedWorkerId || null
+                        };
+
+                        // إذا كان هناك ملف صورة، نقوم برفع الصورة أولاً
                         if (imageFile) {
                             uploadImage(imageFile).then((imageUrl) => {
-                                const requestData = {
-                                    workType: workType,
-                                    budget: budget,
-                                    time: time,
-                                    description: description,
-                                    phone: phone,
-                                    imageUrl: imageUrl,
-                                    location: {
-                                        lng: parseFloat(userLocation.lng),
-                                        lat: parseFloat(userLocation.lat)
-                                    },
-                                    region: regionName, // إضافة اسم المنطقة هنا
-                                    status: "pending",
-                                    workerId: null
-                                };
-
-                                requestsRef.push(requestData)
-                                    .then((newRequestRef) => {
-                                        currentRequestId = newRequestRef.key;
-                                        console.log("تم إنشاء معرف الطلب:", currentRequestId);
-                                        alert('تم إرسال الطلب بنجاح.');
-                                        document.getElementById('requestPopup').style.display = 'none';
-                                        monitorRequestStatus(currentRequestId);
-                                        sendNotificationsToNearbyWorkers(requestData, userLocation);
-                                    })
-                                    .catch((error) => {
-                                        console.error('خطأ في إرسال الطلب إلى Firebase:', error);
-                                        alert('حدث خطأ أثناء إرسال الطلب. يرجى المحاولة مرة أخرى لاحقًا.');
-                                    });
+                                requestData.imageUrl = imageUrl;
+                                pushRequestData(requestData, userLocation);
                             }).catch((error) => {
                                 console.error('خطأ في رفع الصورة:', error);
                                 alert('حدث خطأ أثناء رفع الصورة.');
                             });
                         } else {
-                            const requestData = {
-                                workType: workType,
-                                budget: budget,
-                                time: time,
-                                description: description,
-                                phone: phone,
-                                imageUrl: "",
-                                location: {
-                                    lng: parseFloat(userLocation.lng),
-                                    lat: parseFloat(userLocation.lat)
-                                },
-                                region: regionName, // إضافة اسم المنطقة هنا
-                                status: "pending",
-                                workerId: null
-                            };
-
-                            requestsRef.push(requestData)
-                                .then((newRequestRef) => {
-                                    currentRequestId = newRequestRef.key;
-                                    console.log("تم إنشاء معرف الطلب:", currentRequestId);
-                                    alert('تم إرسال الطلب بنجاح.');
-                                    document.getElementById('requestPopup').style.display = 'none';
-                                    monitorRequestStatus(currentRequestId);
-                                    sendNotificationsToNearbyWorkers(requestData, userLocation);
-                                })
-                                .catch((error) => {
-                                    console.error('خطأ في إرسال الطلب إلى Firebase:', error);
-                                    alert('حدث خطأ أثناء إرسال الطلب. يرجى المحاولة مرة أخرى لاحقًا.');
-                                });
+                            pushRequestData(requestData, userLocation);
                         }
                     })
                     .catch(err => {
@@ -543,6 +506,22 @@ function submitRequest() {
         },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
+}
+
+function pushRequestData(requestData, userLocation) {
+    requestsRef.push(requestData)
+        .then((newRequestRef) => {
+            currentRequestId = newRequestRef.key;
+            console.log("تم إنشاء معرف الطلب:", currentRequestId);
+            alert('تم إرسال الطلب بنجاح.');
+            document.getElementById('requestPopup').style.display = 'none';
+            monitorRequestStatus(currentRequestId);
+            sendNotificationsToNearbyWorkers(requestData, userLocation);
+        })
+        .catch((error) => {
+            console.error('خطأ في إرسال الطلب إلى Firebase:', error);
+            alert('حدث خطأ أثناء إرسال الطلب. يرجى المحاولة مرة أخرى لاحقًا.');
+        });
 }
 
 document.getElementById('submitRequest').addEventListener('click', submitRequest);
@@ -767,14 +746,23 @@ function cleanOldRequests() {
 // استدعاء الدالة عند تحميل الصفحة
 cleanOldRequests();
 
-
 function updateWorkerMarker(location) {
     if (!window.workerMarker) {
-        window.workerMarker = new mapboxgl.Marker().setLngLat([location.lng, location.lat]).addTo(map);
+        // إنشاء عنصر HTML مخصص للماركر
+        var customMarker = document.createElement('div');
+        customMarker.innerHTML = '<i class="fas fa-user" style="color: #FFC107; font-size: 30px;"></i>';
+        customMarker.style.width = '30px';
+        customMarker.style.height = '30px';
+
+        // إنشاء الماركر باستخدام العنصر المخصص
+        window.workerMarker = new mapboxgl.Marker(customMarker)
+            .setLngLat([location.lng, location.lat])
+            .addTo(map);
     } else {
         window.workerMarker.setLngLat([location.lng, location.lat]);
     }
 }
+
 
 function showRouteToUser(workerLocation, userLocation) {
     const directionsUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${workerLocation.lng},${workerLocation.lat};${userLocation.lng},${userLocation.lat}?geometries=geojson&access_token=${mapboxgl.accessToken}`;
@@ -1143,27 +1131,59 @@ locateControl.on('geolocate', (e) => {
 
 
 // فتح النافذة عند النقر على "طلب عامل"
-document.getElementById('requestWorker').addEventListener('click', () => {
-    document.getElementById('requestPopup').style.display = 'block';
+// --- إضافة جديدة: استماع لعقدة activeWorkers وإنشاء العلامات ---
+const workerMarkers = {}; // لتخزين العلامات بحسب معرف العامل
+
+const activeWorkersRef = database.ref('activeWorkers');
+activeWorkersRef.on('value', snapshot => {
+  snapshot.forEach(childSnapshot => {
+     const workerData = childSnapshot.val();
+     const workerId = childSnapshot.key;
+     createOrUpdateWorkerMarker(workerId, workerData.location);
+  });
 });
 
+function createOrUpdateWorkerMarker(workerId, location) {
+    if (!workerMarkers[workerId]) {
+         const marker = new mapboxgl.Marker({ color: 'red' })
+             .setLngLat([location.lng, location.lat])
+             .addTo(map);
+         // عند النقر على العلامة يتم فتح نموذج الطلب الخاص بهذا العامل
+         marker.getElement().addEventListener('click', () => {
+             openWorkerRequestPopup(workerId);
+         });
+         workerMarkers[workerId] = marker;
+    } else {
+         workerMarkers[workerId].setLngLat([location.lng, location.lat]);
+    }
+}
 
-// إلغاء طلب العامل
+function openWorkerRequestPopup(workerId) {
+    // تخزين معرف العامل المُختار لاستخدامه لاحقًا عند إرسال الطلب
+    window.selectedWorkerId = workerId;
+    // فتح نافذة الطلب
+    document.getElementById('requestPopup').style.display = 'block';
+}
+
+// --- باقي الكود الأصلي الذي يحتفظ بوظائف النوافذ الأخرى ---
+/* لم يعد نعتمد على زر "requestWorker" لفتح النموذج بشكل مباشر */
+// document.getElementById('requestWorker').addEventListener('click', () => {
+//     document.getElementById('requestPopup').style.display = 'block';
+// });
+
 document.getElementById('cancelRequest').addEventListener('click', () => {
     document.getElementById('requestPopup').style.display = 'none';
 });
 
-
-// تأكيد وضع العلامة مع انتظار تحميل الخريطة
 document.getElementById('confirmYes').addEventListener('click', () => {
     waitUntilMapReady()
     .then(() => {
         const userLocation = map.getCenter();
-        // إضافة العلامة في الموقع الحالي
+        // هنا يمكننا اختيار عدم إضافة علامة جديدة للمستخدم إذا كانت العلامة الخاصة بالطلب ستظهر بناءً على اختيار العامل
+        // أو يمكن الاحتفاظ بهذا الجزء إذا كان ضروريًا لتأكيد الموقع
         new mapboxgl.Marker()
             .setLngLat(userLocation)
             .addTo(map);
-        // عرض نافذة إدخال الاسم ورقم الهاتف
         document.getElementById('inputPopup').style.display = 'block';
         document.getElementById('confirmationPopup').style.display = 'none';
     })
@@ -1172,53 +1192,49 @@ document.getElementById('confirmYes').addEventListener('click', () => {
     });
 });
 
+document.getElementById('confirmNo').addEventListener('click', () => {
+    document.getElementById('confirmationPopup').style.display = 'none';
+});
 
-        // إلغاء وضع العلامة
-        document.getElementById('confirmNo').addEventListener('click', () => {
-            document.getElementById('confirmationPopup').style.display = 'none';
-        });
-
-        // إرسال المعلومات المدخلة إلى Firebase
-        document.getElementById('submitInfo').addEventListener('click', () => {
-            const name = document.getElementById('nameInput').value;
-            const phone = document.getElementById('phoneInput').value;
-            if (name && phone) {
-                const markerData = {
-                    name: name,
-                    phone: phone,
-                    location: {
-                        lng: map.getCenter().lng,
-                        lat: map.getCenter().lat
-                    }
-                };
-                const markersRef = database.ref('markers');
-                markersRef.push(markerData)
-                    .then(() => {
-                        alert('تم حفظ العلامة بنجاح.');
-                        document.getElementById('inputPopup').style.display = 'none';
-                        document.getElementById('nameInput').value = '';
-                        document.getElementById('phoneInput').value = '';
-                    })
-                    .catch((error) => {
-                        alert('حدث خطأ: ' + error.message);
-                    });
-            } else {
-                alert('يرجى ملء جميع الحقول.');
+document.getElementById('submitInfo').addEventListener('click', () => {
+    const name = document.getElementById('nameInput').value;
+    const phone = document.getElementById('phoneInput').value;
+    if (name && phone) {
+        const markerData = {
+            name: name,
+            phone: phone,
+            location: {
+                lng: map.getCenter().lng,
+                lat: map.getCenter().lat
             }
-        });
+        };
+        const markersRef = database.ref('markers');
+        markersRef.push(markerData)
+            .then(() => {
+                alert('تم حفظ العلامة بنجاح.');
+                document.getElementById('inputPopup').style.display = 'none';
+                document.getElementById('nameInput').value = '';
+                document.getElementById('phoneInput').value = '';
+            })
+            .catch((error) => {
+                alert('حدث خطأ: ' + error.message);
+            });
+    } else {
+        alert('يرجى ملء جميع الحقول.');
+    }
+});
 
-        // إلغاء نافذة إدخال المعلومات
-        document.getElementById('cancelInput').addEventListener('click', () => {
-            document.getElementById('inputPopup').style.display = 'none';
-        });
+document.getElementById('cancelInput').addEventListener('click', () => {
+    document.getElementById('inputPopup').style.display = 'none';
+});
 
-// إغلاق النوافذ بالنقر خارجها
 window.addEventListener('click', (event) => {
     const inputPopup = document.getElementById('inputPopup');
     const requestPopup = document.getElementById('requestPopup');
     if (event.target === inputPopup) inputPopup.style.display = 'none';
     if (event.target === requestPopup) requestPopup.style.display = 'none';
 });
+
 
 
 
