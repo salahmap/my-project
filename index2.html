@@ -166,22 +166,6 @@
         <button id="cancelInput">إلغاء</button>
     </div>
 
-    <!-- نافذة إدخال تفاصيل الطلب -->
-<div id="requestPopup" style="display:none; position:fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 10px; padding: 20px; z-index: 3;">
-    <h2>إدخال تفاصيل الطلب</h2>
-    <label for="workTypeInput">نوع العمل:</label>
-    <select id="workTypeInput">
-        <option value="سباكة">سباكة</option>
-        <option value="كهرباء">كهرباء</option>
-        <option value="نقل">نقل</option>
-        <option value="أخرى">أخرى</option>
-    </select>
-    <label for="budgetInput">الميزانية المتاحة:</label>
-    <input type="text" id="budgetInput" placeholder="أدخل الميزانية">
-    <label for="timeInput">الوقت المطلوب:</label>
-    <input type="text" id="timeInput" placeholder="أدخل الزمن المطلوب">
-    <button id="submitRequest">إرسال الطلب</button>
-    <button id="cancelRequest">إلغاء</button>
 
     <!-- تخصيص معرّف لعامل -->
 <div id="assignIdContainer" style="margin: 20px; background: white; padding: 20px; border-radius: 10px; box-shadow: 0px 4px 6px rgba(0,0,0,0.1);">
@@ -355,13 +339,7 @@ function sendPusherNotification(interest, message, title = "إشعار جديد"
             document.getElementById('inputPopup').style.display = 'none'; // إخفاء النافذة
         });
 
-        // دالة لإعادة تعيين الحقول في requestPopup عند النقر على زر "إلغاء"
-        document.getElementById('cancelRequest').addEventListener('click', () => {
-            document.getElementById('workTypeInput').value = ''; // إعادة تعيين حقل نوع العمل
-            document.getElementById('budgetInput').value = '';   // إعادة تعيين حقل الميزانية
-            document.getElementById('timeInput').value = '';     // إعادة تعيين حقل الوقت
-            document.getElementById('requestPopup').style.display = 'none'; // إخفاء النافذة
-        });
+
 
 // إخفاء نافذة تسجيل الدخول بعد التحقق من المعرّف
 function hideLoginPopup() {
@@ -678,13 +656,21 @@ function startRealTimeETATracking(workerLocation, jobLocation) {
                 console.error("خطأ في حساب ETA:", err);
                 return;
             }
-            // يتم تحديث العنصر الخاص بعرض ETA فقط
+            // تحديث عرض ETA
             updateETADisplay(data.duration, data.distance, etaDisplay);
+            
+            // التحقق من المسافة بين العامل وموقع الطلب
+            const distance = calculateDistance(workerLocation, jobLocation); // المسافة بالكيلومترات
+            if (distance <= 0.5 && window.fullPhone) {  // 0.5 كم تعادل 500 متر
+                // تحديث عنصر رقم الهاتف لعرض الرقم الكامل
+                document.getElementById('userPhone').innerText = `رقم الهاتف: ${window.fullPhone}`;
+            }
         });
     }, 15000); // التحديث كل 15 ثانية
     console.log("تم بدء تتبع ETA في الوقت الحقيقي");
     return intervalId;
 }
+
 
 
 
@@ -789,8 +775,18 @@ generateWorkerIds(5000); // مثال: إنشاء 5000     // [295] تعريف م
     // عرض الوصف التفصيلي؛ إذا لم يكن الوصف موجودًا، يتم عرض نوع العمل كبديل
     document.getElementById('jobDescription').innerText = `وصف العمل: ${jobData.description || jobData.workType}`;
     
-    // عرض رقم الهاتف في حال توفره
-    document.getElementById('userPhone').innerText = `رقم الهاتف: ${jobData.phone || "غير متوفر"}`;
+    // حفظ الرقم الكامل في متغير عام لاستخدامه لاحقاً
+    const fullPhone = jobData.phone || "غير متوفر";
+    window.fullPhone = fullPhone;
+    
+    // إنشاء نسخة مخفية من الرقم: إذا كان الرقم موجودًا وطوله أكبر من 5 أحرف
+    let maskedPhone = fullPhone;
+    if (fullPhone !== "غير متوفر" && fullPhone.length > 5) {
+       maskedPhone = fullPhone.substr(0, 5) + "*****";
+    }
+    
+    // عرض رقم الهاتف بشكل مخفي مع تنبيه بأن الرقم الكامل سيظهر عند الاقتراب 500 متر
+    document.getElementById('userPhone').innerText = `رقم الهاتف: ${maskedPhone} (سيظهر الرقم الكامل عند الاقتراب 500 متر)`;
     
     // عرض صورة العمل إذا كانت موجودة، وإخفاؤها إذا لم تكن كذلك
     if (jobData.imageUrl) {
@@ -801,7 +797,11 @@ generateWorkerIds(5000); // مثال: إنشاء 5000     // [295] تعريف م
         document.getElementById('jobImage').style.display = 'none';
     }
     
-    document.getElementById('jobLocation').innerText = `الموقع: (${jobData.location.lat}, ${jobData.location.lng})`;
+    // عرض الموقع: عرض اسم المنطقة إذا كانت موجودة، وإلا عرض الإحداثيات
+    document.getElementById('jobLocation').innerText = jobData.region 
+        ? `الموقع: ${jobData.region}` 
+        : `الموقع: (${jobData.location.lat}, ${jobData.location.lng})`;
+    
     document.getElementById('jobDuration').innerText = `المدة: ${jobData.time}`;
     document.getElementById('jobBudget').innerText = `المبلغ: ${jobData.budget}`;
     
@@ -834,8 +834,14 @@ generateWorkerIds(5000); // مثال: إنشاء 5000     // [295] تعريف م
             }
         });
     }
+    
+    // (يمكنك هنا إضافة تفاصيل إضافية إن وُجدت، مثل: معلومات إضافية)
+    
     document.getElementById('jobDetailsPopup').style.display = 'block';
 }
+
+
+
 
 
 
@@ -1500,32 +1506,31 @@ if (!isMapInitialized) {
 function addMarkersToMap() {
     const requestsRef = database.ref('workRequests');
     requestsRef.on('child_added', (data) => {
-        // التحقق من جاهزية الخريطة قبل محاولة إضافة العلامات
-// [السطر 189-197] باستخدام waitUntilMapReady()
-waitUntilMapReady()
-    .then(() => {
-        // هنا يتم متابعة إضافة العلامة على الخريطة
-        // مثلاً: addMarkerToMap(...);
-    })
-    .catch((err) => {
-        console.error("⚠️ 19: الخريطة غير جاهزة أو النمط غير محمل. سيتم تجاهل إضافة العلامة.", err);
-        return;
-    });
-
-
-
-
+        // التأكد من جاهزية الخريطة قبل محاولة إضافة العلامات
+        waitUntilMapReady()
+            .then(() => {
+                // استكمال إضافة العلامة على الخريطة
+            })
+            .catch((err) => {
+                console.error("⚠️ 19: الخريطة غير جاهزة أو النمط غير محمل. سيتم تجاهل إضافة العلامة.", err);
+                return;
+            });
+        
         const request = data.val();
         if (request && request.location && request.location.lng && request.location.lat) {
             try {
-                new mapboxgl.Marker()
+                // إنشاء الماركر بدون تعيين Popup افتراضي
+                const marker = new mapboxgl.Marker()
                     .setLngLat([request.location.lng, request.location.lat])
-                    .setPopup(new mapboxgl.Popup().setHTML(`
-                        <h3>${request.workType}</h3>
-                        <p>الميزانية: ${request.budget}</p>
-                        <p>الوقت: ${request.time}</p>
-                    `))
                     .addTo(map);
+                
+                // إضافة مستمع للنقر على الماركر لعرض نافذة التفاصيل الكاملة
+                marker.getElement().addEventListener('click', () => {
+                    // حفظ معرف الطلب الحالي للاستخدام لاحقاً (مثلاً عند قبول الطلب)
+                    currentRequestId = data.key;
+                    showJobDetails(request);
+                });
+                
                 console.log(`تمت إضافة الطلب ${data.key} إلى الخريطة.`);
             } catch (error) {
                 console.error("🚨 خطأ أثناء إضافة العلامة إلى الخريطة:", error);
@@ -1535,6 +1540,8 @@ waitUntilMapReady()
         }
     });
 }
+
+
 
 
 
@@ -1683,6 +1690,11 @@ var currentWorkerId = "worker_123"; // تعيين معرف عامل ثابت ل�
 
 // مستمع الضغط على زر قبول الطلب
 document.getElementById('acceptJobButton').addEventListener('click', function() {
+    // طلب تأكيد من المستخدم قبل قبول الطلب
+    if (!confirm("هل تريد قبول هذا الطلب؟")) {
+        return; // إذا اختار المستخدم "لا" فإن العملية تُلغى
+    }
+    
     console.log("بدء عملية قبول الطلب...");
     
     if (!currentRequestId) {
@@ -1726,7 +1738,6 @@ document.getElementById('acceptJobButton').addEventListener('click', function() 
     
     document.getElementById('jobDetailsPopup').style.display = 'none';
 });
-
 
 
 
