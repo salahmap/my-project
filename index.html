@@ -1145,9 +1145,20 @@ activeWorkersRef.on('value', snapshot => {
 
 function createOrUpdateWorkerMarker(workerId, location) {
     if (!workerMarkers[workerId]) {
-         const marker = new mapboxgl.Marker({ color: 'red' })
+         // إنشاء عنصر HTML مخصص باستخدام الإيموجي 👷‍♂️
+         var customWorkerMarker = document.createElement('div');
+         customWorkerMarker.innerText = '👷‍♂️';
+         customWorkerMarker.style.fontSize = '30px';
+         customWorkerMarker.style.lineHeight = '30px';
+         customWorkerMarker.style.width = '30px';
+         customWorkerMarker.style.height = '30px';
+         customWorkerMarker.style.textAlign = 'center';
+
+         // إنشاء الماركر باستخدام العنصر المخصص
+         const marker = new mapboxgl.Marker(customWorkerMarker)
              .setLngLat([location.lng, location.lat])
              .addTo(map);
+
          // عند النقر على العلامة يتم فتح نموذج الطلب الخاص بهذا العامل
          marker.getElement().addEventListener('click', () => {
              openWorkerRequestPopup(workerId);
@@ -1158,12 +1169,24 @@ function createOrUpdateWorkerMarker(workerId, location) {
     }
 }
 
+
+
 function openWorkerRequestPopup(workerId) {
-    // تخزين معرف العامل المُختار لاستخدامه لاحقًا عند إرسال الطلب
     window.selectedWorkerId = workerId;
-    // فتح نافذة الطلب
+    // تغيير عنوان النافذة لتوضيح أن الطلب مباشر
+    const popupTitle = document.querySelector('#requestPopup h2');
+    if(popupTitle){
+        popupTitle.innerText = "طلب مباشر: إرسال تفاصيل الطلب للعامل";
+    }
     document.getElementById('requestPopup').style.display = 'block';
 }
+
+// إعادة تفعيل زر "طلب عامل" في حالة المستخدم يرغب بفتح النافذة يدوياً
+document.getElementById('requestWorker').addEventListener('click', () => {
+    // إذا لم يكن هناك عامل محدد مسبقًا، يمكن فتح النافذة لإدخال التفاصيل العامة
+    document.getElementById('requestPopup').style.display = 'block';
+});
+
 
 // --- باقي الكود الأصلي الذي يحتفظ بوظائف النوافذ الأخرى ---
 /* لم يعد نعتمد على زر "requestWorker" لفتح النموذج بشكل مباشر */
@@ -1186,6 +1209,7 @@ document.getElementById('confirmYes').addEventListener('click', () => {
             .addTo(map);
         document.getElementById('inputPopup').style.display = 'block';
         document.getElementById('confirmationPopup').style.display = 'none';
+        console.log("تم تأكيد وضع العلامة للمستخدم");
     })
     .catch((err) => {
         console.error("⚠️: 187 تعذر تأكيد وضع العلامة لأن الخريطة ليست جاهزة.", err);
