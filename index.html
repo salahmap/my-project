@@ -353,9 +353,9 @@ function monitorRequestStatus(requestId) {
                             const trackingPanel = document.getElementById('trackingPanel');
                             trackingPanel.style.display = 'block';
                             startWorkerTracking(acceptedWorkerId, userLocation);
-                                // إضافة مراقبة وصول العامل إلى نطاق 500 متر
+                            // إضافة مراقبة وصول العامل إلى نطاق 500 متر
                             trackWorkerArrival(acceptedWorkerId, userLocation);
-                             console.log("تم استدعاء trackWorkerArrival لمراقبة وصول العامل");
+                            console.log("تم استدعاء trackWorkerArrival لمراقبة وصول العامل");
                         })
                         .catch((err) => {
                             console.error("خطأ في حساب ETA:", err);
@@ -364,6 +364,8 @@ function monitorRequestStatus(requestId) {
                 .catch((error) => {
                     console.error("خطأ في الحصول على موقع العامل:", error);
                 });
+        } else if (requestData.status === 'rejected') {
+            alert("العامل غير قادر على قبول الطلب حالياً.");
         } else if (requestData.status === 'completed') {
             alert('🎉 تم إكمال الطلب.');
         } else {
