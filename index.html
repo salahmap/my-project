@@ -200,12 +200,6 @@
     <button id="submitRating">إرسال التقييم</button>
 </div>
 
-<!-- نافذة نتيجة الطلب المباشر -->
-<div id="directRequestResultPopup" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; border-radius:10px; padding:20px; z-index:10;">
-    <h2 id="directRequestResultTitle"></h2>
-    <p id="directRequestResultMessage"></p>
-    <button onclick="document.getElementById('directRequestResultPopup').style.display='none'">إغلاق</button>
-</div>
 
 
 
@@ -333,64 +327,50 @@ function monitorRequestStatus(requestId) {
     const requestRef = database.ref(`workRequests/${requestId}`);
     requestRef.on('value', (snapshot) => {
         const requestData = snapshot.val();
-        console.log("📌 تحديث بيانات الطلب:", requestData);
-        
+        console.log("تحديث بيانات الطلب: ", requestData);
         if (!requestData) {
             console.warn(`⚠️ لا توجد بيانات محدثة للطلب ${requestId}`);
             return;
         }
-        
         if (requestData.status === 'accepted') {
             const acceptedWorkerId = requestData.acceptedBy;
+            // استرجاع موقع العامل من قاعدة البيانات
             database.ref(`workers/${acceptedWorkerId}/location`).once('value')
                 .then((workerSnap) => {
                     const workerLocation = workerSnap.val();
                     if (!workerLocation) {
-                        console.error("❌ لا يوجد موقع للعامل:", acceptedWorkerId);
+                        console.error("لا يوجد موقع للعامل:", acceptedWorkerId);
                         return;
                     }
                     const userLocation = requestData.location;
                     const distance = calculateDistance(userLocation, workerLocation);
+                    // حساب الوقت المقدر باستخدام دالة جديدة ترجع وعداً (Promise)
                     calculateETAWithPromise(workerLocation, userLocation)
                         .then((etaMinutes) => {
                             alert(`✅ تم قبول طلبك من قبل العامل: ${acceptedWorkerId}\nو تم اعطائه مهلة 3 ساعات للوصول\nالمسافة: ${distance.toFixed(2)} كم\nالوقت المقدر للوصول: ${etaMinutes} دقيقة`);
                             console.log(`✅ تم قبول الطلب ${requestId} من العامل ${acceptedWorkerId}، المسافة: ${distance.toFixed(2)} كم، ETA: ${etaMinutes} دقيقة`);
-                            
+                            // تفعيل نافذة تتبع العامل وتحديثها في الوقت الحقيقي
                             const trackingPanel = document.getElementById('trackingPanel');
                             trackingPanel.style.display = 'block';
                             startWorkerTracking(acceptedWorkerId, userLocation);
+                                // إضافة مراقبة وصول العامل إلى نطاق 500 متر
                             trackWorkerArrival(acceptedWorkerId, userLocation);
-                            console.log("📡 تم تفعيل تتبع العامل.");
+                             console.log("تم استدعاء trackWorkerArrival لمراقبة وصول العامل");
                         })
                         .catch((err) => {
-                            console.error("❌ خطأ في حساب ETA:", err);
+                            console.error("خطأ في حساب ETA:", err);
                         });
                 })
                 .catch((error) => {
-                    console.error("❌ خطأ في الحصول على موقع العامل:", error);
+                    console.error("خطأ في الحصول على موقع العامل:", error);
                 });
-
-        } else if (requestData.status === 'rejected') {
-            console.log("❌ الطلب مرفوض من العامل، تحديث واجهة المستخدم.");
-            try {
-                document.getElementById('directRequestResultTitle').innerText = "طلب مرفوض";
-                document.getElementById('directRequestResultMessage').innerText =
-                    `⚠️ تم رفض طلب ${requestData.workType ? requestData.workType : "غير محدد"}.`;
-                document.getElementById('directRequestResultPopup').style.display = 'block';
-                console.log("📌 تم عرض نافذة إشعار رفض الطلب للمستخدم.");
-            } catch (error) {
-                console.error("❌ خطأ أثناء عرض نافذة رفض الطلب:", error);
-            }
         } else if (requestData.status === 'completed') {
             alert('🎉 تم إكمال الطلب.');
         } else {
             console.log(`🔄 حالة الطلب الحالية: ${requestData.status}`);
         }
-        
-        updateDirectRequestTitle(requestData);
     });
 }
-
 
 // تعريف دالة رفع الصورة باستخدام Firebase Storage
 function uploadImage(file) {
@@ -484,22 +464,20 @@ function submitRequest() {
                         }
                         // إعداد بيانات الطلب مع تضمين معرف العامل المختار (إذا وُجد)
                         const requestData = {
-    workType: workType,
-    budget: budget,
-    time: time,
-    description: description,
-    phone: phone,
-    imageUrl: "",
-    location: {
-        lng: parseFloat(userLocation.lng),
-        lat: parseFloat(userLocation.lat)
-    },
-    region: regionName,
-    status: "pending",
-    workerId: window.selectedWorkerId || null,
-    directRequest: window.selectedWorkerId ? true : false
-};
-
+                            workType: workType,
+                            budget: budget,
+                            time: time,
+                            description: description,
+                            phone: phone,
+                            imageUrl: "",
+                            location: {
+                                lng: parseFloat(userLocation.lng),
+                                lat: parseFloat(userLocation.lat)
+                            },
+                            region: regionName, // إضافة اسم المنطقة هنا
+                            status: "pending",
+                            workerId: window.selectedWorkerId || null
+                        };
 
                         // إذا كان هناك ملف صورة، نقوم برفع الصورة أولاً
                         if (imageFile) {
@@ -1195,13 +1173,15 @@ function createOrUpdateWorkerMarker(workerId, location) {
 
 function openWorkerRequestPopup(workerId) {
     window.selectedWorkerId = workerId;
-    // تغيير عنوان النافذة لتوضيح أن الطلب مباشر
     const popupTitle = document.querySelector('#requestPopup h2');
-    if(popupTitle){
-        popupTitle.innerText = "طلب مباشر: إرسال تفاصيل الطلب للعامل";
+    if (popupTitle) {
+        popupTitle.innerHTML = "<span style='font-weight: bold;'>طلب مباشر: إرسال تفاصيل الطلب للعامل</span><br><span style='font-size: 14px; font-weight: normal;'>(إذا لم يظهر إشعار بأن العامل قبل الطلب خلال دقيقة، فهذا يعني أنه لم يوافق)</span>";
     }
     document.getElementById('requestPopup').style.display = 'block';
 }
+
+
+
 
 // إعادة تفعيل زر "طلب عامل" في حالة المستخدم يرغب بفتح النافذة يدوياً
 document.getElementById('requestWorker').addEventListener('click', () => {
