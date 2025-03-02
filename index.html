@@ -200,6 +200,12 @@
     <button id="submitRating">إرسال التقييم</button>
 </div>
 
+<!-- نافذة نتيجة الطلب المباشر -->
+<div id="directRequestResultPopup" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; border-radius:10px; padding:20px; z-index:10;">
+    <h2 id="directRequestResultTitle"></h2>
+    <p id="directRequestResultMessage"></p>
+    <button onclick="document.getElementById('directRequestResultPopup').style.display='none'">إغلاق</button>
+</div>
 
 
 
@@ -365,7 +371,10 @@ function monitorRequestStatus(requestId) {
                     console.error("خطأ في الحصول على موقع العامل:", error);
                 });
         } else if (requestData.status === 'rejected') {
-            alert("العامل غير قادر على قبول الطلب حالياً.");
+            // عرض نافذة النتيجة للطلب المباشر عند الرفض
+            document.getElementById('directRequestResultTitle').innerText = "طلب مباشر";
+            document.getElementById('directRequestResultMessage').innerText = `تم رفض طلب ${requestData.workType}.`;
+            document.getElementById('directRequestResultPopup').style.display = 'block';
         } else if (requestData.status === 'completed') {
             alert('🎉 تم إكمال الطلب.');
         } else {
@@ -466,20 +475,22 @@ function submitRequest() {
                         }
                         // إعداد بيانات الطلب مع تضمين معرف العامل المختار (إذا وُجد)
                         const requestData = {
-                            workType: workType,
-                            budget: budget,
-                            time: time,
-                            description: description,
-                            phone: phone,
-                            imageUrl: "",
-                            location: {
-                                lng: parseFloat(userLocation.lng),
-                                lat: parseFloat(userLocation.lat)
-                            },
-                            region: regionName, // إضافة اسم المنطقة هنا
-                            status: "pending",
-                            workerId: window.selectedWorkerId || null
-                        };
+    workType: workType,
+    budget: budget,
+    time: time,
+    description: description,
+    phone: phone,
+    imageUrl: "",
+    location: {
+        lng: parseFloat(userLocation.lng),
+        lat: parseFloat(userLocation.lat)
+    },
+    region: regionName,
+    status: "pending",
+    workerId: window.selectedWorkerId || null,
+    directRequest: window.selectedWorkerId ? true : false
+};
+
 
                         // إذا كان هناك ملف صورة، نقوم برفع الصورة أولاً
                         if (imageFile) {
