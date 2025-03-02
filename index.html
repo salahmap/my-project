@@ -333,55 +333,64 @@ function monitorRequestStatus(requestId) {
     const requestRef = database.ref(`workRequests/${requestId}`);
     requestRef.on('value', (snapshot) => {
         const requestData = snapshot.val();
-        console.log("تحديث بيانات الطلب: ", requestData);
+        console.log("📌 تحديث بيانات الطلب:", requestData);
+        
         if (!requestData) {
             console.warn(`⚠️ لا توجد بيانات محدثة للطلب ${requestId}`);
             return;
         }
+        
         if (requestData.status === 'accepted') {
             const acceptedWorkerId = requestData.acceptedBy;
-            // استرجاع موقع العامل من قاعدة البيانات
             database.ref(`workers/${acceptedWorkerId}/location`).once('value')
                 .then((workerSnap) => {
                     const workerLocation = workerSnap.val();
                     if (!workerLocation) {
-                        console.error("لا يوجد موقع للعامل:", acceptedWorkerId);
+                        console.error("❌ لا يوجد موقع للعامل:", acceptedWorkerId);
                         return;
                     }
                     const userLocation = requestData.location;
                     const distance = calculateDistance(userLocation, workerLocation);
-                    // حساب الوقت المقدر باستخدام دالة جديدة ترجع وعداً (Promise)
                     calculateETAWithPromise(workerLocation, userLocation)
                         .then((etaMinutes) => {
                             alert(`✅ تم قبول طلبك من قبل العامل: ${acceptedWorkerId}\nو تم اعطائه مهلة 3 ساعات للوصول\nالمسافة: ${distance.toFixed(2)} كم\nالوقت المقدر للوصول: ${etaMinutes} دقيقة`);
                             console.log(`✅ تم قبول الطلب ${requestId} من العامل ${acceptedWorkerId}، المسافة: ${distance.toFixed(2)} كم، ETA: ${etaMinutes} دقيقة`);
-                            // تفعيل نافذة تتبع العامل وتحديثها في الوقت الحقيقي
+                            
                             const trackingPanel = document.getElementById('trackingPanel');
                             trackingPanel.style.display = 'block';
                             startWorkerTracking(acceptedWorkerId, userLocation);
-                            // إضافة مراقبة وصول العامل إلى نطاق 500 متر
                             trackWorkerArrival(acceptedWorkerId, userLocation);
-                            console.log("تم استدعاء trackWorkerArrival لمراقبة وصول العامل");
+                            console.log("📡 تم تفعيل تتبع العامل.");
                         })
                         .catch((err) => {
-                            console.error("خطأ في حساب ETA:", err);
+                            console.error("❌ خطأ في حساب ETA:", err);
                         });
                 })
                 .catch((error) => {
-                    console.error("خطأ في الحصول على موقع العامل:", error);
+                    console.error("❌ خطأ في الحصول على موقع العامل:", error);
                 });
+
         } else if (requestData.status === 'rejected') {
-            // عرض نافذة النتيجة للطلب المباشر عند الرفض
-            document.getElementById('directRequestResultTitle').innerText = "طلب مباشر";
-            document.getElementById('directRequestResultMessage').innerText = `تم رفض طلب ${requestData.workType}.`;
-            document.getElementById('directRequestResultPopup').style.display = 'block';
+            console.log("❌ الطلب مرفوض من العامل، تحديث واجهة المستخدم.");
+            try {
+                document.getElementById('directRequestResultTitle').innerText = "طلب مرفوض";
+                document.getElementById('directRequestResultMessage').innerText =
+                    `⚠️ تم رفض طلب ${requestData.workType ? requestData.workType : "غير محدد"}.`;
+                document.getElementById('directRequestResultPopup').style.display = 'block';
+                console.log("📌 تم عرض نافذة إشعار رفض الطلب للمستخدم.");
+            } catch (error) {
+                console.error("❌ خطأ أثناء عرض نافذة رفض الطلب:", error);
+            }
         } else if (requestData.status === 'completed') {
             alert('🎉 تم إكمال الطلب.');
         } else {
             console.log(`🔄 حالة الطلب الحالية: ${requestData.status}`);
         }
+        
+        updateDirectRequestTitle(requestData);
     });
 }
+
 
 // تعريف دالة رفع الصورة باستخدام Firebase Storage
 function uploadImage(file) {
