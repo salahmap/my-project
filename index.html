@@ -457,37 +457,26 @@ function uploadImage(file) {
     });
 }
 
-// دالة إرسال الطلب وتخزين معرف الطلب في currentRequestId
-// تعريف دالة رفع الصورة باستخدام Firebase Storage
-function uploadImage(file) {
-    return new Promise((resolve, reject) => {
-        if (!file) {
-            return reject("No file provided");
+// دالة التحقق من عدد الطلبات المعلقة للمستخدم
+function canSubmitNewRequest(userId) {
+  return firebase.database().ref('workRequests').orderByChild('userId').equalTo(userId)
+    .once('value')
+    .then(snapshot => {
+      let pendingCount = 0;
+      snapshot.forEach(child => {
+        if (child.val().status === 'pending') {
+          pendingCount++;
         }
-        // إنشاء مرجع إلى Firebase Storage
-        const storageRef = firebase.storage().ref();
-        // إنشاء مسار فريد للملف
-        const fileRef = storageRef.child('images/' + Date.now() + '_' + file.name);
-        // بدء رفع الملف
-        const uploadTask = fileRef.put(file);
-        uploadTask.on('state_changed',
-            (snapshot) => {
-                // يمكنك متابعة تقدم الرفع هنا إذا رغبت
-            },
-            (error) => {
-                reject(error);
-            },
-            () => {
-                // عند اكتمال الرفع، استرجاع رابط التنزيل
-                uploadTask.snapshot.ref.getDownloadURL()
-                    .then((downloadURL) => {
-                        resolve(downloadURL);
-                    })
-                    .catch(reject);
-            }
-        );
+      });
+      console.log("عدد الطلبات المعلقة للمستخدم:", pendingCount);
+      return pendingCount < 3;
+    })
+    .catch(error => {
+      console.error("خطأ أثناء استعلام الطلبات:", error);
+      return false;
     });
 }
+
 
 // دالة إرسال الطلب مع الحقول الجديدة (الوصف، رقم الهاتف، صورة العمل)
 function submitRequest() {
@@ -518,20 +507,22 @@ function submitRequest() {
                         }
                         // إعداد بيانات الطلب مع تضمين معرف العامل المختار (إذا وُجد)
                         const requestData = {
-                            workType: workType,
-                            budget: budget,
-                            time: time,
-                            description: description,
-                            phone: phone,
-                            imageUrl: "",
-                            location: {
-                                lng: parseFloat(userLocation.lng),
-                                lat: parseFloat(userLocation.lat)
-                            },
-                            region: regionName, // إضافة اسم المنطقة هنا
-                            status: "pending",
-                            workerId: window.selectedWorkerId || null
-                        };
+    workType: workType,
+    budget: budget,
+    time: time,
+    description: description,
+    phone: phone,
+    imageUrl: "",
+    location: {
+        lng: parseFloat(userLocation.lng),
+        lat: parseFloat(userLocation.lat)
+    },
+    region: regionName,
+    status: "pending",
+    workerId: window.selectedWorkerId || null,
+    userId: currentUserId // إضافة معرف المستخدم هنا
+};
+
 
                         // إذا كان هناك ملف صورة، نقوم برفع الصورة أولاً
                         if (imageFile) {
@@ -561,6 +552,8 @@ function submitRequest() {
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
 }
+
+
 
 function pushRequestData(requestData, userLocation) {
     requestsRef.push(requestData)
@@ -699,18 +692,82 @@ function updateRequest() {
         description: document.getElementById('reviewDescription').value,
         phone: document.getElementById('reviewPhone').value,
     };
-    console.log("تحديث بيانات الطلب:", updatedData);
-    database.ref(`workRequests/${currentRequestId}`).update(updatedData)
-    .then(() => {
-        console.log("تم تحديث الطلب بنجاح.");
-        alert("تم تحديث الطلب بنجاح.");
-        document.getElementById('reviewPopup').style.display = 'none';
+    console.log("المعلومات الجديدة التي سيتم تحديثها:", updatedData);
+    
+    // قراءة البيانات القديمة للطلب قبل التحديث (للمراقبة)
+    database.ref(`workRequests/${currentRequestId}`).once('value')
+    .then(snapshot => {
+        console.log("البيانات القديمة للطلب:", snapshot.val());
+        
+        // تحديث بيانات الطلب بعد التأكد
+        database.ref(`workRequests/${currentRequestId}`).update(updatedData)
+        .then(() => {
+            console.log("تم تحديث الطلب بنجاح.");
+            alert("تم تحديث الطلب بنجاح.");
+            document.getElementById('reviewPopup').style.display = 'none';
+        })
+        .catch(error => {
+            console.error("خطأ في تحديث الطلب:", error);
+            alert("حدث خطأ أثناء تحديث الطلب.");
+        });
     })
     .catch(error => {
-        console.error("خطأ في تحديث الطلب:", error);
-        alert("حدث خطأ أثناء تحديث الطلب.");
+        console.error("خطأ في جلب البيانات القديمة للطلب:", error);
     });
 }
+
+function openReviewPopupForUser(userId) {
+  firebase.database().ref('workRequests').orderByChild('userId').equalTo(userId)
+    .once('value')
+    .then(snapshot => {
+      let pendingRequests = [];
+      snapshot.forEach(child => {
+        let data = child.val();
+        if (data.status === 'pending') {
+          pendingRequests.push({ id: child.key, ...data });
+        }
+      });
+      console.log("الطلبات المعلقة للمستخدم:", pendingRequests);
+      if (pendingRequests.length === 0) {
+        alert("لا توجد طلبات معلقة للتعديل.");
+        return;
+      }
+      let reviewContent = "اختر الطلب الذي تريد تعديله أو حذفه:\n";
+      pendingRequests.forEach((req, index) => {
+        reviewContent += `${index + 1}. ${req.workType} - الميزانية: ${req.budget}\n`;
+      });
+      let choice = prompt(reviewContent + "\nأدخل رقم الطلب للتعديل:");
+      if (choice) {
+        let selectedRequest = pendingRequests[choice - 1];
+        if (selectedRequest) {
+          console.log("الطلب المختار للتعديل:", selectedRequest);
+          openEditRequestWindow(selectedRequest); // تأكد من وجود دالة openEditRequestWindow لمعالجة التعديل
+        } else {
+          alert("الاختيار غير صحيح.");
+          console.error("الاختيار غير صحيح في مراجعة الطلبات.");
+        }
+      }
+    })
+    .catch(error => {
+      console.error("خطأ أثناء استعلام الطلبات:", error);
+    });
+}
+
+function openEditRequestWindow(request) {
+    // تعيين معرف الطلب الحالي لتحديثه لاحقاً
+    currentRequestId = request.id;
+    console.log("فتح نافذة تعديل الطلب للطلب:", request);
+    // تعبئة الحقول في نافذة المراجعة بالبيانات القادمة من الطلب
+    document.getElementById('reviewWorkType').value = request.workType || "";
+    document.getElementById('reviewBudget').value = request.budget || "";
+    document.getElementById('reviewTime').value = request.time || "";
+    document.getElementById('reviewDescription').value = request.description || "";
+    document.getElementById('reviewPhone').value = request.phone || "";
+    // إظهار نافذة المراجعة
+    document.getElementById('reviewPopup').style.display = 'block';
+}
+
+
 
 // وظيفة لحذف الطلب من قاعدة البيانات والخريطة
 function deleteRequest() {
@@ -750,7 +807,13 @@ function removeRequestMarker(requestId) {
 }
 
 // إضافة المستمعين للأحداث للعناصر الجديدة
-document.getElementById('reviewRequestButton').addEventListener('click', openReviewPopup);
+// تعريف المتغير currentUserId في مكان عام قبل استخدامه
+var currentUserId = "user_123"; // يجب أن يكون هذا المعرّف هو معرّف المستخدم الحالي
+
+document.getElementById('reviewRequestButton').addEventListener('click', function() {
+  openReviewPopupForUser(currentUserId);
+});
+
 document.getElementById('updateRequestButton').addEventListener('click', updateRequest);
 document.getElementById('deleteRequestButton').addEventListener('click', deleteRequest);
 document.getElementById('closeReviewPopup').addEventListener('click', () => {
