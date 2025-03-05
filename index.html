@@ -117,10 +117,18 @@
             <option value="dark">الوضع الليلي</option>
             <option value="light">الوضع الفاتح</option> <!-- الخيار الجديد -->
         </select>
-        
-        <button id="requestWater" class="controlButton">طلب ماء</button>
         <button id="requestWorker" class="controlButton">طلب عامل</button>
-        <div id="weatherInfo"></div>
+
+        <button id="requestWater" class="controlButton">طلب ماء</button>
+
+        <!-- NEW CODE: زر مراجعة/تعديل الطلب -->
+<button id="reviewRequestButton" class="controlButton" style="display:none;">عرض التفاصيل/تعديل الطلب</button>
+
+<!-- إضافة زر الإلغاء في واجهة المستخدم -->
+<div id="cancelRequestContainer" style="display:none; position: fixed; bottom: 20px; right: 20px; z-index: 1000;">
+    <button id="cancelRequestButton" class="controlButton" style="background-color: #d9534f;">إلغاء الطلب</button>
+  </div>
+          <div id="weatherInfo"></div>
         <div id="workerInfo"></div>
         <div id="mosqueInfo"></div>
     </div>
@@ -200,6 +208,29 @@
     <button id="submitRating">إرسال التقييم</button>
 </div>
 
+<!-- NEW CODE: نافذة مراجعة وتعديل الطلب -->
+<div id="reviewPopup" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; border-radius:10px; padding:20px; z-index:3;">
+    <h2>تفاصيل الطلب</h2>
+    <label for="reviewWorkType">نوع العمل:</label>
+    <select id="reviewWorkType">
+        <option value="سباكة">سباكة</option>
+        <option value="كهرباء">كهرباء</option>
+        <option value="نقل">نقل</option>
+        <option value="أخرى">أخرى</option>
+    </select>
+    <label for="reviewBudget">الميزانية:</label>
+    <input type="text" id="reviewBudget" placeholder="أدخل الميزانية">
+    <label for="reviewTime">الوقت المطلوب:</label>
+    <input type="text" id="reviewTime" placeholder="أدخل الوقت المطلوب">
+    <label for="reviewDescription">وصف العمل:</label>
+    <textarea id="reviewDescription" placeholder="أدخل وصف العمل"></textarea>
+    <label for="reviewPhone">رقم الهاتف:</label>
+    <input type="text" id="reviewPhone" placeholder="أدخل رقم الهاتف">
+    <br><br>
+    <button id="updateRequestButton">تحديث الطلب</button>
+    <button id="deleteRequestButton">حذف الطلب</button>
+    <button id="closeReviewPopup">إغلاق</button>
+</div>
 
 
 
@@ -264,12 +295,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     beamsClient.start()
         .then(() => {
-            // تسجيل الجهاز في قناة debug-new-orders
             return beamsClient.addDeviceInterest('debug-new-orders');
         })
         .then(() => {
             console.log('Pusher Beams جاهز لاستقبال إشعارات الطلبات الجديدة');
-            // تسجيل الجهاز في قناة إضافية debug-new-orderss
             return beamsClient.addDeviceInterest('debug-new-orders');
         })
         .then(() => {
@@ -280,7 +309,28 @@ document.addEventListener("DOMContentLoaded", () => {
     beamsClient.onNotificationOpened = (payload) => {
         alert(`إشعار جديد من Pusher Beams: ${payload.notification.body}`);
     };
+
+    // إضافة مستمع لزر إلغاء الطلب بعد التأكد من وجوده في الصفحة
+    const cancelRequestBtn = document.getElementById('cancelRequestButton');
+    if (cancelRequestBtn) {
+        cancelRequestBtn.addEventListener('click', function() {
+            showCancelConfirmation(function() {
+                // تحديث حالة الطلب في Firebase عند إلغاء الطلب من قبل المستخدم
+                const requestRef = firebase.database().ref(`workRequests/${currentRequestId}`);
+                requestRef.update({ status: 'canceled_by_user' })
+                    .then(() => {
+                        alert('تم إلغاء الطلب.');
+                        // إرسال إشعار للعامل باستخدام الدالة المناسبة
+                        sendPusherNotification(workerId, 'تم إلغاء الطلب من قبل المستخدم.');
+                        // إخفاء زر الإلغاء بعد التنفيذ
+                        document.getElementById('cancelRequestContainer').style.display = 'none';
+                    })
+                    .catch((err) => console.error("خطأ في تحديث حالة الطلب:", err));
+            });
+        });
+    }
 });
+
 
 
 // تعريف الكائنات بعد التهيئة
@@ -519,6 +569,8 @@ function pushRequestData(requestData, userLocation) {
             console.log("تم إنشاء معرف الطلب:", currentRequestId);
             alert('تم إرسال الطلب بنجاح.');
             document.getElementById('requestPopup').style.display = 'none';
+            // NEW CODE: تفعيل زر مراجعة الطلب بعد إرسال الطلب
+document.getElementById('reviewRequestButton').style.display = 'block';
             monitorRequestStatus(currentRequestId);
             sendNotificationsToNearbyWorkers(requestData, userLocation);
         })
@@ -597,6 +649,113 @@ function startWorkerTracking(workerId, userLocation) {
             });
     });
 }
+
+
+// NEW CODE: دوال مراجعة وتعديل الطلب
+
+// وظيفة لفتح نافذة مراجعة الطلب وتحميل بيانات الطلب الحالي
+function openReviewPopup() {
+    if (!currentRequestId) {
+        console.error("لم يتم تحديد معرف الطلب للمراجعة.");
+        alert("لا يوجد طلب لتعديله.");
+        return;
+    }
+    console.log("فتح نافذة مراجعة وتعديل الطلب للطلب:", currentRequestId);
+    // قراءة بيانات الطلب من قاعدة البيانات
+    database.ref(`workRequests/${currentRequestId}`).once('value')
+    .then(snapshot => {
+        const requestData = snapshot.val();
+        if (!requestData) {
+            console.error("بيانات الطلب غير موجودة للمعرف:", currentRequestId);
+            alert("لا يمكن إيجاد بيانات الطلب.");
+            return;
+        }
+        // ملء الحقول بالبيانات الحالية
+        document.getElementById('reviewWorkType').value = requestData.workType || "";
+        document.getElementById('reviewBudget').value = requestData.budget || "";
+        document.getElementById('reviewTime').value = requestData.time || "";
+        document.getElementById('reviewDescription').value = requestData.description || "";
+        document.getElementById('reviewPhone').value = requestData.phone || "";
+        document.getElementById('reviewPopup').style.display = 'block';
+        console.log("تم تحميل بيانات الطلب في نافذة المراجعة.");
+    })
+    .catch(error => {
+        console.error("خطأ في جلب بيانات الطلب:", error);
+        alert("حدث خطأ أثناء جلب بيانات الطلب.");
+    });
+}
+
+// وظيفة لتحديث بيانات الطلب في قاعدة البيانات
+function updateRequest() {
+    if (!currentRequestId) {
+        console.error("لا يوجد معرف طلب للتحديث.");
+        alert("لا يوجد طلب لتحديثه.");
+        return;
+    }
+    const updatedData = {
+        workType: document.getElementById('reviewWorkType').value,
+        budget: document.getElementById('reviewBudget').value,
+        time: document.getElementById('reviewTime').value,
+        description: document.getElementById('reviewDescription').value,
+        phone: document.getElementById('reviewPhone').value,
+    };
+    console.log("تحديث بيانات الطلب:", updatedData);
+    database.ref(`workRequests/${currentRequestId}`).update(updatedData)
+    .then(() => {
+        console.log("تم تحديث الطلب بنجاح.");
+        alert("تم تحديث الطلب بنجاح.");
+        document.getElementById('reviewPopup').style.display = 'none';
+    })
+    .catch(error => {
+        console.error("خطأ في تحديث الطلب:", error);
+        alert("حدث خطأ أثناء تحديث الطلب.");
+    });
+}
+
+// وظيفة لحذف الطلب من قاعدة البيانات والخريطة
+function deleteRequest() {
+    if (!currentRequestId) {
+        console.error("لا يوجد معرف طلب للحذف.");
+        alert("لا يوجد طلب لحذفه.");
+        return;
+    }
+    if (!confirm("هل أنت متأكد من حذف الطلب؟")) {
+        return;
+    }
+    console.log("حذف الطلب بالمعرف:", currentRequestId);
+    database.ref(`workRequests/${currentRequestId}`).remove()
+    .then(() => {
+        console.log("تم حذف الطلب بنجاح.");
+        alert("تم حذف الطلب بنجاح.");
+        // إزالة الطلب من الخريطة (إذا كان هناك ماركر مرتبط بالطلب)
+        removeRequestMarker(currentRequestId);
+        // إخفاء زر المراجعة لأن الطلب تم حذفه
+        document.getElementById('reviewRequestButton').style.display = 'none';
+    })
+    .catch(error => {
+        console.error("خطأ في حذف الطلب:", error);
+        alert("حدث خطأ أثناء حذف الطلب.");
+    });
+}
+
+// دالة مساعدة لإزالة ماركر الطلب من الخريطة (إذا كنت تستخدم واحداً)
+function removeRequestMarker(requestId) {
+    if(window.requestMarker) {
+        window.requestMarker.remove();
+        window.requestMarker = null;
+        console.log("تم إزالة ماركر الطلب من الخريطة.");
+    } else {
+        console.warn("لم يتم العثور على ماركر الطلب لإزالته.");
+    }
+}
+
+// إضافة المستمعين للأحداث للعناصر الجديدة
+document.getElementById('reviewRequestButton').addEventListener('click', openReviewPopup);
+document.getElementById('updateRequestButton').addEventListener('click', updateRequest);
+document.getElementById('deleteRequestButton').addEventListener('click', deleteRequest);
+document.getElementById('closeReviewPopup').addEventListener('click', () => {
+    document.getElementById('reviewPopup').style.display = 'none';
+});
 
 
 function sendPusherNotification(workerId, message) {
@@ -980,6 +1139,27 @@ const styles = {
 });
 
 
+
+document.addEventListener("DOMContentLoaded", () => {
+  const cancelRequestBtn = document.getElementById('cancelRequestButton');
+  if (cancelRequestBtn) {
+    cancelRequestBtn.addEventListener('click', function() {
+      showCancelConfirmation(function() {
+        const requestRef = firebase.database().ref(`workRequests/${currentRequestId}`);
+        requestRef.update({ status: 'canceled_by_user' })
+          .then(() => {
+            alert('تم إلغاء الطلب.');
+            // استخدام المتغير الصحيح الذي يحمل معرّف العامل (مثلاً window.selectedWorkerId)
+            sendPusherNotification(window.selectedWorkerId, 'تم إلغاء الطلب من قبل المستخدم.');
+            document.getElementById('cancelRequestContainer').style.display = 'none';
+          })
+          .catch((err) => console.error("خطأ في تحديث حالة الطلب:", err));
+      });
+    });
+  }
+});
+
+
 // دالة تنتظر تحميل نمط الخريطة قبل المتابعة
 function waitUntilMapReady() {
     return new Promise((resolve, reject) => {
@@ -1188,17 +1368,19 @@ function openWorkerRequestPopup(workerId) {
 
 
 // إعادة تفعيل زر "طلب عامل" في حالة المستخدم يرغب بفتح النافذة يدوياً
-document.getElementById('requestWorker').addEventListener('click', () => {
-    // إذا لم يكن هناك عامل محدد مسبقًا، يمكن فتح النافذة لإدخال التفاصيل العامة
-    document.getElementById('requestPopup').style.display = 'block';
+document.addEventListener('DOMContentLoaded', () => {
+    const requestWorkerBtn = document.getElementById('requestWorker');
+    if (requestWorkerBtn) {
+        requestWorkerBtn.addEventListener('click', () => {
+            document.getElementById('requestPopup').style.display = 'block';
+        });
+    } else {
+        console.error("عنصر 'requestWorker' غير موجود في الصفحة.");
+    }
 });
 
 
-// --- باقي الكود الأصلي الذي يحتفظ بوظائف النوافذ الأخرى ---
-/* لم يعد نعتمد على زر "requestWorker" لفتح النموذج بشكل مباشر */
-// document.getElementById('requestWorker').addEventListener('click', () => {
-//     document.getElementById('requestPopup').style.display = 'block';
-// });
+
 
 document.getElementById('cancelRequest').addEventListener('click', () => {
     document.getElementById('requestPopup').style.display = 'none';
@@ -1280,6 +1462,15 @@ window.addEventListener('click', (event) => {
         weatherInfo.style.display = 'none';
     }
 });
+
+
+function showCancelConfirmation(callback) {
+  // إنشاء نافذة تأكيد بسيطة
+  const confirmation = confirm("هل أنت متأكد من رغبتك في إلغاء الطلب؟");
+  if (confirmation) {
+    callback(); // استدعاء الإجراء في حال الموافقة
+  }
+}
 
 
         // عرض معلومات عن العمال
