@@ -122,7 +122,7 @@
         <button id="requestWater" class="controlButton">طلب ماء</button>
 
         <!-- NEW CODE: زر مراجعة/تعديل الطلب -->
-<button id="reviewRequestButton" class="controlButton" style="display:none;">عرض التفاصيل/تعديل الطلب</button>
+        <button id="reviewRequestButton" class="controlButton">عرض التفاصيل/تعديل الطلب</button>
 
 <!-- إضافة زر الإلغاء في واجهة المستخدم -->
 <div id="cancelRequestContainer" style="display:none; position: fixed; bottom: 20px; right: 20px; z-index: 1000;">
@@ -480,33 +480,43 @@ function canSubmitNewRequest(userId) {
 
 // دالة إرسال الطلب مع الحقول الجديدة (الوصف، رقم الهاتف، صورة العمل)
 function submitRequest() {
-    navigator.geolocation.getCurrentPosition(
-        (position) => {
-            const userLocation = {
-                lat: position.coords.latitude,
-                lng: position.coords.longitude
-            };
-            console.log("تم الحصول على موقع المستخدم:", userLocation);
+    canSubmitNewRequest(currentUserId)
+        .then((canSubmit) => {
+            if (!canSubmit) {
+                console.error("عدد الطلبات المعلقة تجاوز الحد المسموح به للمستخدم:", currentUserId);
+                alert("لقد قدمت 3 طلبات معلقة، عليك حذف الطلبات السابقة إذا أردت تقديم طلب جديد.");
+                return;
+            }
+            console.log("المستخدم يمكنه تقديم طلب جديد:", currentUserId);
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const userLocation = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    };
+                    console.log("تم الحصول على موقع المستخدم:", userLocation);
 
-            const workType = document.getElementById('workTypeInput').value;
-            const budget = document.getElementById('budgetInput').value;
-            const time = document.getElementById('timeInput').value;
-            const description = document.getElementById('descriptionInput').value;
-            const phone = document.getElementById('phoneInputRequest') ? document.getElementById('phoneInputRequest').value : "";
-            const imageFile = document.getElementById('imageInput').files[0];
+                    const workType = document.getElementById('workTypeInput').value;
+                    const budget = document.getElementById('budgetInput').value;
+                    const time = document.getElementById('timeInput').value;
+                    const description = document.getElementById('descriptionInput').value;
+                    const phone = document.getElementById('phoneInputRequest') 
+                                  ? document.getElementById('phoneInputRequest').value 
+                                  : "";
+                    const imageFile = document.getElementById('imageInput').files[0];
 
-            if (workType && budget && time && userLocation.lng && userLocation.lat) {
-                // استدعاء خدمة عكس التكويد للحصول على اسم المنطقة
-                const reverseGeocodeUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${userLocation.lng},${userLocation.lat}.json?access_token=${mapboxgl.accessToken}&types=region&language=ar`;
-                fetch(reverseGeocodeUrl)
-                    .then(response => response.json())
-                    .then(geoData => {
-                        let regionName = "";
-                        if (geoData.features && geoData.features.length > 0) {
-                            regionName = geoData.features[0].place_name;
-                        }
-                        // إعداد بيانات الطلب مع تضمين معرف العامل المختار (إذا وُجد)
-                        const requestData = {
+                    if (workType && budget && time && userLocation.lng && userLocation.lat) {
+                        // استدعاء خدمة عكس التكويد للحصول على اسم المنطقة
+                        const reverseGeocodeUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${userLocation.lng},${userLocation.lat}.json?access_token=${mapboxgl.accessToken}&types=region&language=ar`;
+                        fetch(reverseGeocodeUrl)
+                            .then(response => response.json())
+                            .then(geoData => {
+                                let regionName = "";
+                                if (geoData.features && geoData.features.length > 0) {
+                                    regionName = geoData.features[0].place_name;
+                                }
+                                // إعداد بيانات الطلب مع تضمين معرف العامل المختار (إذا وُجد)
+                                const requestData = {
     workType: workType,
     budget: budget,
     time: time,
@@ -514,44 +524,54 @@ function submitRequest() {
     phone: phone,
     imageUrl: "",
     location: {
-        lng: parseFloat(userLocation.lng),
-        lat: parseFloat(userLocation.lat)
+         lng: parseFloat(userLocation.lng),
+         lat: parseFloat(userLocation.lat)
     },
     region: regionName,
     status: "pending",
     workerId: window.selectedWorkerId || null,
-    userId: currentUserId // إضافة معرف المستخدم هنا
+    userId: currentUserId,
+    submittedAt: new Date().toLocaleString()
 };
 
 
-                        // إذا كان هناك ملف صورة، نقوم برفع الصورة أولاً
-                        if (imageFile) {
-                            uploadImage(imageFile).then((imageUrl) => {
-                                requestData.imageUrl = imageUrl;
-                                pushRequestData(requestData, userLocation);
-                            }).catch((error) => {
-                                console.error('خطأ في رفع الصورة:', error);
-                                alert('حدث خطأ أثناء رفع الصورة.');
+                                // إذا كان هناك ملف صورة، نقوم برفع الصورة أولاً
+                                if (imageFile) {
+                                    uploadImage(imageFile)
+                                        .then((imageUrl) => {
+                                            requestData.imageUrl = imageUrl;
+                                            pushRequestData(requestData, userLocation);
+                                        })
+                                        .catch((error) => {
+                                            console.error('خطأ في رفع الصورة:', error);
+                                            alert('حدث خطأ أثناء رفع الصورة.');
+                                        });
+                                } else {
+                                    pushRequestData(requestData, userLocation);
+                                }
+                            })
+                            .catch(err => {
+                                console.error("خطأ في استرجاع اسم المنطقة:", err);
+                                alert("حدث خطأ أثناء تحديد المنطقة.");
                             });
-                        } else {
-                            pushRequestData(requestData, userLocation);
-                        }
-                    })
-                    .catch(err => {
-                        console.error("خطأ في استرجاع اسم المنطقة:", err);
-                        alert("حدث خطأ أثناء تحديد المنطقة.");
-                    });
-            } else {
-                alert('يرجى ملء جميع الحقول وتحديد موقع صحيح.');
-            }
-        },
-        (error) => {
-            console.error("فشل الحصول على موقع المستخدم:", error);
-            alert("تعذر الحصول على موقعك الحالي. يرجى المحاولة مرة أخرى.");
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
+                    } else {
+                        alert('يرجى ملء جميع الحقول وتحديد موقع صحيح.');
+                    }
+                },
+                (error) => {
+                    console.error("فشل الحصول على موقع المستخدم:", error);
+                    alert("تعذر الحصول على موقعك الحالي. يرجى المحاولة مرة أخرى.");
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
+        })
+        .catch((error) => {
+            console.error("خطأ أثناء التحقق من عدد الطلبات المعلقة:", error);
+            alert("حدث خطأ أثناء التحقق، يرجى المحاولة لاحقاً.");
+        });
 }
+
+
 
 
 
@@ -734,8 +754,9 @@ function openReviewPopupForUser(userId) {
       }
       let reviewContent = "اختر الطلب الذي تريد تعديله أو حذفه:\n";
       pendingRequests.forEach((req, index) => {
-        reviewContent += `${index + 1}. ${req.workType} - الميزانية: ${req.budget}\n`;
-      });
+    reviewContent += `${index + 1}. ${req.workType} - الميزانية: ${req.budget} - التاريخ: ${req.submittedAt}\n`;
+});
+
       let choice = prompt(reviewContent + "\nأدخل رقم الطلب للتعديل:");
       if (choice) {
         let selectedRequest = pendingRequests[choice - 1];
@@ -786,14 +807,15 @@ function deleteRequest() {
         alert("تم حذف الطلب بنجاح.");
         // إزالة الطلب من الخريطة (إذا كان هناك ماركر مرتبط بالطلب)
         removeRequestMarker(currentRequestId);
-        // إخفاء زر المراجعة لأن الطلب تم حذفه
-        document.getElementById('reviewRequestButton').style.display = 'none';
+        // عدم إخفاء زر مراجعة الطلب حتى يبقى ظاهرًا
+        // document.getElementById('reviewRequestButton').style.display = 'none';
     })
     .catch(error => {
         console.error("خطأ في حذف الطلب:", error);
         alert("حدث خطأ أثناء حذف الطلب.");
     });
 }
+
 
 // دالة مساعدة لإزالة ماركر الطلب من الخريطة (إذا كنت تستخدم واحداً)
 function removeRequestMarker(requestId) {
