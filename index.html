@@ -17,17 +17,31 @@
 
 
             /* تصميم الإشعار */
-    .notification {
-        position: fixed;
-        bottom: 10px;
-        right: 10px;
-        background-color: rgba(30, 144, 255, 0.9);
-        color: white;
-        padding: 10px 20px;
-        border-radius: 5px;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
-        z-index: 1000;
-    }
+/* تصميم الإشعار */
+.notification {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%); /* يحرك العنصر ليكون في المنتصف تمامًا */
+    background-color: #FFC107; /* لون الخلفية */
+    color: #000;
+    padding: 15px 30px;
+    font-size: 18px;
+    border-radius: 10px;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+    z-index: 10000;
+    text-align: center;
+}
+
+.notification button {
+    margin: 10px 5px 0 5px;
+    padding: 5px 10px;
+    font-size: 16px;
+    cursor: pointer;
+    border: none;
+    border-radius: 5px;
+}
+
 
 
         #map { height: 100vh; width: 100%; }
@@ -413,7 +427,7 @@ function monitorRequestStatus(requestId) {
 
                             // تفعيل نافذة تتبع العامل وتحديثها في الوقت الحقيقي
                             document.getElementById('trackingPanel').style.display = 'block';
-                            startWorkerTracking(acceptedWorkerId, userLocation);
+                            startWorkerTracking(acceptedWorkerId, userLocation, workerName);
                             trackWorkerArrival(acceptedWorkerId, userLocation);
                             console.log("📡 تم استدعاء trackWorkerArrival لمراقبة وصول العامل");
                         });
@@ -578,7 +592,7 @@ function submitRequest() {
     status: "pending",
     workerId: window.selectedWorkerId || null,
     userId: currentUserId,
-    submittedAt: new Date().toLocaleString()
+    submittedAt: Date.now()
 };
 
 
@@ -687,7 +701,7 @@ function calculateETAWithPromise(workerLocation, userLocation) {
     });
 }
 
-function startWorkerTracking(workerId, userLocation) {
+function startWorkerTracking(workerId, userLocation, workerName) {
     const trackingPanel = document.getElementById('trackingPanel');
     const trackingInfo = document.getElementById('trackingInfo');
     const workerRef = database.ref(`workers/${workerId}/location`);
@@ -700,8 +714,7 @@ function startWorkerTracking(workerId, userLocation) {
         const distance = calculateDistance(userLocation, workerLocation);
         calculateETAWithPromise(workerLocation, userLocation)
             .then((etaMinutes) => {
-                trackingInfo.innerText = `العامل: ${workerId}\nالمسافة: ${distance.toFixed(2)} كم\nETA: ${etaMinutes} دقيقة`;
-                // تحديث المسار على الخريطة للمستخدم (إذا رغبت)
+                trackingInfo.innerText = `العامل: ${workerName}\nالمسافة: ${distance.toFixed(2)} كم\nالوقت المقدر للوصول: ${etaMinutes} دقيقة`;
                 showRouteToUser(workerLocation, userLocation);
             })
             .catch((err) => {
@@ -709,6 +722,7 @@ function startWorkerTracking(workerId, userLocation) {
             });
     });
 }
+
 
 
 // NEW CODE: دوال مراجعة وتعديل الطلب
@@ -814,8 +828,8 @@ function openReviewPopupForUser(userId) {
       }
       let reviewContent = "اختر الطلب الذي تريد تعديله أو حذفه:\n";
       pendingRequests.forEach((req, index) => {
-    reviewContent += `${index + 1}. ${req.workType} - الميزانية: ${req.budget} - التاريخ: ${req.submittedAt}\n`;
-});
+        reviewContent += `${index + 1}. ${req.workType} - الميزانية: ${req.budget} - التاريخ: ${new Date(req.submittedAt).toLocaleString()}\n`;
+    });
 
       let choice = prompt(reviewContent + "\nأدخل رقم الطلب للتعديل:");
       if (choice) {
@@ -922,12 +936,17 @@ function sendPusherNotification(workerId, message) {
 }
 
 
-function monitorWorkerArrival(workerLocation, userLocation, radius = 500) { // نصف قطر 500 متر
-    const distance = calculateDistance(workerLocation, userLocation);
-    if (distance <= radius) {
-        displayNotification('العامل قريب من موقعك!');
+function monitorWorkerArrival(workerLocation, userLocation, radius = 500) {
+    const distanceInKm = calculateDistance(userLocation, workerLocation);
+    console.log("المسافة المحسوبة (بالكم):", distanceInKm);
+    
+    if (distanceInKm * 1000 <= radius) {
+        displayNotification('العامل قريب من موقعك!', "123456789");
+    } else {
+        console.log("المسافة أكبر من 500 متر.");
     }
 }
+
 
 
 function calculateETA(workerLocation, jobLocation) {
@@ -1025,27 +1044,40 @@ function cleanOldRequests() {
             const updates = {};
             snapshot.forEach((childSnapshot) => {
                 const request = childSnapshot.val();
+                const key = childSnapshot.key;
 
+                // حذف الطلب إذا كانت بيانات الموقع غير صالحة
                 if (!request || !request.location || typeof request.location.lat !== 'number' || typeof request.location.lng !== 'number') {
-                    console.warn(`حذف الطلب بدون موقع أو بيانات غير صالحة: ${childSnapshot.key}`, request);
-                    updates[childSnapshot.key] = null; // حذف الطلب
+                    console.warn(`حذف الطلب بدون موقع أو بيانات غير صالحة: ${key}`, request);
+                    updates[key] = null; // حذف الطلب
                 } else {
-                    console.log(`طلب صالح: ${childSnapshot.key}`, request);
+                    console.log(`طلب صالح: ${key}`, request);
+                }
+                
+                // شرط إضافي لحذف الطلبات القديمة (أكثر من 5 أيام) في حالة "pending"
+                if (request && request.submittedAt && request.status === "pending") {
+                    const submittedTime = request.submittedAt;
+                    const currentTime = Date.now();
+                    if (currentTime - submittedTime > 5 * 24 * 60 * 60 * 1000) {
+                        console.log(`تم تحديد الطلب ${key} كقديم (أكثر من 5 أيام) وسيتم حذفه.`);
+                        updates[key] = null;
+                    }
                 }
             });
 
             if (Object.keys(updates).length > 0) {
                 requestsRef.update(updates)
-                    .then(() => console.log("تم حذف الطلبات غير الصالحة بنجاح."))
-                    .catch((error) => console.error("خطأ أثناء حذف الطلبات غير الصالحة:", error));
+                    .then(() => console.log("تم حذف الطلبات غير الصالحة والقديمة بنجاح."))
+                    .catch((error) => console.error("خطأ أثناء حذف الطلبات:", error));
             } else {
-                console.log("لا توجد طلبات غير صالحة للإزالة.");
+                console.log("لا توجد طلبات غير صالحة أو قديمة للإزالة.");
             }
         } else {
             console.warn("لم يتم العثور على أي طلبات في قاعدة البيانات.");
         }
     });
 }
+
 
 
 
@@ -1179,13 +1211,51 @@ document.getElementById('submitRequest').addEventListener('click', submitRequest
 
 
 // وظيفة عرض الإشعار
-function displayNotification(message) {
+function displayNotification(message, workerPhone) {
+    console.log("عرض الإشعار:", message); // رسالة تأكيد
+    // إنشاء الحاوية الرئيسية للإشعار
     const notification = document.createElement('div');
     notification.className = 'notification';
-    notification.innerText = message;
+
+    // إنشاء عنصر لعرض الرسالة الأساسية
+    const messageEl = document.createElement('p');
+    messageEl.innerText = message;
+    notification.appendChild(messageEl);
+
+    // إذا وُرد رقم هاتف العامل، نضيفه مع زر الاتصال
+    if (workerPhone) {
+        const phoneEl = document.createElement('p');
+        phoneEl.innerText = `رقم هاتف العامل: ${workerPhone}`;
+        notification.appendChild(phoneEl);
+
+        // إنشاء زر الاتصال
+        const callButton = document.createElement('button');
+        callButton.innerText = 'اتصال';
+        callButton.addEventListener('click', () => {
+            console.log("تم النقر على زر الاتصال، سيتم فتح تطبيق الهاتف.");
+            try {
+                window.location.href = `tel:${workerPhone}`;
+            } catch (error) {
+                console.error("خطأ أثناء محاولة فتح تطبيق الهاتف:", error);
+            }
+        });
+        notification.appendChild(callButton);
+    }
+
+    // إنشاء زر الإغلاق الذي يقوم بإزالة الإشعار عند النقر
+    const closeButton = document.createElement('button');
+    closeButton.innerText = 'إغلاق';
+    closeButton.addEventListener('click', () => {
+        console.log("تم النقر على زر الإغلاق، سيتم إزالة الإشعار.");
+        notification.remove();
+    });
+    notification.appendChild(closeButton);
+
+    // إضافة الإشعار إلى جسم الصفحة (لن يتم إزالته تلقائيًا)
     document.body.appendChild(notification);
-    setTimeout(() => notification.remove(), 5000); // إزالة الإشعار بعد 5 ثوانٍ
+    console.log("تم عرض الإشعار بنجاح.");
 }
+
 
 
 
