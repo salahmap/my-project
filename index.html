@@ -640,11 +640,12 @@ function pushRequestData(requestData, userLocation) {
     requestsRef.push(requestData)
         .then((newRequestRef) => {
             currentRequestId = newRequestRef.key;
+            // حفظ معرف الطلب في localStorage ليستمر بعد إعادة تحميل الصفحة
+            localStorage.setItem('currentRequestId', currentRequestId);
             console.log("تم إنشاء معرف الطلب:", currentRequestId);
             alert('تم إرسال الطلب بنجاح.');
             document.getElementById('requestPopup').style.display = 'none';
-            // NEW CODE: تفعيل زر مراجعة الطلب بعد إرسال الطلب
-document.getElementById('reviewRequestButton').style.display = 'block';
+            document.getElementById('reviewRequestButton').style.display = 'block';
             monitorRequestStatus(currentRequestId);
             sendNotificationsToNearbyWorkers(requestData, userLocation);
         })
@@ -653,6 +654,7 @@ document.getElementById('reviewRequestButton').style.display = 'block';
             alert('حدث خطأ أثناء إرسال الطلب. يرجى المحاولة مرة أخرى لاحقًا.');
         });
 }
+
 
 document.getElementById('submitRequest').addEventListener('click', submitRequest);
 
@@ -724,6 +726,15 @@ function startWorkerTracking(workerId, userLocation, workerName) {
 }
 
 
+document.addEventListener("DOMContentLoaded", () => {
+    const storedRequestId = localStorage.getItem('currentRequestId');
+    if (storedRequestId) {
+        currentRequestId = storedRequestId;
+        // استئناف مراقبة الطلب إذا كان موجودًا
+        monitorRequestStatus(currentRequestId);
+        document.getElementById('reviewRequestButton').style.display = 'block';
+    }
+});
 
 // NEW CODE: دوال مراجعة وتعديل الطلب
 
@@ -826,17 +837,21 @@ function openReviewPopupForUser(userId) {
         alert("لا توجد طلبات معلقة للتعديل.");
         return;
       }
+      // إذا كان هناك طلب واحد فقط، نقوم بفتح نافذة التعديل مباشرة
+      if (pendingRequests.length === 1) {
+        openEditRequestWindow(pendingRequests[0]);
+        return;
+      }
       let reviewContent = "اختر الطلب الذي تريد تعديله أو حذفه:\n";
       pendingRequests.forEach((req, index) => {
         reviewContent += `${index + 1}. ${req.workType} - الميزانية: ${req.budget} - التاريخ: ${new Date(req.submittedAt).toLocaleString()}\n`;
-    });
-
+      });
       let choice = prompt(reviewContent + "\nأدخل رقم الطلب للتعديل:");
       if (choice) {
         let selectedRequest = pendingRequests[choice - 1];
         if (selectedRequest) {
           console.log("الطلب المختار للتعديل:", selectedRequest);
-          openEditRequestWindow(selectedRequest); // تأكد من وجود دالة openEditRequestWindow لمعالجة التعديل
+          openEditRequestWindow(selectedRequest);
         } else {
           alert("الاختيار غير صحيح.");
           console.error("الاختيار غير صحيح في مراجعة الطلبات.");
@@ -847,6 +862,7 @@ function openReviewPopupForUser(userId) {
       console.error("خطأ أثناء استعلام الطلبات:", error);
     });
 }
+
 
 function openEditRequestWindow(request) {
     // تعيين معرف الطلب الحالي لتحديثه لاحقاً
@@ -879,16 +895,16 @@ function deleteRequest() {
     .then(() => {
         console.log("تم حذف الطلب بنجاح.");
         alert("تم حذف الطلب بنجاح.");
-        // إزالة الطلب من الخريطة (إذا كان هناك ماركر مرتبط بالطلب)
         removeRequestMarker(currentRequestId);
-        // عدم إخفاء زر مراجعة الطلب حتى يبقى ظاهرًا
-        // document.getElementById('reviewRequestButton').style.display = 'none';
+        // إزالة معرف الطلب من localStorage
+        localStorage.removeItem('currentRequestId');
     })
     .catch(error => {
         console.error("خطأ في حذف الطلب:", error);
         alert("حدث خطأ أثناء حذف الطلب.");
     });
 }
+
 
 
 // دالة مساعدة لإزالة ماركر الطلب من الخريطة (إذا كنت تستخدم واحداً)
