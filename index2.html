@@ -30,7 +30,7 @@
             font-size: 14px;
         }
         .controlButton:hover {
-            background-color: rgba(30, 144, 255, 1);
+            background-color: rgb(49, 255, 30);
         }
         .controls {
             position: absolute;
@@ -43,14 +43,56 @@
             gap: 5px;
         }
         .iconButton {
-            width: 40px;
-            height: 40px;
-            border: none;
-            cursor: pointer;
-            background: none;
-            margin: 5px;
-            z-index: 2;
-        }
+  width: 40px;
+  height: 40px;
+  border: none;
+  cursor: pointer;
+  background: none;
+  margin: 5px;
+  z-index: 2;
+  border-radius: 50%; /* لضمان ظهور الزر بشكل دائري ورقيق */
+}
+
+/* تنسيق لوحة الطلبات */
+#ordersPanel {
+  position: absolute;
+  top: 60px;
+  right: 10px;
+  width: 300px;
+  max-height: 70vh;
+  background-color: rgba(255, 255, 255, 0.95);
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  overflow-y: auto;
+  padding: 10px;
+  display: none;
+  z-index: 10;
+}
+.orderItem {
+  border-bottom: 1px solid #ddd;
+  padding: 8px;
+  margin-bottom: 5px;
+}
+.orderItem p {
+  margin: 5px 0;
+}
+.orderItem button {
+  background-color: #28a745;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 5px;
+  color: white;
+  cursor: pointer;
+}
+
+/* مثال على وسائط CSS لضمان التصميم المتجاوب */
+@media (max-width: 600px) {
+  #ordersPanel {
+    width: 90%;
+    right: 5%;
+  }
+}
+
         .icon {
             font-size: 20px;
             color: #ff5722;
@@ -91,6 +133,35 @@
     display: none;
 }
 
+
+.mapboxgl-ctrl-geocoder {
+  width: 200px !important;  
+  height: 35px !important;  
+  border-radius: 5px;        
+  font-size: 14px;           
+  display: flex;             
+  align-items: center;       
+  justify-content: center;   
+  position: relative; /* تأكد من ضبط الموضع */
+  z-index: 10; /* تأكد من أن مربع البحث فوق العناصر الأخرى */
+}
+
+/* جعل قائمة البحث تظهر فوق جميع العناصر */
+.mapboxgl-ctrl-geocoder .suggestions {
+  position: absolute !important;
+  z-index: 9999 !important; /* رفع القائمة فوق أي عنصر آخر */
+  background-color: white; /* الحفاظ على وضوح القائمة */
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+.mapboxgl-ctrl-geocoder .mapboxgl-ctrl-geocoder--icon {
+  display: none !important; /* إخفاء الأيقونات (X والدائرة) */
+}
+
+
+
     </style>
 </head>
 <body>
@@ -122,23 +193,33 @@
     
 
 
-    <div class="controls">
-        <button id="toggleWeather" class="iconButton">
-            <i class="fas fa-cloud-sun icon"></i>
-        </button>
-        <select id="styleSelector" class="controlButton">
-            <option value="streets">شوارع</option>
-            <option value="satellite">الأقمار الصناعية</option>
-            <option value="outdoors">خارجية</option>
-            <option value="hybrid" selected>هايبرد</option>
-            <option value="dark">الوضع الليلي</option>
-            <option value="light">الوضع الفاتح</option>
-        </select>
-        
-        <button id="requestWater" class="controlButton">طلب ماء</button>
-        <div id="weatherInfo"></div>
-        <div id="workerInfo"></div>
-    </div>
+<div class="controls">
+    <!-- زر عرض الطلبات مع شارة إشعار -->
+    <button id="toggleOrdersButton" class="controlButton">
+      عرض الطلبات <span id="ordersBadge"></span>
+    </button>
+    <button id="toggleWeather" class="iconButton">
+      <i class="fas fa-cloud-sun icon"></i>
+    </button>
+    <select id="styleSelector" class="controlButton">
+      <option value="streets">شوارع</option>
+      <option value="satellite">الأقمار الصناعية</option>
+      <option value="outdoors">خارجية</option>
+      <option value="hybrid" selected>هايبرد</option>
+      <option value="dark">الوضع الليلي</option>
+      <option value="light">الوضع الفاتح</option>
+    </select>
+    <button id="requestWater" class="controlButton">طلب ماء</button>
+    <div id="weatherInfo"></div>
+    <div id="workerInfo"></div>
+  </div>
+  
+  <!-- إضافة لوحة عرض الطلبات المعلقة -->
+  <div id="ordersPanel">
+    <!-- سيتم تعبئتها ديناميكياً ببيانات الطلبات -->
+  </div>
+  
+
 
 
 
@@ -179,12 +260,6 @@
     </div>
 
 
-<!-- تخصيص معرّف لعامل -->
-<div id="assignIdContainer" style="margin: 20px; background: white; padding: 20px; border-radius: 10px; box-shadow: 0px 4px 6px rgba(0,0,0,0.1);">
-    <h3>تخصيص معرّف لعامل</h3>
-    <input type="text" id="workerIdInput" placeholder="معرّف العامل" style="margin-bottom: 10px; width: 100%; padding: 8px;">
-    <input type="text" id="workerNameInput" placeholder="اسم العامل" style="margin-bottom: 10px; width: 100%; padding: 8px;">
-    <button id="assignIdButton" style="padding: 10px; background-color: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer;">تخصيص المعرّف</button>
 
     <!-- تسجيل الدخول باستخدام المعرّف -->
     <div id="loginPopup" style="display: flex; flex-direction: column; align-items: center; justify-content: center; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 10px; box-shadow: 0px 4px 6px rgba(0,0,0,0.3); z-index: 10;">
@@ -201,6 +276,8 @@
     <button id="acceptDirectRequest">قبول الطلب</button>
     <button id="rejectDirectRequest">رفض الطلب</button>
 </div>
+
+
 
 
 
@@ -1572,6 +1649,91 @@ if (currentWorkerLocation && jobLocation) {
 
 
 
+// دالة تبديل عرض/إخفاء لوحة الطلبات
+function toggleOrdersPanel() {
+  const panel = document.getElementById("ordersPanel");
+  if (panel.style.display === "none" || panel.style.display === "") {
+    panel.style.display = "block";
+    console.log("Orders panel shown.");
+    fetchPendingOrders();
+  } else {
+    panel.style.display = "none";
+    console.log("Orders panel hidden.");
+  }
+}
+
+// دالة لجلب الطلبات المعلقة من Firebase وتحديث اللوحة
+function fetchPendingOrders() {
+  const ordersPanel = document.getElementById("ordersPanel");
+  ordersPanel.innerHTML = ""; // تفريغ المحتوى القديم
+  firebase.database().ref("workRequests")
+    .orderByChild("status").equalTo("pending")
+    .once("value", function(snapshot) {
+      if (!snapshot.exists()) {
+        ordersPanel.innerHTML = "<p>لا يوجد طلبات</p>";
+        console.log("No pending orders found.");
+        updateOrdersBadge(0);
+        return;
+      }
+      let orders = [];
+      snapshot.forEach(function(childSnapshot) {
+        const order = childSnapshot.val();
+        order.orderId = childSnapshot.key;
+        orders.push(order);
+      });
+      // ترتيب الطلبات تنازلياً حسب التاريخ (الأحدث أولاً)
+      orders.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+      orders.forEach(function(order) {
+        const orderItem = document.createElement("div");
+        orderItem.className = "orderItem";
+        orderItem.innerHTML = `
+          <p><strong>وقت التقديم:</strong> ${order.timestamp || "غير متوفر"}</p>
+          <p><strong>نوع العمل:</strong> ${order.workType || "غير محدد"}</p>
+          <p><strong>الحالة:</strong> ${order.status === "pending" ? "في انتظار" : order.status}</p>
+          <button onclick="acceptOrder('${order.orderId}')">قبول</button>
+        `;
+        ordersPanel.appendChild(orderItem);
+      });
+      updateOrdersBadge(orders.length);
+    }, function(error) {
+      console.error("Error fetching pending orders:", error);
+    });
+}
+
+// دالة لتحديث شارة عدد الطلبات على زر "عرض الطلبات"
+function updateOrdersBadge(count) {
+  const badge = document.getElementById("ordersBadge");
+  badge.textContent = count > 0 ? count : "";
+}
+
+// دالة لقبول الطلب وتحديث حالته في Firebase
+function acceptOrder(orderId) {
+  firebase.database().ref("workRequests/" + orderId).update({ status: "accepted" })
+    .then(function() {
+      alert("تم قبول الطلب");
+      console.log("Order " + orderId + " accepted.");
+      fetchPendingOrders(); // تحديث القائمة بعد القبول
+    })
+    .catch(function(error) {
+      console.error("Error accepting order:", error);
+    });
+}
+
+// إخفاء لوحة الطلبات عند النقر خارجها
+document.addEventListener("click", function(event) {
+  const panel = document.getElementById("ordersPanel");
+  const toggleButton = document.getElementById("toggleOrdersButton");
+  if (panel.style.display === "block" && !panel.contains(event.target) && !toggleButton.contains(event.target)) {
+    panel.style.display = "none";
+    console.log("Orders panel hidden due to outside click.");
+  }
+});
+
+// ربط حدث النقر على زر "عرض الطلبات" بالدالة
+document.getElementById("toggleOrdersButton").addEventListener("click", function(event) {
+  event.stopPropagation(); // منع وصول الحدث إلى document
+  toggleOrdersPanel();
+});
 
 
 
@@ -1741,25 +1903,21 @@ map = new mapboxgl.Map({
   container: 'map',
   style: 'mapbox://styles/mapbox/satellite-streets-v11',
   center: [0, 0],  // بدء العرض من مركز الأرض
-  zoom: 0.8,       // رؤية الكرة الأرضية من الفضاء العميق
+  zoom: 0.8,       // رؤية الكرة الأرضية من الفضاء البعيد
   projection: 'globe',
   maxBounds: [[-180, -85], [180, 85]], // منع الخروج من الكرة الأرضية
   interactive: true, // السماح بالتفاعل اللمسي
   attributionControl: false // إزالة شعار Mapbox لتحسين تجربة المستخدم
 });
 
-// تحسين تأثير الغلاف الجوي لتقليل الإشعاع وجعل النجوم واضحة
+// تحسين الأداء عند التحميل وجعل الإشعاع أخف
 map.on('style.load', () => {
   map.setFog({
     range: [1, 8],  // تقليل مدى الضباب حتى يظهر الفضاء بوضوح
-    color: 'rgba(10, 10, 25, 0.4)', // جعل لون الغلاف الجوي داكنًا أكثر ليظهر الفضاء
-    horizonBlend: 0.05, // تقليل التوهج عند الأفق لجعل النجوم واضحة
-    spaceColor: 'rgb(0, 0, 0)', // تعتيم خلفية الفضاء لرؤية النجوم بوضوح
-    starIntensity: 0.9 // زيادة وضوح النجوم في الخلفية
+    color: 'rgba(10, 10, 25, 0.5)', // جعل لون الغلاف الجوي داكنًا أكثر ليظهر الفضاء
   });
 });
 
-// تنفيذ تأثير التحرك بعد تحميل الخريطة مع تأخير لمحاكاة رؤية الأرض من الفضاء
 // تنفيذ تأثير التحرك بعد تحميل الخريطة مع تأخير لمحاكاة رؤية الأرض من الفضاء
 map.on('load', () => {
   waitUntilMapReady().then(() => {
@@ -1780,7 +1938,7 @@ map.on('load', () => {
 // تحسين تجربة اللمس على الأجهزة المحمولة
 if (window.innerWidth < 768) {
   map.touchZoomRotate.enable(); // تفعيل التكبير والتدوير باللمس
-  map.doubleClickZoom.disable(); // تعطيل التكبير بالنقر المزدوج لمنع التفاعل غير المرغوب فيه
+  map.doubleClickZoom.disable(); // تعطيل التكبير بالنقر المزدوج
 }
 
 
@@ -2306,33 +2464,7 @@ if (acceptJobButton) {
 
 
 
-        document.getElementById('assignIdButton').addEventListener('click', () => {
-  const workerId = document.getElementById('workerIdInput').value;
-  const workerName = document.getElementById('workerNameInput').value;
-  const userLocation = map.getCenter();
 
-  if (workerId && workerName) {
-    fetch('/assign-id', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        workerId: workerId,
-        workerName: workerName,
-        location: { lng: userLocation.lng, lat: userLocation.lat },
-      }),
-    })
-      .then((response) => {
-        if (response.ok) {
-          alert('تم تخصيص المعرّف بنجاح!');
-        } else {
-          alert('حدث خطأ أثناء تخصيص المعرّف.');
-        }
-      })
-      .catch((error) => console.error('Error:', error));
-  } else {
-    alert('يرجى ملء جميع الحقول.');
-  }
-});
 
 // التأكد من أن الكود يعمل فقط إذا تم تعريف map
 if (typeof map !== 'undefined' && map instanceof mapboxgl.Map) {
@@ -2446,26 +2578,8 @@ if (typeof map !== 'undefined' && map instanceof mapboxgl.Map) {
 
 
         
-    </script>
 
-<!-- زر اختبار الإشعارات -->
-<button id="testNotification">اختبار الإشعارات</button>
 
-<script>
-  // تأكد من تنفيذ الكود بعد تحميل محتويات الصفحة
-  document.getElementById('testNotification').addEventListener('click', () => {
-      fetch('/send-notification', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: 'اختبار إشعار!' })
-      })
-      .then(res => res.json())
-      .then(data => console.log('نتيجة الاختبار:', data))
-      .catch(err => console.error('فشل اختبار الإشعارات:', err));
-  });
-</script>
-<!-- كود تسجيل Service Worker -->
-<script>
 
   </script>
 
