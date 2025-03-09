@@ -1740,26 +1740,49 @@ function startTracking(workerId) {
 map = new mapboxgl.Map({
   container: 'map',
   style: 'mapbox://styles/mapbox/satellite-streets-v11',
-  center: [0, 0],
-  zoom: 2,
-  projection: 'globe'
+  center: [0, 0],  // بدء العرض من مركز الأرض
+  zoom: 0.8,       // رؤية الكرة الأرضية من الفضاء العميق
+  projection: 'globe',
+  maxBounds: [[-180, -85], [180, 85]], // منع الخروج من الكرة الأرضية
+  interactive: true, // السماح بالتفاعل اللمسي
+  attributionControl: false // إزالة شعار Mapbox لتحسين تجربة المستخدم
 });
-map.on('style.load', () => { 
-  map.setFog({}); 
-});
-map.on('load', () => {
-  waitUntilMapReady().then(() => {
-    map.flyTo({
-      center: [13.1913, 32.8872],
-      zoom: 12,
-      pitch: 60,      // زاوية ميل تعطي عمقاً ثلاثي الأبعاد
-      bearing: 45,    // دوران لطيف يعزز الإحساس بالحركة
-      speed: 0.3,
-      curve: 1.8,
-      easing: function(t) { return t*t; }
-    });
+
+// تحسين تأثير الغلاف الجوي لتقليل الإشعاع وجعل النجوم واضحة
+map.on('style.load', () => {
+  map.setFog({
+    range: [1, 8],  // تقليل مدى الضباب حتى يظهر الفضاء بوضوح
+    color: 'rgba(10, 10, 25, 0.4)', // جعل لون الغلاف الجوي داكنًا أكثر ليظهر الفضاء
+    horizonBlend: 0.05, // تقليل التوهج عند الأفق لجعل النجوم واضحة
+    spaceColor: 'rgb(0, 0, 0)', // تعتيم خلفية الفضاء لرؤية النجوم بوضوح
+    starIntensity: 0.9 // زيادة وضوح النجوم في الخلفية
   });
 });
+
+// تنفيذ تأثير التحرك بعد تحميل الخريطة مع تأخير لمحاكاة رؤية الأرض من الفضاء
+// تنفيذ تأثير التحرك بعد تحميل الخريطة مع تأخير لمحاكاة رؤية الأرض من الفضاء
+map.on('load', () => {
+  waitUntilMapReady().then(() => {
+    setTimeout(() => {
+      map.flyTo({
+        center: [13.1913, 32.8872], // الانتقال إلى طرابلس
+        zoom: window.innerWidth < 768 ? 9 : 12, // تقريب أقل على الهواتف
+        pitch: window.innerWidth < 768 ? 30 : 60, // زاوية ميل أقل على الأجهزة المحمولة
+        bearing: 45, // دوران لطيف أثناء الحركة
+        speed: 0.3, // حركة بطيئة لمحاكاة التنقل الطبيعي
+        curve: 2.2, // منحنى سلس للحركة
+        easing: t => t * t // حركة تخفيف تدريجية
+      });
+    }, 2000); // تأخير الانتقال 2.5 ثانية لمحاكاة رؤية الأرض من الفضاء
+  });
+});
+
+// تحسين تجربة اللمس على الأجهزة المحمولة
+if (window.innerWidth < 768) {
+  map.touchZoomRotate.enable(); // تفعيل التكبير والتدوير باللمس
+  map.doubleClickZoom.disable(); // تعطيل التكبير بالنقر المزدوج لمنع التفاعل غير المرغوب فيه
+}
+
 
 
 
