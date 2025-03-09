@@ -85,13 +85,19 @@
     font-size: 16px;
 }
 
+
+#etaPanel,
+#countdownPanel {
+    display: none;
+}
+
     </style>
 </head>
 <body>
     <h1 id="title" style="display: none;">تطبيق الخريطة المحسن</h1>
     <div id="map"></div>
 
-<!-- نافذة تفاصيل العمل بعد التعديل -->
+<!-- نافذة تفاصيل العمل بعد التعديل بدون زر الإلغاء -->
 <div id="jobDetailsPopup" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; border-radius:10px; padding:20px; z-index:3;">
     <h2>تفاصيل العمل</h2>
     <p id="jobDescription"></p>
@@ -106,6 +112,12 @@
     <button id="acceptJobButton">قبول الطلب</button>
     <button onclick="document.getElementById('jobDetailsPopup').style.display='none'">إغلاق</button>
 </div>
+
+<!-- زر إلغاء الطلب الآن موجود على الشاشة الرئيسية -->
+<div id="cancelJobContainer" style="display:none; position: fixed; bottom: 20px; left: 20px; z-index: 1000;">
+    <button id="cancelJobButton" class="controlButton" style="background-color: #d9534f;">إلغاء الطلب</button>
+</div>
+
 
     
 
@@ -329,6 +341,9 @@ function sendPusherNotification(interest, message, title = "إشعار جديد"
     .then(data => console.log("تم إرسال الإشعار بنجاح:", data))
     .catch(error => console.error("فشل إرسال الإشعار:", error));
 }
+// ربط الدالة بالكائن window لجعلها متاحة بشكل عام
+window.sendPusherNotification = sendPusherNotification;
+
 
 
 
@@ -592,6 +607,27 @@ function calculateDistance(loc1, loc2) {
 }
 
 
+// إضافة دالة getWorkerDistance للتحقق من المسافة بين موقع العامل وموقع الطلب
+function getWorkerDistance() {
+    // تأكد من أن المتغيرات currentWorkerLocation و jobLocation معرّفة بشكل صحيح
+    if (typeof currentWorkerLocation === 'undefined' || typeof jobLocation === 'undefined') {
+        console.error("المتغيرات الخاصة بالمواقع غير متوفرة لحساب المسافة");
+        return 0;
+    }
+    return calculateDistance(currentWorkerLocation, jobLocation);
+}
+
+// دالة عرض نافذة التأكيد قبل تنفيذ الإلغاء
+function showCancelConfirmation(callback) {
+    const confirmation = confirm("هل أنت متأكد من رغبتك في إلغاء الطلب؟");
+    if (confirmation) {
+        callback(); // تنفيذ الإجراء إذا وافق المستخدم
+    } else {
+        console.log("تم إلغاء عملية الإلغاء بناءً على تأكيد المستخدم.");
+    }
+}
+
+
 
 function calculateETA(workerLocation, jobLocation, callback) {
     const directionsRequest = `https://api.mapbox.com/directions/v5/mapbox/driving/${workerLocation.lng},${workerLocation.lat};${jobLocation.lng},${jobLocation.lat}?steps=true&geometries=geojson&access_token=${mapboxgl.accessToken}`;
@@ -627,7 +663,21 @@ function startRealTimeETATracking(workerLocation, jobLocation) {
         console.error("عنصر etaDisplay غير موجود في الصفحة لتحديث ETA");
         return;
     }
+    // إعادة تعيين حالة الإلغاء وإيقاف أي مؤشر سابق
+    orderCanceled = false;
+    if (window.etaIntervalId) {
+        clearInterval(window.etaIntervalId);
+        window.etaIntervalId = null;
+    }
+    
     const intervalId = setInterval(() => {
+        console.log("قيمة orderCanceled:", orderCanceled);
+        // إذا كان الطلب ملغى، يتم إيقاف المؤقت وعدم التحديث
+        if (orderCanceled) {
+            clearInterval(intervalId);
+            console.log("تم إيقاف تتبع ETA لأن الطلب ملغى.");
+            return;
+        }
         calculateETA(workerLocation, jobLocation, (err, data) => {
             if (err) {
                 console.error("خطأ في حساب ETA:", err);
@@ -637,18 +687,15 @@ function startRealTimeETATracking(workerLocation, jobLocation) {
             updateETADisplay(data.duration, data.distance, etaDisplay);
             
             // التحقق من المسافة بين العامل وموقع الطلب
-            const distance = calculateDistance(workerLocation, jobLocation); // المسافة بالكيلومترات
-            if (distance <= 0.5 && window.fullPhone) {  // 0.5 كم تعادل 500 متر
-                // تحديث عنصر رقم الهاتف لعرض الرقم الكامل
+            const distance = calculateDistance(workerLocation, jobLocation);
+            if (distance <= 0.5 && window.fullPhone) {
                 document.getElementById('userPhone').innerText = `رقم الهاتف: ${window.fullPhone}`;
             }
         });
-    }, 15000); // التحديث كل 15 ثانية
+    }, 5000); // التحديث كل 15 ثانية
     console.log("تم بدء تتبع ETA في الوقت الحقيقي");
     return intervalId;
 }
-
-
 
 
 // دوال العد التنازلي
@@ -661,6 +708,10 @@ function formatTime(ms) {
 }
 
 function startCountdown(duration, targetElement, onComplete) {
+    if (!targetElement) {
+        console.error("⚠️ عنصر 'countdownTimer' غير موجود في الصفحة.");
+        return;
+    }
     let remaining = duration;
     targetElement.innerText = formatTime(remaining);
     const countdownInterval = setInterval(() => {
@@ -675,8 +726,12 @@ function startCountdown(duration, targetElement, onComplete) {
         }
     }, 1000);
     console.log("تم بدء العد التنازلي");
+    // تخزين معرف المؤقت في متغير عام
+    window.countdownIntervalId = countdownInterval;
     return countdownInterval;
 }
+
+
 
 
 
@@ -706,86 +761,116 @@ function sendPusherNotificationByWorker(workerId, message) {
     const database = firebase.database();
     const workersRef = database.ref('workers');
 
-    // دالة لإنشاء دفعة من المعرّفات
-    function generateWorkerIds(batchSize) {
-    for (let i = 0; i < batchSize; i++) {
-        // دمج الرقم الزمني مع رقم عشوائي يولد أرقاماً فقط
-        const workerId = `${Date.now()}${Math.floor(Math.random() * 100000)}`;
-        database.ref(`availableWorkerIds/${workerId}`).set({ used: false });
-    }
-    console.log(`${batchSize} معرّفات تم إنشاؤها بنجاح.`);
-}
-// إنشاء دفعة من المعرّفات عند الحاجة
-generateWorkerIds(10);
+
 
 
 // تعريف المتغير بشكل عام بدون فحص مسبق
 let workerId = null;
 
 // دالة إنشاء جلسة العامل بعد تسجيل الدخول
-function initializeWorkerSession(id) {
-    workerId = id;  // تعيين معرف العامل
-
-    // إنشاء المراجع بناءً على معرف العامل
+function initializeWorkerSession(workerId) {
+    // تأكيد أن workerId (أو currentWorkerId) يحتوي على القيمة الصحيحة
+    console.log("✅ currentWorkerId:", workerId);
+    
+    // إنشاء المراجع بناءً على معرّف العامل
     window.workerRef = database.ref(`workers/${workerId}`);
     window.workerReviewsRef = workerRef.child('reviews');
 
-    console.log("✅ workerId معرف بنجاح:", workerId);
-    console.log("✅ workerRef معرف بنجاح:", workerRef.toString());
-    console.log("✅ workerReviewsRef معرف بنجاح:", workerReviewsRef.toString());
-
+    console.log("✅ workerRef:", workerRef.toString());
+    console.log("✅ workerReviewsRef:", workerReviewsRef.toString());
+    
     // استدعاء الدوال التي تعتمد على المعرف
     updateLocationWithGPS(workerId);
     focusOnWorkerLocation(workerId);
 
-    // نقل مستمع تحديث currentRequest داخل الدالة بعد تعريف workerRef
+    // تسجيل مستمع لتحديث الطلبات للعامل الحالي
     workerRef.child('currentRequest').on('value', (snapshot) => {
         const requestData = snapshot.val();
         if (requestData) {
-            console.log(`تم تحديث حالة الطلب للعامل ${workerId}:`, requestData);
+            console.log(`تم تحديث حالة الطلب للعامل ${workerId}: ${requestData.status}`);
         } else {
-            console.warn(`لا توجد طلبات مرتبطة بالعامل ${workerId}. تأكد من تسجيل الطلب بشكل صحيح.`);
+            console.log(`لا توجد طلبات حاليًا للعامل ${workerId}`);
         }
     });
 }
 
 
 
+
 // دالة تسجيل الدخول باستخدام معرّف العامل
-let currentWorkerId = null;
+let currentWorkerId = null; // تعريف متغيّر عام لتخزين معرّف العامل
+let currentWorkerName = null; // تعريف متغيّر عام لتخزين اسم العامل
+let activeRequestExists = false; // لتحديد ما إذا كان للعامل طلب نشط بالفعل
 
 function loginWorker() {
-    // قراءة قيمة الإدخال من حقل workerLoginId
     const inputId = document.getElementById('workerLoginId').value;
-    
+
     if (!inputId) {
         alert("يرجى إدخال معرّف العامل.");
         return;
     }
-    
-    // التحقق من وجود العامل في قاعدة البيانات
+
+    // التحقق مما إذا كان المعرف موجودًا داخل "workers"
     database.ref(`workers/${inputId}`).once('value')
         .then((snapshot) => {
             if (snapshot.exists()) {
                 const workerData = snapshot.val();
                 console.log(`✅ تم تسجيل الدخول بنجاح: ${workerData.name}`);
                 
-                // تعيين معرف العامل في المتغير العام
+                // تعيين currentWorkerId و currentWorkerName بعد نجاح تسجيل الدخول
                 currentWorkerId = inputId;
-                
+                currentWorkerName = workerData.name; // إضافة تعيين اسم العامل
+
                 // إخفاء نافذة تسجيل الدخول
                 document.getElementById('loginPopup').style.display = 'none';
                 
-                // بعد تسجيل الدخول، استدعاء دالة تهيئة الجلسة التي تنشئ المراجع وتستدعي الدوال اللازمة
+                // تهيئة جلسة العامل
                 initializeWorkerSession(currentWorkerId);
-                
             } else {
-                console.warn("⚠️ المعرّف غير صالح أو غير موجود في قاعدة البيانات.");
-                alert("المعرّف غير صالح، يرجى التحقق.");
+                // التحقق من وجود المعرف داخل "availableWorkerIds"
+                database.ref(`availableWorkerIds/${inputId}`).once('value')
+                    .then((availableSnapshot) => {
+                        if (availableSnapshot.exists() && availableSnapshot.val().used === false) {
+                            console.log(`🔄 تخصيص المعرّف ${inputId} وإنشاؤه في workers.`);
+                            
+                            // تحديث حالة المعرّف في availableWorkerIds إلى "مستخدم"
+                            database.ref(`availableWorkerIds/${inputId}`).update({ used: true, usedAt: new Date().toISOString() });
+                            
+                            const workerName = prompt("أدخل اسمك لاستخدام هذا المعرّف:");
+                            if (!workerName) {
+                                alert("يجب إدخال اسم لاستخدام هذا المعرّف.");
+                                return;
+                            }
+                            
+                            // إنشاء سجل جديد في "workers"
+                            database.ref(`workers/${inputId}`).set({
+                                name: workerName,
+                                assignedAt: new Date().toISOString(),
+                                location: { lng: 0, lat: 0 } // سيتم تحديثه لاحقًا
+                            }).then(() => {
+                                console.log(`✅ تم تخصيص المعرّف ${inputId} للعامل: ${workerName}`);
+                                
+                                // تعيين currentWorkerId و currentWorkerName بعد التخصيص
+                                currentWorkerId = inputId;
+                                currentWorkerName = workerName; // تعيين اسم العامل
+                                
+                                // تسجيل الدخول بعد التخصيص
+                                document.getElementById('loginPopup').style.display = 'none';
+                                initializeWorkerSession(currentWorkerId);
+                            });
+                        } else {
+                            console.warn("⚠️ المعرّف غير صالح أو غير موجود في قاعدة البيانات.");
+                            alert("المعرّف غير صالح، يرجى التحقق.");
+                        }
+                    })
+                    .catch((error) => console.error("❌ خطأ أثناء التحقق من availableWorkerIds:", error));
             }
         })
         .catch((error) => console.error("❌ خطأ أثناء تسجيل الدخول:", error));
 }
+
+
+
 
 
 
@@ -820,29 +905,76 @@ function updateLocationWithGPS(workerId) {
         }, { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 });
         
         navigator.geolocation.watchPosition((position) => {
-            const newLocation = {
-                lat: position.coords.latitude,
-                lng: position.coords.longitude,
-            };
-            console.log("📡 93 Updating location with watchPosition:", newLocation);
-            window.currentWorkerLocation = newLocation;
-            updateWorkerLocation(workerId, newLocation);
-            updateActiveWorkerLocation(workerId, newLocation);
-        }, (error) => {
-            console.error("🚨 197 Error during continuous location tracking:", error);
-        }, { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 });
+    const newLocation = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+    };
+    console.log("📡 93 Updating location with watchPosition:", newLocation);
+    window.currentWorkerLocation = newLocation;
+    updateWorkerLocation(workerId, newLocation);
+    updateActiveWorkerLocation(workerId, newLocation);
+    // استدعاء الدالة لفحص المسافة وتحديث ظهور زر الإلغاء
+    checkDistanceAndToggleCancelButton();
+}, (error) => {
+    console.error("🚨 197 Error during continuous location tracking:", error);
+}, { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 });
+
     } else {
         console.error("🚨 198 Geolocation is not supported in this browser.");
     }
 }
 
 // إضافة مستمع لطلبات العمل الموجهة للعامل الحالي
+let initialLoadDone = false;
 const workerRequestsRef = database.ref('workRequests').orderByChild('workerId').equalTo(workerId);
+
+// أولاً، نستخدم once لتحميل البيانات الحالية
+workerRequestsRef.once('value', snapshot => {
+    // عند انتهاء التحميل نضبط العلم إلى true
+    initialLoadDone = true;
+});
+
+// بعد ذلك نضيف مستمع child_added
 workerRequestsRef.on('child_added', snapshot => {
+    // إذا لم يكتمل التحميل الأولي نتجاهل الحدث
+    if (!initialLoadDone) return;
+    
     const requestData = snapshot.val();
     console.log('طلب جديد موجه لك:', requestData);
     alert('لديك طلب جديد: ' + requestData.workType);
 });
+
+
+
+function checkDistanceAndToggleCancelButton() {
+    // يظهر زر الإلغاء فقط إذا كان هناك طلب نشط (orderActive) ولم يُلغَ بعد
+    if (!currentRequestId || !orderActive) return;
+    firebase.database().ref(`workRequests/${currentRequestId}`).once('value')
+        .then(snapshot => {
+            const request = snapshot.val();
+            // إذا كان الطلب ملغى أو لم يعد في حالة "pending" فلا تظهر الخيارات
+            if (!request || request.status !== 'pending') {
+                document.getElementById('cancelJobContainer').style.display = 'none';
+                console.log("🔒 الطلب غير متاح للإلغاء، إخفاء زر الإلغاء.");
+                return;
+            }
+            if (request && request.location) {
+                const distance = calculateDistance(currentWorkerLocation, request.location);
+                console.log(`المسافة بين العامل والطلب: ${distance.toFixed(2)} كم`);
+                if (distance <= 0.5) {
+                    document.getElementById('cancelJobContainer').style.display = 'none';
+                    console.log('⏱️ إخفاء زر الإلغاء لأن العامل على بعد أقل من 500 متر.');
+                } else {
+                    document.getElementById('cancelJobContainer').style.display = 'block';
+                }
+            }
+        })
+        .catch(error => {
+            console.error('❌ خطأ أثناء حساب المسافة:', error);
+        });
+}
+
+
 
 document.addEventListener("DOMContentLoaded", () => {
     // تأكيد تحميل العناصر المطلوبة:
@@ -867,6 +999,113 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 
+// مستمع حدث زر "إلغاء الطلب" الخاص بالعامل
+// تعريف مفاتيح Pusher الخاصة بك
+const pusherInstanceId = "2a17d881-b1a6-4a38-8cd4-de1ab8212f67";
+const pusherAuthorization = "94B66644D08CBCEDEEBE73156329B8DF8F82064EC4B9D16750B88454146530FB";
+
+// دالة لإعادة تهيئة واجهة المستخدم بعد إلغاء الطلب
+function resetJobUI() {
+    // إخفاء نافذة تفاصيل الطلب
+    document.getElementById('jobDetailsPopup').style.display = 'none';
+    // إخفاء زر إلغاء الطلب
+    document.getElementById('cancelJobContainer').style.display = 'none';
+    
+    // إيقاف العد التنازلي إذا كان معرفه محفوظ في المتغير العام
+    if (window.countdownIntervalId) {
+        clearInterval(window.countdownIntervalId);
+        window.countdownIntervalId = null;
+        console.log("تم إيقاف العد التنازلي.");
+    }
+    
+    // إعادة ضبط محتوى العد التنازلي دون حذف العنصر نفسه
+    const countdownTimer = document.getElementById('countdownTimer');
+    if (countdownTimer) {
+        countdownTimer.innerText = '';
+    }
+    document.getElementById('countdownPanel').style.display = 'none';  // إخفاء الحاوية عند الإلغاء
+    
+    // إعادة ضبط عرض ETA دون حذف العنصر نفسه
+    const etaDisplay = document.getElementById('etaDisplay');
+    if (etaDisplay) {
+        etaDisplay.innerText = '';
+    }
+    document.getElementById('etaPanel').style.display = 'none';  // إخفاء الحاوية عند الإلغاء
+    
+    // إزالة حالة الطلب من التخزين المحلي
+    localStorage.removeItem('orderStatus');
+    localStorage.removeItem('currentRequestId');
+}
+
+
+
+
+
+
+document.getElementById('cancelJobButton').addEventListener('click', function() {
+    const distance = getWorkerDistance();
+    if (distance < 0.5) { 
+        alert("لقد سجلت تقدمك في المنظومة ولا يمكنك الإلغاء الآن.");
+        console.error("محاولة إلغاء الطلب أثناء اقتراب العامل من الموقع");
+        return;
+    } else {
+        if (!confirm("تنبيه: الطلب لن يُلغى إذا أصبحت قريباً (أقل من 500 متر) من الموقع. هل تريد المتابعة؟")) {
+            console.log("تم إلغاء عملية الإلغاء بناءً على تأكيد المستخدم.");
+            return;
+        }
+    }
+    
+    showCancelConfirmation(function() {
+        const requestRef = firebase.database().ref(`workRequests/${currentRequestId}`);
+        // إعادة تعيين الحالة وتسجيل معرف العامل الذي ألغى الطلب
+        requestRef.update({ 
+            status: 'pending',
+            canceledBy: currentWorkerId  
+        })
+        .then(() => {
+            // تسجيل سجل تاريخي جديد للإلغاء مع استخدام قيمة افتراضية إذا currentWorkerName غير معرف
+            const historyRef = requestRef.child('orderHistory');
+            historyRef.push({
+                 type: 'canceled',
+                 workerId: currentWorkerId,
+                 workerName: currentWorkerName ? currentWorkerName : "غير معروف",
+                 timestamp: firebase.database.ServerValue.TIMESTAMP
+            });
+            alert('تم إلغاء الطلب. يمكنك قبوله مرة أخرى.');
+            orderCanceled = true;
+            orderActive = false;
+            activeRequestExists = false;
+            currentRequestId = null;
+            localStorage.removeItem('orderStatus');
+            localStorage.removeItem('currentRequestId');
+            sendPusherNotification(window.selectedWorkerId, 'تم إلغاء الطلب من قبل العامل.');
+            console.log("تم إلغاء الطلب وتحديث الحالة في Firebase مع تسجيل معرف العامل الذي ألغى الطلب.");
+            if (map.getLayer('route')) {
+                map.removeLayer('route');
+                map.removeSource('route');
+                console.log("تم إزالة مسار الطلب من الخريطة.");
+            }
+            if (window.etaIntervalId) {
+                clearInterval(window.etaIntervalId);
+                window.etaIntervalId = null;
+                console.log("تم إيقاف تتبع ETA.");
+            }
+            if (window.countdownIntervalId) {
+                clearInterval(window.countdownIntervalId);
+                window.countdownIntervalId = null;
+                console.log("تم إيقاف العد التنازلي.");
+            }
+            resetJobUI();
+        })
+        .catch((err) => {
+            console.error("خطأ في تحديث حالة الطلب:", err);
+        });
+    });
+});
+
+
+
+
 
 
  
@@ -874,23 +1113,18 @@ document.addEventListener("DOMContentLoaded", () => {
         // دالة لعرض تفاصيل العمل
         // دالة لعرض تفاصيل العمل مع حساب المسافة
         function showJobDetails(jobData) {
-    // عرض الوصف التفصيلي؛ إذا لم يكن الوصف موجودًا، يتم عرض نوع العمل كبديل
+    // عرض تفاصيل العمل
     document.getElementById('jobDescription').innerText = `وصف العمل: ${jobData.description || jobData.workType}`;
     
-    // حفظ الرقم الكامل في متغير عام لاستخدامه لاحقاً
+    // إعداد البيانات مثل رقم الهاتف والصورة والموقع
     const fullPhone = jobData.phone || "غير متوفر";
     window.fullPhone = fullPhone;
-    
-    // إنشاء نسخة مخفية من الرقم: إذا كان الرقم موجودًا وطوله أكبر من 5 أحرف
     let maskedPhone = fullPhone;
     if (fullPhone !== "غير متوفر" && fullPhone.length > 5) {
        maskedPhone = fullPhone.substr(0, 5) + "*****";
     }
-    
-    // عرض رقم الهاتف بشكل مخفي مع تنبيه بأن الرقم الكامل سيظهر عند الاقتراب 500 متر
     document.getElementById('userPhone').innerText = `رقم الهاتف: ${maskedPhone} (سيظهر الرقم الكامل عند الاقتراب 500 متر)`;
     
-    // عرض صورة العمل إذا كانت موجودة، وإخفاؤها إذا لم تكن كذلك
     if (jobData.imageUrl) {
         const jobImage = document.getElementById('jobImage');
         jobImage.src = jobData.imageUrl;
@@ -899,7 +1133,6 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById('jobImage').style.display = 'none';
     }
     
-    // عرض الموقع: عرض اسم المنطقة إذا كانت موجودة، وإلا عرض الإحداثيات
     document.getElementById('jobLocation').innerText = jobData.region 
         ? `الموقع: ${jobData.region}` 
         : `الموقع: (${jobData.location.lat}, ${jobData.location.lng})`;
@@ -913,12 +1146,9 @@ document.addEventListener("DOMContentLoaded", () => {
         console.error("currentWorkerLocation غير معرف لحساب المسافة");
     } else {
         const distance = calculateDistance(currentWorkerLocation, jobData.location);
-        console.log(`المسافة المحسوبة: ${distance.toFixed(2)} كم`);
         const distanceElem = document.getElementById('jobDistance');
         if (distanceElem) {
             distanceElem.innerText = `المسافة: ${distance.toFixed(2)} كم`;
-        } else {
-            console.error("عنصر عرض المسافة 'jobDistance' غير موجود في الصفحة");
         }
         // استدعاء حساب ETA وتحديث العرض
         calculateETA(currentWorkerLocation, jobData.location, (err, data) => {
@@ -930,36 +1160,36 @@ document.addEventListener("DOMContentLoaded", () => {
             if (etaElem) {
                 const minutes = Math.round(data.duration / 60);
                 etaElem.innerText = `الوقت المقدر: ${minutes} دقيقة`;
-                console.log("تم تحديث ETA في نافذة تفاصيل العمل");
-            } else {
-                console.error("عنصر 'estimatedArrivalTime' غير موجود");
             }
         });
     }
     
-    // (يمكنك هنا إضافة تفاصيل إضافية إن وُجدت، مثل: معلومات إضافية)
+    // تعديل مظهر زر "قبول الطلب" بناءً على حالة الطلب
+    const acceptBtn = document.getElementById('acceptJobButton');
+    if (jobData.status !== 'pending') {
+        acceptBtn.style.display = 'inline-block';
+        acceptBtn.textContent = 'تم قبول الطلب';
+        acceptBtn.style.backgroundColor = 'red';
+        acceptBtn.disabled = true;
+    } else {
+        acceptBtn.style.display = 'inline-block';
+        acceptBtn.textContent = 'قبول الطلب';
+        acceptBtn.style.backgroundColor = 'green';
+        acceptBtn.disabled = false;
+    }
     
+    // إظهار نافذة تفاصيل العمل
     document.getElementById('jobDetailsPopup').style.display = 'block';
+    
+    // **التعديل الجديد**: إظهار حاويات ETA والعد التنازلي عند وجود طلب نشط
+    document.getElementById('etaPanel').style.display = 'block';
+    document.getElementById('countdownPanel').style.display = 'block';
 }
 
 
 
-    // مستمع حدث زر "قبول الطلب"
-    document.getElementById('acceptDirectRequest').addEventListener('click', function() {
-        console.log("تم النقر على زر قبول الطلب");
-        // مثال لتحديث حالة الطلب في Firebase (تأكد من تعريف currentRequestId و workerId في الكود الرئيسي)
-        firebase.database().ref('workRequests/' + currentRequestId).update({
-            status: 'accepted',
-            acceptedBy: workerId
-        }).then(function() {
-            console.log("تم تحديث حالة الطلب إلى accepted في Firebase");
-        }).catch(function(error) {
-            console.error("حدث خطأ أثناء تحديث حالة الطلب:", error);
-        });
-        // إخفاء النافذة بعد القبول
-        document.getElementById('directRequestPopup').style.display = 'none';
-        alert("تم قبول الطلب بنجاح.");
-    });
+
+
 
     // مستمع حدث زر "رفض الطلب"
     document.getElementById('rejectDirectRequest').addEventListener('click', function() {
@@ -1072,6 +1302,14 @@ requestRef.on('child_added', (snapshot) => {
     currentRequestId = requestId;
     console.log("✅ تم تعيين currentRequestId للطلب الجديد:", currentRequestId);
 
+    // ***** إضافة شرط التحقق من وجود طلب نشط مسبقاً *****
+    if (activeRequestExists) {
+        console.log("⚠️ العامل لديه طلب نشط بالفعل. تم تجاهل الطلب الجديد.");
+        // يمكنك هنا تحديث نافذة التفاصيل برسالة توضيحية إن رغبت (مثلاً تحديث innerHTML)
+        return;
+    }
+    // *****************************************************
+
     // التحقق من صحة بيانات الطلب
     if (!requestData || !requestId) {
         console.error("🚨 38 بيانات الطلب غير صحيحة من قاعدة البيانات:", { requestData, requestId });
@@ -1113,6 +1351,7 @@ requestRef.on('child_added', (snapshot) => {
             return;
         });
 });
+
 
 
 
@@ -1184,26 +1423,105 @@ function startRequestTimeout(requestId, timeoutMinutes = 10) {
 }
 
 // دالة قبول الطلب بعد التعديل
-function acceptRequest(requestId, workerId) {
-    const requestRef = database.ref(`workRequests/${requestId}`); // ✅ تصحيح بناء السلسلة النصية
+function acceptRequest(requestId, workerId, workerName) {
+    const requestRef = database.ref(`workRequests/${requestId}`);
+    return requestRef.once('value')
+        .then(snapshot => {
+            const request = snapshot.val();
+            if (!request) {
+                alert('❌ الطلب غير موجود.');
+                console.error(`❌ فشل العثور على الطلب ${requestId}.`);
+                return Promise.reject('الطلب غير موجود');
+            }
+            if (request.status !== 'pending') {
+                alert('⚠️ لا يمكن قبول الطلب لأنه لم يعد في حالة انتظار.');
+                console.error(`❌ رفض قبول الطلب ${requestId}: الحالة الحالية ${request.status}`);
+                return Promise.reject('الطلب غير متاح للقبول');
+            }
+            return requestRef.update({
+                status: 'accepted',
+                acceptedBy: workerId
+            });
+        })
+        .then(() => {
+            // تسجيل القبول في سجل التاريخ (يُضاف سجل جديد دون استبدال القيم السابقة)
+            const activityRef = database.ref(`workRequests/${requestId}/orderHistory`);
+            activityRef.push({
+                type: 'accepted',
+                workerId: workerId,
+                workerName: workerName,
+                timestamp: firebase.database.ServerValue.TIMESTAMP
+            });
 
-    requestRef.update({
-        status: 'accepted',
-        acceptedBy: workerId  // إضافة الحقل acceptedBy
-    }).then(() => {
-        alert('تم قبول الطلب بنجاح.');
-        console.log(`📢 تم قبول الطلب ${requestId} من العامل ${workerId} في ${new Date().toLocaleTimeString()}`);
-        
-        // إلغاء مؤقت المهلة عند قبول الطلب
-        if (timeoutIntervals[requestId]) {
-            clearInterval(timeoutIntervals[requestId]);
-            console.log(`تم إلغاء مؤقت الطلب ${requestId} بعد القبول.`);
-            delete timeoutIntervals[requestId];
-        }
-    }).catch((error) => {
-        console.error(`❌ فشل في قبول الطلب ${requestId}:`, error);
-    });
+            alert('✅ تم قبول الطلب بنجاح.');
+            console.log(`📢 تم قبول الطلب ${requestId} من العامل ${workerId} في ${new Date().toLocaleTimeString()}`);
+            if (window.markers && window.markers[requestId]) {
+                window.markers[requestId].setColor('yellow');
+                console.log(`🎨 تم تغيير لون الماركر للطلب ${requestId} إلى أصفر.`);
+            }
+            if (window.timeoutIntervals && window.timeoutIntervals[requestId]) {
+                clearInterval(window.timeoutIntervals[requestId]);
+                console.log(`⏳ تم إلغاء مؤقت الطلب ${requestId} بعد القبول.`);
+                delete window.timeoutIntervals[requestId];
+            }
+            requestRef.onDisconnect().update({
+                status: 'pending',
+                note: 'تم إعادة تعيين الطلب بسبب انقطاع اتصال العامل'
+            })
+            .then(() => {
+                console.log("✅ onDisconnect تم تعيينه للطلب:", requestId);
+            })
+            .catch((error) => {
+                console.error("❌ خطأ في تعيين onDisconnect للطلب:", requestId, error);
+            });
+            startWorkerHeartbeat(workerId);
+
+            // التعديلات الجديدة:
+// إعادة تعيين الحالة بعد قبول الطلب
+orderCanceled = false;
+orderActive = true;
+localStorage.setItem('orderStatus', 'accepted'); // تحديث التخزين المحلي لحالة الطلب
+
+// إعادة إظهار لوحات ETA والعد التنازلي
+document.getElementById('etaPanel').style.display = 'block';
+document.getElementById('countdownPanel').style.display = 'block';
+
+// تحديث الموقع الحالي للعامل في حال كان هنالك دالة لتحديث الموقع
+if (typeof updateLocationWithGPS === 'function' && currentWorkerId) {
+    updateLocationWithGPS(currentWorkerId); // سيعمل على تحديث currentWorkerLocation
 }
+
+// تحديث jobLocation من بيانات الطلب (يفترض أن requestData يحتوي على بيانات الطلب الجديدة)
+if (requestData && requestData.location) {
+    jobLocation = requestData.location;
+} else {
+    console.error("بيانات موقع الطلب غير متوفرة.");
+}
+
+// التأكد من أن بيانات المواقع متوفرة قبل بدء تتبع ETA
+console.log('currentWorkerLocation:', currentWorkerLocation);
+console.log('jobLocation:', jobLocation);
+
+if (currentWorkerLocation && jobLocation) {
+    // بدء تتبع ETA مع البيانات المحدثة
+    window.etaIntervalId = startRealTimeETATracking(currentWorkerLocation, jobLocation);
+} else {
+    console.error("لا يمكن بدء تتبع ETA؛ تأكد من صحة بيانات المواقع.");
+}
+
+        })
+        .catch(error => {
+            console.error(`❌ لم يتم قبول الطلب ${requestId}:`, error);
+        });
+}
+
+
+
+
+
+
+
+
 
 
 
@@ -1343,9 +1661,10 @@ function startTracking(workerId) {
             try {
                 // إضافة أو تحديث العلامة على الخريطة
                 if (!window.workerMarkers[workerId]) {
-                    window.workerMarkers[workerId] = new mapboxgl.Marker()
-                        .setLngLat([location.lng, location.lat])
-                        .addTo(map);
+                    window.workerMarkers[workerId] = new mapboxgl.Marker({ color: 'green' })
+    .setLngLat([location.lng, location.lat])
+    .addTo(map);
+
                     console.log(`✔️ 17 تم إضافة العلامة للعامل ${workerId}.`);
                 } else {
                     window.workerMarkers[workerId].setLngLat([location.lng, location.lat]);
@@ -1364,31 +1683,7 @@ function startTracking(workerId) {
 
 
 
-function initializeWorkerSession(id) {
-    workerId = id;  // تعيين معرف العامل الحالي
 
-    // إنشاء المراجع بناءً على المعرف الحالي
-    window.workerRef = database.ref(`workers/${workerId}`);
-    window.workerReviewsRef = workerRef.child('reviews');
-
-    console.log("✅ workerId معرف بنجاح:", workerId);
-    console.log("✅ workerRef معرف بنجاح:", workerRef.toString());
-    console.log("✅ workerReviewsRef معرف بنجاح:", workerReviewsRef.toString());
-
-    // استدعاء الدوال التي تعتمد على المعرف
-    updateLocationWithGPS(workerId);
-    focusOnWorkerLocation(workerId);
-
-    // تسجيل مستمع لتحديث الطلبات للعامل الحالي فقط
-    workerRef.child('currentRequest').on('value', (snapshot) => {
-        const requestData = snapshot.val();
-        if (requestData) {
-            console.log(`تم تحديث حالة الطلب للعامل ${workerId}: ${requestData.status}`);
-        } else {
-            console.log(`لا توجد طلبات حاليًا للعامل ${workerId}`);
-        }
-    });
-}
 
 // ملاحظة: يُفترض أن دالة loginWorker بعد التحقق من تسجيل الدخول تقوم باستدعاء initializeWorkerSession
 
@@ -1518,16 +1813,32 @@ function ensureMapInitialized() {
 
 
 
+// تعريف متغيرات الحالة عامةً
+let orderActive = false;  // يتم تفعيله عند قبول الطلب
+let orderCanceled = false; // يتم تفعيله عند إلغاء الطلب
+
 document.addEventListener('DOMContentLoaded', () => {
+
+    // التحقق من حالة الطلب المخزنة في localStorage واسترجاعها
+    const storedStatus = localStorage.getItem('orderStatus');
+    const storedRequestId = localStorage.getItem('currentRequestId');
+    if (storedStatus && storedRequestId && storedStatus === 'canceled_by_worker') {
+        // ضبط الحالة لتجنب تشغيل الدوال الخاصة بالتحديث
+        orderCanceled = true;
+        orderActive = false;
+        document.getElementById('cancelJobContainer').style.display = 'none';
+        console.log("تم استرجاع حالة الإلغاء من التخزين المحلي.");
+    }
+    
     console.log("✔️ 120 تم تحميل DOM بنجاح. بدء التهيئة...");
 
-    // ✅ تحقق من تحميل Firebase و Mapbox قبل استخدامها
+    // التحقق من تحميل Firebase و Mapbox
     if (typeof firebase === 'undefined' || typeof mapboxgl === 'undefined') {
         console.error("🚨 165 لم يتم تحميل Firebase أو Mapbox. يرجى التحقق من الروابط.");
         return;
     }
     
-    // ✅ تهيئة الخريطة فقط إذا لم تكن مهيأة
+    // تهيئة الخريطة إذا لم تكن مهيأة بالفعل
     if (!isMapInitialized) {
         console.log("🔄 168 بدء تهيئة الخريطة...");
         initializeMap();
@@ -1536,7 +1847,7 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log("✅ 169 الخريطة مهيأة بالفعل.");
     }
 
-    // ✅ تأكيد تحميل جميع العناصر قبل إضافة الأحداث
+    // التأكد من تحميل جميع العناصر قبل إضافة الأحداث
     const acceptJobButton = document.getElementById('acceptJobButton');
     const locateButton = document.getElementById('locateButton');
     const styleSelector = document.getElementById('styleSelector');
@@ -1546,8 +1857,6 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error("🚨 170 بعض العناصر غير موجودة في DOM. تأكد من تحميل الصفحة بالكامل.");
         return;
     }
-
-    
 
     styleSelector.addEventListener('change', function () {
         const selectedStyle = this.value;
@@ -1576,29 +1885,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-    // إضافة مستمع الزر هنا
-    const acceptJobButton = document.getElementById('acceptJobButton');
-    if (acceptJobButton) {
-        acceptJobButton.addEventListener('click', () => {
-            // تحقق من جاهزية الخريطة
-            if (!isMapReady) {
-                console.error("⚠️ 52 لا يمكن قبول الطلب قبل أن تصبح الخريطة جاهزة.");
-                return;
-            }
 
-            // منطق القبول: عرض التنبيه وإغلاق النافذة
-            alert(' تم قبول العمل بنجاح');
-            document.getElementById('jobDetailsPopup').style.display = 'none';
-
-            // منطق عرض المسار: استبدل القيم بقيم ديناميكية عند الحاجة
-            const workerLocation = { lng: 13.1913, lat: 32.8872 }; // موقع العامل
-            const jobLocation = { lng: 13.2, lat: 32.9 }; // موقع العمل
-            showRoute(workerLocation, jobLocation);
-        });
-    } else {
-        console.error("🚨 55 الزر 'acceptJobButton' غير موجود في DOM.");
-    }
-;
 
 
 
@@ -1634,15 +1921,30 @@ function addMarkersToMap() {
         if (request && request.location && request.location.lng && request.location.lat) {
             try {
                 // إنشاء الماركر بدون تعيين Popup افتراضي
-                const marker = new mapboxgl.Marker()
-                    .setLngLat([request.location.lng, request.location.lat])
-                    .addTo(map);
+                const marker = new mapboxgl.Marker({ color: 'green' })
+    .setLngLat([request.location.lng, request.location.lat])
+    .addTo(map);
+
                 
-                // إضافة مستمع للنقر على الماركر لعرض نافذة التفاصيل الكاملة
+                // NEW CODE: تخزين الماركر في كائن عام لتسهيل الإزالة لاحقاً
+                if (!window.requestMarkers) {
+                    window.requestMarkers = {};
+                }
+                window.requestMarkers[data.key] = marker;
+                
+                // تعديل مستمع النقر بحيث يعيد جلب البيانات المحدثة من Firebase
                 marker.getElement().addEventListener('click', () => {
-                    // حفظ معرف الطلب الحالي للاستخدام لاحقاً (مثلاً عند قبول الطلب)
                     currentRequestId = data.key;
-                    showJobDetails(request);
+                    firebase.database().ref('workRequests/' + data.key).once('value')
+                    .then((snapshot) => {
+                        const updatedRequest = snapshot.val();
+                        console.log("تم جلب بيانات الطلب المحدثة:", updatedRequest);
+                        showJobDetails(updatedRequest);
+                    })
+                    .catch((error) => {
+                        console.error("خطأ أثناء جلب بيانات الطلب:", error);
+                        alert("حدث خطأ أثناء جلب بيانات الطلب.");
+                    });
                 });
                 
                 console.log(`تمت إضافة الطلب ${data.key} إلى الخريطة.`);
@@ -1656,6 +1958,19 @@ function addMarkersToMap() {
 }
 
 
+
+// NEW CODE: مستمع لإزالة الماركر عند حذف الطلب من Firebase
+database.ref('workRequests').on('child_removed', (snapshot) => {
+    const removedRequestId = snapshot.key;
+    console.log(`تم حذف الطلب ${removedRequestId} من Firebase.`);
+    if (window.requestMarkers && window.requestMarkers[removedRequestId]) {
+        window.requestMarkers[removedRequestId].remove();
+        delete window.requestMarkers[removedRequestId];
+        console.log(`تم إزالة ماركر الطلب ${removedRequestId} من الخريطة.`);
+    } else {
+        console.warn(`لم يتم العثور على ماركر الطلب ${removedRequestId} لإزالته.`);
+    }
+});
 
 
 
@@ -1754,6 +2069,18 @@ map.on('load', () => {
     map.addControl(locateControl);
 });
 
+// NEW CODE: مستمع لتحديث بيانات الطلب عند حدوث تغيير
+database.ref('workRequests').on('child_changed', (snapshot) => {
+    const updatedData = snapshot.val();
+    const requestKey = snapshot.key;
+    console.log(`تم تحديث بيانات الطلب ${requestKey}:`, updatedData);
+    // في حالة كان المستخدم ينقر على الماركر لعرض التفاصيل، يمكنك تحديث النافذة مباشرة
+    // أو تحديث متغير global يحتفظ ببيانات الطلب
+    // مثال: إذا كان currentRequestId يساوي requestKey، يمكنك إعادة عرض النافذة:
+    if (currentRequestId === requestKey) {
+        showJobDetails(updatedData);
+    }
+});
 
 
 
@@ -1802,55 +2129,120 @@ map.on('style.load', () => {
 var currentRequestId = null;
 
 // مستمع الضغط على زر قبول الطلب
-document.getElementById('acceptJobButton').addEventListener('click', function() {
-    // طلب تأكيد من المستخدم قبل قبول الطلب
-    if (!confirm("هل تريد قبول هذا الطلب؟")) {
-        return; // إذا اختار المستخدم "لا" فإن العملية تُلغى
-    }
-    
-    console.log("بدء عملية قبول الطلب...");
-    
-    if (!currentRequestId) {
-        console.error("معرّف الطلب غير متوفر. يرجى التأكد من وجود طلب نشط.");
-        return;
-    }
-    
-    if (!currentWorkerId) {
-        console.error("معرّف العامل غير متوفر. يرجى تسجيل الدخول أولاً.");
-        alert("يرجى تسجيل الدخول قبل قبول الطلب.");
-        return;
-    }
-    
-    console.log("بيانات الطلب ومعرف العامل متوفرة. جاري استدعاء دالة acceptRequest...");
-    acceptRequest(currentRequestId, currentWorkerId);
-    
-    if (!currentWorkerLocation || !jobLocation) {
-        console.error("بيانات الموقع للعامل أو الطلب غير متوفرة.");
-        return;
-    }
-    
-    if (typeof showRoute === "function") {
-        showRoute(currentWorkerLocation, jobLocation);
-        console.log("تم استدعاء دالة showRoute لعرض الاتجاه والمسافة على الخريطة");
-    } else {
-        console.error("وظيفة showRoute غير معرفة");
-    }
-    
-    // بدء تتبع ETA في الوقت الحقيقي وتحديث لوحة etaPanel
-    startRealTimeETATracking(currentWorkerLocation, jobLocation);
-    
-    // بدء العد التنازلي لمدة 3 ساعات (3 * 60 * 60 * 1000 ملّي ثانية)
-    const countdownElement = document.getElementById('countdownTimer');
-    if (countdownElement) {
-        startCountdown(3 * 60 * 60 * 1000, countdownElement, function() {
-            cancelRequestDueToTimeout(currentRequestId);
-        });
-    } else {
-        console.error("عنصر 'countdownTimer' غير موجود في الصفحة");
-    }
-    
-    document.getElementById('jobDetailsPopup').style.display = 'none';
-});
+const acceptJobButton = document.getElementById('acceptJobButton');
+
+if (acceptJobButton) {
+    acceptJobButton.addEventListener('click', async () => {
+        // عرض نافذة التأكيد الأولى
+        if (!confirm("هل تريد قبول هذا الطلب؟")) {
+            console.log("تم إلغاء عملية قبول الطلب بناءً على تأكيد المستخدم.");
+            return;
+        }
+
+        console.log("بدء عملية قبول الطلب...");
+
+        // التحقق من المتغيرات الأساسية
+        if (!currentRequestId) {
+            console.error("معرّف الطلب غير متوفر. يرجى التأكد من وجود طلب نشط.");
+            return;
+        }
+        if (!currentWorkerId) {
+            console.error("معرّف العامل غير متوفر. يرجى تسجيل الدخول أولاً.");
+            alert("يرجى تسجيل الدخول قبل قبول الطلب.");
+            return;
+        }
+        if (activeRequestExists) {
+            console.log("تم قبول طلب سابق بالفعل. لن يتم قبول طلب جديد.");
+            alert("لقد قمت بقبول طلب مسبقاً. لا يمكن قبول طلب جديد.");
+            return;
+        }
+
+        // تعطيل زر القبول لتفادي الضغط المزدوج
+        acceptJobButton.disabled = true;
+        console.log("تم تعطيل زر قبول الطلب لتفادي الضغط المزدوج.");
+
+        try {
+            // جلب بيانات الطلب والتحقق من حالته
+            const snapshot = await firebase.database().ref('workRequests/' + currentRequestId).once('value');
+            const request = snapshot.val();
+
+            if (!request) {
+                console.error("❌ لم يتم العثور على الطلب في قاعدة البيانات.");
+                alert("❌ الطلب غير موجود.");
+                acceptJobButton.disabled = false;
+                return;
+            }
+
+            if (request.status !== 'pending') {
+                alert("⚠️ لا يمكن قبول الطلب لأنه لم يعد في حالة انتظار.");
+                console.error("رفض قبول الطلب: الحالة الحالية " + request.status);
+                acceptJobButton.disabled = false;
+                return;
+            }
+
+            // تحديث حالة الطلب في Firebase
+            await firebase.database().ref('workRequests/' + currentRequestId).update({
+                status: 'accepted',
+                acceptedBy: currentWorkerId
+            });
+
+            alert("✅ تم قبول الطلب بنجاح.");
+            console.log(`📢 تم قبول الطلب ${currentRequestId} بواسطة العامل ${currentWorkerId}`);
+
+            activeRequestExists = true;
+
+            // إخفاء نافذة تفاصيل الطلب
+            document.getElementById('jobDetailsPopup').style.display = 'none';
+
+            // تنفيذ الدوال الإضافية بعد قبول الطلب
+            if (currentWorkerLocation && jobLocation) {
+                if (typeof showRoute === "function") {
+                    showRoute(currentWorkerLocation, jobLocation);
+                    console.log("🚗 تم استدعاء دالة showRoute لعرض الاتجاه والمسافة على الخريطة.");
+                } else {
+                    console.error("⚠️ وظيفة showRoute غير معرفة.");
+                }
+
+                startRealTimeETATracking(currentWorkerLocation, jobLocation);
+            } else {
+                console.error("❌ بيانات الموقع للعامل أو الطلب غير متوفرة.");
+            }
+
+            // التحقق من المسافة لتحديث زر الإلغاء
+            const distance = getWorkerDistance();
+            if (distance >= 0.5) {
+                document.getElementById('cancelJobContainer').style.display = 'block';
+                console.log("📍 تم إظهار زر إلغاء الطلب لأن المسافة:", distance.toFixed(2), "كم");
+            } else {
+                document.getElementById('cancelJobContainer').style.display = 'none';
+                alert("⚠️ الطلب لن يُلغى إذا أصبح العامل قريبًا (أقل من 500 متر) من الموقع.");
+                console.log("🚨 العامل قريب جدًا ولا يمكن إلغاء الطلب. المسافة:", distance.toFixed(2), "كم");
+            }
+
+            // بدء العد التنازلي لإنهاء الطلب إذا لم يُنفذ خلال مدة معينة
+            const countdownElement = document.getElementById('countdownTimer');
+            if (countdownElement) {
+                startCountdown(3 * 60 * 60 * 1000, countdownElement, () => {
+                    cancelRequestDueToTimeout(currentRequestId);
+                });
+            } else {
+                console.error("⚠️ عنصر 'countdownTimer' غير موجود في الصفحة.");
+            }
+
+        } catch (error) {
+            console.error("❌ حدث خطأ أثناء معالجة قبول الطلب:", error);
+            alert("❌ حدث خطأ أثناء قبول الطلب. يرجى المحاولة مرة أخرى.");
+            acceptJobButton.disabled = false;
+        }
+    });
+} else {
+    console.error("🚨 الزر 'acceptJobButton' غير موجود في DOM.");
+}
+
+
+
+
+
 
 
 
@@ -1899,9 +2291,10 @@ if (typeof map !== 'undefined' && map instanceof mapboxgl.Map) {
         document.getElementById('confirmYes').addEventListener('click', () => {
             const userLocation = map.getCenter();
             // إضافة العلامة في الموقع الحالي
-            new mapboxgl.Marker()
-                .setLngLat(userLocation)
-                .addTo(map);
+            new mapboxgl.Marker({ color: 'green' })
+    .setLngLat(userLocation)
+    .addTo(map);
+
             // عرض نافذة إدخال الاسم ورقم الهاتف
             document.getElementById('inputPopup').style.display = 'block';
             document.getElementById('confirmationPopup').style.display = 'none';
@@ -1955,634 +2348,34 @@ if (typeof map !== 'undefined' && map instanceof mapboxgl.Map) {
         });
 
 
-        function cancelRequestDueToTimeout(requestId) {
+        function cancelRequestDueToTimeout(requestId, workerId, workerName) {
     const requestRef = database.ref(`workRequests/${requestId}`);
-    requestRef.update({ status: 'cancelled' })  // أو 'timeout' حسب منطق التطبيق
-        .then(() => {
-            console.log(`تم إلغاء الطلب ${requestId} بسبب انتهاء وقت الوصول.`);
-            alert("انتهى الوقت المسموح للوصول، تم إلغاء الطلب.");
-        })
-        .catch((error) => {
-            console.error(`خطأ أثناء إلغاء الطلب ${requestId}:`, error);
-        });
-}
-
-
-
-
-        
-    </script>
-
-<!-- زر اختبار الإشعارات -->
-<button id="testNotification">اختبار الإشعارات</button>
-
-<script>
-  // تأكد من تنفيذ الكود بعد تحميل محتويات الصفحة
-  document.getElementById('testNotification').addEventListener('click', () => {
-      fetch('/send-notification', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: 'اختبار إشعار!' })
-      })
-      .then(res => res.json())
-      .then(data => console.log('نتيجة الاختبار:', data))
-      .catch(err => console.error('فشل اختبار الإشعارات:', err));
-  });
-</script>
-<!-- كود تسجيل Service Worker -->
-<script>
-
-  </script>
-
-</body>
-</html>
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>تطبيق الخريطة المحسن</title>
-    <link href="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css" rel="stylesheet" />
-    <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.css" type="text/css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #f4f4f4;
-        }
-        #map { height: 100vh; width: 100%; }
-        .controlButton {
-            background-color: rgba(30, 144, 255, 0.8);
-            border: none;
-            border-radius: 10px;
-            padding: 10px;
-            color: white;
-            font-weight: bold;
-            cursor: pointer;
-            margin: 5px 0;
-            transition: background-color 0.3s ease;
-            width: 100%;
-            font-size: 14px;
-        }
-        .controlButton:hover {
-            background-color: rgba(30, 144, 255, 1);
-        }
-        .controls {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            z-index: 1;
-            max-width: 90%;
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-        .iconButton {
-            width: 40px;
-            height: 40px;
-            border: none;
-            cursor: pointer;
-            background: none;
-            margin: 5px;
-            z-index: 2;
-        }
-        .icon {
-            font-size: 20px;
-            color: #ff5722;
-            transition: color 0.3s;
-        }
-        .icon:hover {
-            color: #e64a19;
-        }
-        #locateButtonContainer {
-            position: absolute;
-            bottom: 20px; /* مسافة من الأسفل */
-            right: 20px; /* مسافة من اليمين */
-            z-index: 2;
-        }
-        #locateButton {
-            background-color: rgba(30, 144, 255, 0.8);
-            border: none;
-            border-radius: 10px;
-            padding: 10px;
-            color: white;
-            font-weight: bold;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
-            font-size: 14px;
-        }
-        #locateButton:hover {
-            background-color: rgba(30, 144, 255, 1);
-        }
-        #etaPanel p {
-    display: inline-block;
-    margin: 0 10px;
-    font-size: 16px;
-}
-
-    </style>
-</head>
-<body>
-    <h1 id="title" style="display: none;">تطبيق الخريطة المحسن</h1>
-    <div id="map"></div>
-
-<!-- نافذة تفاصيل العمل بعد التعديل -->
-<div id="jobDetailsPopup" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; border-radius:10px; padding:20px; z-index:3;">
-    <h2>تفاصيل العمل</h2>
-    <p id="jobDescription"></p>
-    <p id="userPhone"></p>
-    <!-- عنصر عرض الصورة -->
-    <img id="jobImage" src="" alt="صورة العمل" style="max-width:100%; height:auto; display:none;">
-    <p id="jobLocation"></p>
-    <p id="jobDuration"></p>
-    <p id="jobBudget"></p>
-    <p id="jobDistance"></p>
-    <p id="estimatedArrivalTime"></p>
-    <button id="acceptJobButton">قبول الطلب</button>
-    <button onclick="document.getElementById('jobDetailsPopup').style.display='none'">إغلاق</button>
-</div>
-
     
-
-
-    <div class="controls">
-        <button id="toggleWeather" class="iconButton">
-            <i class="fas fa-cloud-sun icon"></i>
-        </button>
-        <select id="styleSelector" class="controlButton">
-            <option value="streets">شوارع</option>
-            <option value="satellite">الأقمار الصناعية</option>
-            <option value="outdoors">خارجية</option>
-            <option value="hybrid" selected>هايبرد</option>
-            <option value="dark">الوضع الليلي</option>
-            <option value="light">الوضع الفاتح</option>
-        </select>
-        
-        <button id="requestWater" class="controlButton">طلب ماء</button>
-        <div id="weatherInfo"></div>
-        <div id="workerInfo"></div>
-    </div>
-
-
-
-    <div id="locateButtonContainer">
-        <button id="locateButton">تحديد موقعي</button>
-    </div>
-
-<!-- حاوية عرض معلومات ETA تبقى في الأسفل -->
-<div id="etaPanel" style="position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%); background: white; padding: 10px; border-radius: 5px; z-index: 4;">
-    <p id="etaDisplay"></p>
-</div>
-
-<!-- حاوية العد التنازلي تظهر في أعلى الصفحة بحجم خط أصغر -->
-<div id="countdownPanel" style="position: fixed; top: 10px; left: 50%; transform: translateX(-50%); background: #fff; padding: 5px 8px; border-radius: 5px; z-index: 4; font-size: 12px;">
-    <p id="countdownTimer"></p>
-</div>
-
-    
-    
-
-    <!-- نافذة التحذير -->
-    <div id="confirmationPopup" style="display:none; position:fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 10px; padding: 20px; z-index: 3;">
-        <h2>تحذير</h2>
-        <p>سيتم وضع العلامة في المكان الذي تقف فيه حاليا. هل أنت موافق؟</p>
-        <button id="confirmYes">نعم</button>
-        <button id="confirmNo">لا</button>
-    </div>
-
-    <!-- نافذة إدخال الاسم ورقم الهاتف -->
-    <div id="inputPopup" style="display:none; position:fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 10px; padding: 20px; z-index: 3;">
-        <h2>إضافة معلومات</h2>
-        <label for="nameInput">اسم:</label>
-        <input type="text" id="nameInput" placeholder="أدخل الاسم">
-        <label for="phoneInput">رقم هاتف:</label>
-        <input type="text" id="phoneInput" placeholder="أدخل رقم الهاتف">
-        <button id="submitInfo">التالي</button>
-        <button id="cancelInput">إلغاء</button>
-    </div>
-
-
-    <!-- تخصيص معرّف لعامل -->
-<div id="assignIdContainer" style="margin: 20px; background: white; padding: 20px; border-radius: 10px; box-shadow: 0px 4px 6px rgba(0,0,0,0.1);">
-    <h3>تخصيص معرّف لعامل</h3>
-    <input type="text" id="workerIdInput" placeholder="معرّف العامل" style="margin-bottom: 10px; width: 100%; padding: 8px;">
-    <input type="text" id="workerNameInput" placeholder="اسم العامل" style="margin-bottom: 10px; width: 100%; padding: 8px;">
-    <button id="assignIdButton" style="padding: 10px; background-color: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer;">تخصيص المعرّف</button>
-
-    <!-- تسجيل الدخول باستخدام المعرّف -->
-    <div id="loginPopup" style="display: flex; flex-direction: column; align-items: center; justify-content: center; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 10px; box-shadow: 0px 4px 6px rgba(0,0,0,0.3); z-index: 10;">
-        <h3>أدخل المعرّف الخاص بك للبدء</h3>
-        <input type="text" id="workerLoginId" placeholder="أدخل معرّف العامل" style="margin-bottom: 10px; width: 200px; padding: 10px; border: 1px solid #ccc; border-radius: 5px;">
-        <button id="loginWorkerButton" style="padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">تسجيل الدخول</button>
-
- 
-</div>
-
-
-<!-- مكتبات Firebase App و Messaging -->
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-<script src="https://js.pusher.com/beams/1.0/push-notifications-cdn.js"></script>
-
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-
-<!-- مكتبات إضافية -->
-<script src="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.js"></script>
-<script src="https://unpkg.com/@turf/turf"></script>
-<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.js"></script>
-<script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.7.0/mapbox-gl-geocoder.min.js"></script>
-
-<script>
-
-    
-    // التحقق من تحميل مكتبات Firebase و Pusher Beams
-if (typeof firebase === 'undefined' || typeof PusherPushNotifications === 'undefined') {
-    console.error('🚨💭 123  تأكد من تحميل مكتبات Firebase وPusher قبل استخدامها.');
-} else {
-    console.log('✅💭 124 تم تحميل المكتبات بنجاح.');
-if (!firebase || !PusherPushNotifications) {
-    console.error('🚨 149 فشل تحميل مكتبات Firebase أو Pusher Beams.');
-}
-}
-    document.addEventListener('DOMContentLoaded', function() {
-           // تهيئة Firebase Auth
-           const auth = firebase.auth();
-        
-        // عرض نافذة تسجيل الدخول عند تحميل الصفحة
-    document.getElementById('loginPopup').style.display = 'flex';
-
-
-
-
-
-
-
-
-
-
-
-
-
-// تحقق من تحميل مكتبة Pusher Beams
-if (typeof PusherPushNotifications === 'undefined') {
-    console.error('🚨💭 137 Pusher Beams لم يتم تحميل المكتبة. تأكد من تضمين المكتبة في HTML.');
-} else {
-    console.log('✅💭 141 Pusher Beams تم تحميل المكتبة بنجاح.');
-}
-
-function initBeams() {
-    console.log("🚀 142 DOMContentLoaded تم تنفيذه بنجاح.");
-    
-    // إنشاء كائن Beams Client
-    const beamsClient = new PusherPushNotifications.Client({
-    instanceId: '2a17d881-b1a6-4a38-8cd4-de1ab8212f67',
-  });
-    
-    console.log("📝 140 قبل تسجيل Service Worker الخاص بـ Beams.");
-    
-    navigator.serviceWorker.register('http://localhost:20000/service-worker.js')
-        .then((registration) => {
-            console.log("📝 143 تم تسجيل Service Worker الخاص بـ Beams:", registration);
-            return beamsClient.start({ serviceWorkerRegistration: registration });
-        })
-        .then(() => {
-            console.log('🛠️ 136 تم استدعاء start() بنجاح، يتم الآن تنفيذ addDeviceInterest.');
-            beamsClient.addDeviceInterest('debug-new-orderss')
-  .then(() => console.log('تم تسجيل الجهاز للاشتراك في debug-new-orderss'))
-  .catch(err => console.error('فشل تسجيل الجهاز:', err));
-        })
-        .then(() => {
-            console.log('✅💭 125 Pusher Beams جاهز لاستقبال إشعارات الطلبات الجديدة');
-        })
-        .catch((err) => {
-            console.error('🚨 127 خطأ في التسجيل:', err);
-            alert(`⚠️ 150 خطأ في تسجيل Service Worker: ${err.message}`);
-console.error('🚨 151 فشل تسجيل Service Worker:', err);
-        });
-    
-    beamsClient.onNotificationOpened = (payload) => {
-        alert(`إشعار جديد من Pusher Beams: ${payload.notification.body}`);
-    };
-}
-
-// تأكد من تنفيذ الكود سواء حدث DOMContentLoaded أم لا
-if (document.readyState === 'loading') {
-    document.addEventListener("DOMContentLoaded", initBeams);
-} else {
-    initBeams();
-}
-
-console.log("✅💭 126 Pusher Beams تم تحميل المكتبة بنجاح.");
-
-if (typeof PusherPushNotifications === 'undefined') {
-    console.error('🚨 134 مكتبة Pusher Beams غير محملة، تأكد من تضمينها في الصفحة.');
-} else {
-    console.log('✅ 135 مكتبة Pusher Beams تم تحميلها بنجاح.');
-}
-
-// تسجيل Service Worker مرة واحدة (إذا لم يكن ذلك مطلوبًا أكثر من مرة)
-if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('http://localhost:20000/service-worker.js')
-    .then(registration => {
-        console.log('✅😘💕 128 Service Worker مسجل بنجاح:', registration.scope);
+    // تحديث الحالة مع الاحتفاظ بآخر عامل ألغى الطلب
+    requestRef.update({
+        status: 'cancelled',
+        canceledBy: workerId // لا يزال هذا الحقل يحتفظ بآخر عامل ألغى الطلب
     })
-    .catch(error => {
-        console.error('🚨 129 فشل تسجيل Service Worker:', error);
-    });
-} else {
-    console.warn('⚠️ 130  المتصفح لا يدعم Service Worker.');
-}
-
-// دالة إرسال إشعار باستخدام Pusher Beams
-function sendPusherNotification(interest, message, title = "إشعار جديد") {
-    fetch(`https://${pusherInstanceId}.pushnotifications.pusher.com/publish_api/v1/instances/${pusherInstanceId}/publishes`, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${pusherAuthorization}`,
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            interests: [interest],
-            fcm: {
-                notification: {
-                    title: title,
-                    body: message
-                }
-            }
-        })
-    })
-    .then(response => response.json())
-    .then(data => console.log("تم إرسال الإشعار بنجاح:", data))
-    .catch(error => console.error("فشل إرسال الإشعار:", error));
-}
-
-
-
-
-
-
-
-
-
-
-
-         // دالة لإعادة تعيين الحقول في inputPopup عند النقر على زر "إلغاء"
-         document.getElementById('cancelInput').addEventListener('click', () => {
-            document.getElementById('nameInput').value = ''; // إعادة تعيين حقل الاسم
-            document.getElementById('phoneInput').value = ''; // إعادة تعيين حقل الهاتف
-            document.getElementById('inputPopup').style.display = 'none'; // إخفاء النافذة
+    .then(() => {
+        // تسجيل الإلغاء في السجل التاريخي للطلبات
+        const activityRef = database.ref(`workRequests/${requestId}/orderHistory`);
+        activityRef.push({
+            type: 'timeout',
+            workerId: workerId,
+            workerName: workerName,
+            timestamp: firebase.database.ServerValue.TIMESTAMP
         });
 
+        console.log(`🚫 تم إلغاء الطلب ${requestId} بسبب انتهاء وقت الوصول من قبل ${workerName} (${workerId}).`);
+        alert("⏳ انتهى الوقت المسموح للوصول، تم إلغاء الطلب.");
 
-
-// إخفاء نافذة تسجيل الدخول بعد التحقق من المعرّف
-function hideLoginPopup() {
-    document.getElementById('loginPopup').style.display = 'none';
-}
-});
-    
-
-function showRoute(workerLocation, jobLocation) {
-    const directionsRequest = `https://api.mapbox.com/directions/v5/mapbox/driving/${workerLocation.lng},${workerLocation.lat};${jobLocation.lng},${jobLocation.lat}?steps=true&geometries=geojson&access_token=${mapboxgl.accessToken}`;
-    console.log('30 طلب الاتجاهات:', directionsRequest);
-
-    fetch(directionsRequest)
-        .then(response => response.json())
-        .then(data => {
-            const route = data.routes[0].geometry;
-            // حفظ بيانات المسار في متغير عام
-            window.currentRouteData = {
-                type: 'Feature',
-                geometry: route
-            };
-
-            // استخدم بيانات المسار من المتغير العام
-            if (map.getSource('route')) {
-                console.log('31 تم العثور على المصدر route:', map.getSource('route'));
-                map.getSource('route').setData(window.currentRouteData);
-            } else {
-                map.addLayer({
-                    id: 'route',
-                    type: 'line',
-                    source: {
-                        type: 'geojson',
-                        data: window.currentRouteData
-                    },
-                    layout: { 'line-join': 'round', 'line-cap': 'round' },
-                    paint: { 'line-color': '#3887be', 'line-width': 5 }
-                });
-            }
-        })
-        .catch(console.error);
-}
-
-
-
-function updateWorkerLocation(workerId, newLocation) {
-    const workerLocationRef = database.ref(`workers/${workerId}/location`);
-    
-    // استخدام المرجع المباشر للعامل بدلاً من المتغير العام workerRef
-    database.ref(`workers/${workerId}`).once('value').then((snapshot) => {
-        const workerData = snapshot.val();
-        const currentLocation = workerData && workerData.location;
-        
-        if (!currentLocation || currentLocation.lat !== newLocation.lat || currentLocation.lng !== newLocation.lng) {
-            workerLocationRef.set(newLocation)
-            .then(() => console.log("✅ 148 تم تحديث الموقع في Firebase:", newLocation))
-            .catch((error) => console.error("❌ 153 خطأ في تحديث الموقع في Firebase:", error));
-        } else {
-            console.log("🔄 88 لم يتغير الموقع، لا حاجة لتحديث Firebase.");
-        }
-    }).catch((error) => {
-        console.error("❌ 89 خطأ أثناء قراءة الموقع من Firebase:", error);
-    });
-}
-
-
-// [السطر 180] تعديل دالة تحديث الموقع باستخدام GPS لتحسين سرعة الاستجابة
-function updateLocationWithGPS(workerId) {
-    if (navigator.geolocation) {
-        // الحصول على الموقع الأولي باستخدام getCurrentPosition مع دقة عالية
-        navigator.geolocation.getCurrentPosition((position) => {
-            const initialLocation = {
-                lat: position.coords.latitude,
-                lng: position.coords.longitude,
-            };
-            console.log("✅ 90 Pre-cached location:", initialLocation);
-            updateWorkerLocation(workerId, initialLocation);
-        }, (error) => {
-            console.error("🚨 91 Error pre-fetching location:", error);
-        }, { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-        );
-        
-        // متابعة تحديث الموقع باستخدام watchPosition مع دقة عالية
-        navigator.geolocation.watchPosition((position) => {
-            const newLocation = {
-                lat: position.coords.latitude,
-                lng: position.coords.longitude,
-            };
-            console.log("📡 93 Updating location with watchPosition:", newLocation);
-            window.currentWorkerLocation = newLocation;
-            updateWorkerLocation(workerId, newLocation);
-        }, (error) => {
-            console.error("🚨 197 Error during continuous location tracking:", error);
-        }, { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-        );
-    } else {
-        console.error("🚨 198 Geolocation is not supported in this browser.");
-    }
-}
-
-
-
-
-
-let isMapReady = false; // تعريف المتغير لتتبع جاهزية الخريطة.
-console.log("⚙️ 56 تم تعريف isMapReady وقيمته الحالية هي:", isMapReady);
-
-/**
- * دالة تتحقق من جاهزية الخريطة للاستخدام.
- * @returns {boolean} هل الخريطة جاهزة للاستخدام؟
- */
-let mapReadyLogged = false; // متغير لتعقب تسجيل الجاهزية
-
-function isMapReadyToUse() {
-    if (typeof map === 'undefined') {
-        console.error("🚨 60 [خطأ] الكائن 'map' غير معرّف بعد. سيتم إعادة تهيئته.");
-        initializeMap(); // إعادة التهيئة عند الحاجة
-        return false;
-    }
-
-    if (!(map instanceof mapboxgl.Map)) {
-        console.error("🚨 61 [خطأ] الكائن 'map' ليس مثيلاً لـ Mapbox. سيتم إعادة تهيئته.");
-        initializeMap(); // إصلاح التهيئة
-        return false;
-    }
-
-    if (!map.isStyleLoaded()) {
-        console.warn("⚠️ 62 [تحذير] النمط الخاص بالخريطة لم يتم تحميله بالكامل بعد.");
-        return false;
-    }
-
- 
-    if (typeof isMapReady === 'undefined' || !isMapReady) {
-        console.warn("⚠️ 63 [تحذير] حالة isMapReady غير مهيأة أو غير جاهزة.");
-        return false;
-    }
-
-    if (!mapReadyLogged) {
-        console.log("✅ 114 [نجاح] الخريطة جاهزة بالكامل! يمكن الآن تنفيذ العمليات المرتبطة بها.");
-        mapReadyLogged = true; // منع تسجيل الرسالة مرة أخرى
-    }
-
-
-    return true;
-}
-
-
-// دالة تنتظر تحميل نمط الخريطة قبل المتابعة
-function waitUntilMapReady() {
-    return new Promise((resolve, reject) => {
-        if (map && map.isStyleLoaded()) {
-            console.log("ℹ️: 176 الخريطة جاهزة بالفعل.");
-            resolve();
-        } else {
-            // انتظار حدث تحميل النمط (يعمل لمرة واحدة)
-            map.once('style.load', () => {
-                console.log("ℹ️: 177 تم تحميل النمط – الخريطة جاهزة الآن.");
-                resolve();
-            });
-            // تعيين مهلة انتظار (مثلاً 15 ثانية)
-            setTimeout(() => {
-                if (!map.isStyleLoaded()) {
-                    console.error("🚨:178  انتهى وقت الانتظار لتحميل النمط.");
-                    reject(new Error(" 179 انتهى وقت الانتظار لتحميل النمط."));
-                }
-            }, 15000);
-        }
-    });
-}
-
-
-let map; // تعريف متغير الخريطة إذا لم يكن موجودًا بالفعل.
-console.log("⚙️ 57 تم تعريف المتغير map وهو حالياً:", map);
-
-let isMapInitialized = false; // متغير لتتبع حالة تحميل الخريطة.
-console.log("⚙️ 58 تم تعريف isMapInitialized وقيمته الحالية هي:", isMapInitialized);
-
-
-/**
- * دالة التحقق من جاهزية الخريطة
- * @returns {boolean} هل الخريطة جاهزة للاستخدام
- */
-
-
-
-
-
-
-
-// إعداد Firebase بالمفاتيح الصحيحة
-const firebaseConfig = {
-    apiKey: "AIzaSyAQ2FQL0DvbPx4YnJrrAmal2o-yaH_KP_s",
-    authDomain: "adlo-44d1b.firebaseapp.com",
-    databaseURL: "https://adlo-44d1b-default-rtdb.firebaseio.com",
-    projectId: "adlo-44d1b",
-    storageBucket: "adlo-44d1b.firebasestorage.app",
-    messagingSenderId: "96260637269",
-    appId: "1:96260637269:web:e3bc37ab2b41038c254adc",
-    measurementId: "G-R0SGBWC3CJ"
-};
-
-// تهيئة Firebase
-if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
-    console.log("✅ 94 Firebase تم تهيئته بنجاح.");
-} else {
-    console.warn("⚠️ 95 Firebase تم تهيئته مسبقًا، لن يتم التهيئة مرة أخرى.");
-}
-
-
-
-function focusOnWorkerLocation(workerId) {
-  // التأكد من تمرير معرّف العامل 547
-  if (!workerId) {
-    console.error("🚨 190 لم يتم تمرير معرّف العامل.");
-    return;
-  }
-  console.log(`🔍 191 بدء تنفيذ focusOnWorkerLocation للعامل ${workerId}`);
-
-  // استرجاع بيانات الموقع من Firebase
-  database.ref(`workers/${workerId}/location`).once('value')
-    .then((snapshot) => {
-      const location = snapshot.val();
-      console.log("📡 193 تم استرجاع البيانات من Firebase:", location);
-
-      // التحقق من وجود بيانات الموقع وصحتها
-      if (location && location.lat && location.lng) {
-        console.log(`📍 194 موقع العامل: ${location.lng}, ${location.lat}`);
-
-        // الانتظار حتى تكون الخريطة جاهزة للاستخدام
-        waitUntilMapReady().then(() => {
-          console.log(`🗺️ 195 سيتم تركيز الخريطة على موقع العامل ${workerId}`);
-          map.flyTo({
-            center: [location.lng, location.lat],
-            zoom: 15,
-            speed: 0.8 // سرعة الانتقال (يمكنك تعديلها)
-          });
-        }).catch(err => {
-          console.error("🚨 196 خطأ أثناء انتظار جاهزية الخريطة:", err);
-        });
-      } else {
-        console.error(`🚨 199 بيانات موقع العامل ${workerId} غير متوفرة أو غير صحيحة.`);
-      }
+        // تحديث الحالة التشغيلية
+        orderCanceled = true;
+        orderActive = false;
+        clearInterval(window.etaIntervalId);
     })
     .catch((error) => {
-      console.error(`🚨 200 خطأ أثناء جلب موقع العامل ${workerId}:`, error);
+        console.error(`❌ خطأ أثناء إلغاء الطلب ${requestId}:`, error);
     });
 }
 
@@ -2590,1267 +2383,6 @@ function focusOnWorkerLocation(workerId) {
 
 
 
-// دالة لحساب المسافة بين موقعين باستخدام صيغة Haversine (تم إضافتها في السطر 265)
-function calculateDistance(loc1, loc2) {
-    if (!loc1 || !loc2) {
-        console.error("بيانات الموقع غير متوفرة لحساب المسافة");
-        return 0;
-    }
-    const lat1 = parseFloat(loc1.lat);
-    const lng1 = parseFloat(loc1.lng);
-    const lat2 = parseFloat(loc2.lat);
-    const lng2 = parseFloat(loc2.lng);
-    const R = 6371; // نصف قطر الأرض بالكيلومترات
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLng = (lng2 - lng1) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-              Math.sin(dLng / 2) * Math.sin(dLng / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const distance = R * c;
-    console.log(`المسافة المحسوبة بين الموقعين: ${distance.toFixed(2)} كم`);
-    return distance;
-}
-
-
-
-function calculateETA(workerLocation, jobLocation, callback) {
-    const directionsRequest = `https://api.mapbox.com/directions/v5/mapbox/driving/${workerLocation.lng},${workerLocation.lat};${jobLocation.lng},${jobLocation.lat}?steps=true&geometries=geojson&access_token=${mapboxgl.accessToken}`;
-    fetch(directionsRequest)
-        .then(response => response.json())
-        .then(data => {
-            if (!data.routes || !data.routes[0]) {
-                console.error("لم يتم استرجاع بيانات الطريق من API");
-                return;
-            }
-            const durationInSeconds = data.routes[0].duration;
-            const distanceInMeters = data.routes[0].distance;
-            console.log("تم حساب ETA بنجاح", { duration: durationInSeconds, distance: distanceInMeters });
-            callback(null, { duration: durationInSeconds, distance: distanceInMeters, route: data.routes[0].geometry });
-        })
-        .catch(err => {
-            console.error("خطأ في استدعاء API لحساب ETA:", err);
-            callback(err);
-        });
-}
-
-function updateETADisplay(duration, distance, targetElement) {
-    const minutes = Math.round(duration / 60);
-    const kilometers = (distance / 1000).toFixed(2);
-    targetElement.innerText = `الوقت المقدر: ${minutes} دقيقة | المسافة: ${kilometers} كم`;
-    console.log("تم تحديث واجهة المستخدم للوقت المقدر", { minutes, kilometers });
-}
-
-
-function startRealTimeETATracking(workerLocation, jobLocation) {
-    const etaDisplay = document.getElementById('etaDisplay');
-    if (!etaDisplay) {
-        console.error("عنصر etaDisplay غير موجود في الصفحة لتحديث ETA");
-        return;
-    }
-    const intervalId = setInterval(() => {
-        calculateETA(workerLocation, jobLocation, (err, data) => {
-            if (err) {
-                console.error("خطأ في حساب ETA:", err);
-                return;
-            }
-            // تحديث عرض ETA
-            updateETADisplay(data.duration, data.distance, etaDisplay);
-            
-            // التحقق من المسافة بين العامل وموقع الطلب
-            const distance = calculateDistance(workerLocation, jobLocation); // المسافة بالكيلومترات
-            if (distance <= 0.5 && window.fullPhone) {  // 0.5 كم تعادل 500 متر
-                // تحديث عنصر رقم الهاتف لعرض الرقم الكامل
-                document.getElementById('userPhone').innerText = `رقم الهاتف: ${window.fullPhone}`;
-            }
-        });
-    }, 15000); // التحديث كل 15 ثانية
-    console.log("تم بدء تتبع ETA في الوقت الحقيقي");
-    return intervalId;
-}
-
-
-
-
-// دوال العد التنازلي
-function formatTime(ms) {
-    const totalSeconds = Math.floor(ms / 1000);
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-    return `${hours} ساعة ${minutes} دقيقة ${seconds} ثانية`;
-}
-
-function startCountdown(duration, targetElement, onComplete) {
-    let remaining = duration;
-    targetElement.innerText = formatTime(remaining);
-    const countdownInterval = setInterval(() => {
-        remaining -= 1000;
-        if (remaining <= 0) {
-            clearInterval(countdownInterval);
-            targetElement.innerText = "انتهى الوقت";
-            console.log("تم انتهاء العد التنازلي بنجاح");
-            onComplete();  // تنفيذ الإجراء عند انتهاء الوقت
-        } else {
-            targetElement.innerText = formatTime(remaining);
-        }
-    }, 1000);
-    console.log("تم بدء العد التنازلي");
-    return countdownInterval;
-}
-
-
-
-
-// إعداد Firebase Messaging للإرسال فقط
-const messaging = firebase.messaging();
-
-// تعريف إرسال إشعار بناءً على معرّف العامل
-function sendPusherNotificationByWorker(workerId, message) {
-    fetch('http://localhost:7000/send-notification', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workerId, message })
-    })
-    .then((response) => response.json())
-    .then((data) => console.log(' 188 تم إرسال الإشعار بنجاح:', data))
-    .catch((error) => console.error(' 189 فشل الإرسال:', error));
-}
-
-
-
-
-
-
-    
-    // مرجع إلى قاعدة بيانات Firebase حيث سيتم تخزين بيانات العمال
-    const database = firebase.database();
-    const workersRef = database.ref('workers');
-
-    // دالة لإنشاء دفعة من المعرّفات
-function generateWorkerIds(batchSize) {
-    for (let i = 0; i < batchSize; i++) {
-        const workerId = `worker_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-        database.ref(`availableWorkerIds/${workerId}`).set({ used: false });
-    }
-    console.log(`${batchSize} معرّفات تم إنشاؤها بنجاح.`);
-}
-
-// إنشاء دفعة من المعرّفات عند الحاجة
-generateWorkerIds(5000); // مثال: إنشاء 5000     // [295] تعريف معرف العامل
-
-
-
-
-    const workerId = "worker_123"; // تأكد من تعديل المعرف عند الحاجة
-    if (!workerId) {
-        throw new Error("🚨159 workerId غير معرف بشكل صحيح.");
-    }
-    console.log("✅ 160 workerId معرف بنجاح:", workerId);
-
-    // [297] تعريف workerRef
-    const workerRef = database.ref(`workers/${workerId}`);
-    if (!workerRef) {
-        console.error("🚨 161 لم يتم تعريف workerRef بشكل صحيح.");
-    } else {
-        console.log("✅ 162 workerRef معرف بنجاح:", workerRef.toString());
-    }
-
-    // [301] تعريف workerReviewsRef باستخدام workerRef.child
-    const workerReviewsRef = workerRef.child('reviews');
-    if (!workerReviewsRef) {
-        console.error("🚨 163 لم يتم تعريف workerReviewsRef بشكل صحيح.");
-    } else {
-        console.log("✅ 164 workerReviewsRef معرف بنجاح:", workerReviewsRef.toString());
-    }
-
-
- 
-
-        // دالة لعرض تفاصيل العمل
-        // دالة لعرض تفاصيل العمل مع حساب المسافة
-        function showJobDetails(jobData) {
-    // عرض الوصف التفصيلي؛ إذا لم يكن الوصف موجودًا، يتم عرض نوع العمل كبديل
-    document.getElementById('jobDescription').innerText = `وصف العمل: ${jobData.description || jobData.workType}`;
-    
-    // حفظ الرقم الكامل في متغير عام لاستخدامه لاحقاً
-    const fullPhone = jobData.phone || "غير متوفر";
-    window.fullPhone = fullPhone;
-    
-    // إنشاء نسخة مخفية من الرقم: إذا كان الرقم موجودًا وطوله أكبر من 5 أحرف
-    let maskedPhone = fullPhone;
-    if (fullPhone !== "غير متوفر" && fullPhone.length > 5) {
-       maskedPhone = fullPhone.substr(0, 5) + "*****";
-    }
-    
-    // عرض رقم الهاتف بشكل مخفي مع تنبيه بأن الرقم الكامل سيظهر عند الاقتراب 500 متر
-    document.getElementById('userPhone').innerText = `رقم الهاتف: ${maskedPhone} (سيظهر الرقم الكامل عند الاقتراب 500 متر)`;
-    
-    // عرض صورة العمل إذا كانت موجودة، وإخفاؤها إذا لم تكن كذلك
-    if (jobData.imageUrl) {
-        const jobImage = document.getElementById('jobImage');
-        jobImage.src = jobData.imageUrl;
-        jobImage.style.display = 'block';
-    } else {
-        document.getElementById('jobImage').style.display = 'none';
-    }
-    
-    // عرض الموقع: عرض اسم المنطقة إذا كانت موجودة، وإلا عرض الإحداثيات
-    document.getElementById('jobLocation').innerText = jobData.region 
-        ? `الموقع: ${jobData.region}` 
-        : `الموقع: (${jobData.location.lat}, ${jobData.location.lng})`;
-    
-    document.getElementById('jobDuration').innerText = `المدة: ${jobData.time}`;
-    document.getElementById('jobBudget').innerText = `المبلغ: ${jobData.budget}`;
-    
-    window.jobLocation = jobData.location;
-    
-    if (typeof currentWorkerLocation === 'undefined') {
-        console.error("currentWorkerLocation غير معرف لحساب المسافة");
-    } else {
-        const distance = calculateDistance(currentWorkerLocation, jobData.location);
-        console.log(`المسافة المحسوبة: ${distance.toFixed(2)} كم`);
-        const distanceElem = document.getElementById('jobDistance');
-        if (distanceElem) {
-            distanceElem.innerText = `المسافة: ${distance.toFixed(2)} كم`;
-        } else {
-            console.error("عنصر عرض المسافة 'jobDistance' غير موجود في الصفحة");
-        }
-        // استدعاء حساب ETA وتحديث العرض
-        calculateETA(currentWorkerLocation, jobData.location, (err, data) => {
-            if (err) {
-                console.error("خطأ في حساب ETA أثناء عرض تفاصيل العمل", err);
-                return;
-            }
-            const etaElem = document.getElementById('estimatedArrivalTime');
-            if (etaElem) {
-                const minutes = Math.round(data.duration / 60);
-                etaElem.innerText = `الوقت المقدر: ${minutes} دقيقة`;
-                console.log("تم تحديث ETA في نافذة تفاصيل العمل");
-            } else {
-                console.error("عنصر 'estimatedArrivalTime' غير موجود");
-            }
-        });
-    }
-    
-    // (يمكنك هنا إضافة تفاصيل إضافية إن وُجدت، مثل: معلومات إضافية)
-    
-    document.getElementById('jobDetailsPopup').style.display = 'block';
-}
-
-
-
-
-
-
-
-
-
-
-// مستمع لقبول الطلبات الجديدة
-const savedRequests = []; // تخزين الطلبات مؤقتًا
-
-function processSavedRequests() {
-    try {
-        console.log("⚡ 37 بدء عملية التحقق من الطلبات المحفوظة...");
-
-        // التحقق من جاهزية الخريطة باستخدام الدالة الموحدة
-        if (typeof map === 'undefined' || !(map instanceof mapboxgl.Map)) {
-    console.error("🚨 115 الكائن map غير مهيأ أو غير معرّف. سيتم إعادة تهيئته.");
-    initializeMap(); // إعادة التهيئة إذا لم تكن موجودة
-    return;
-}
-
-// [السطر 35-42] باستخدام waitUntilMapReady()
-waitUntilMapReady()
-    .then(() => {
-        // هنا تكتب الكود الذي يتابع معالجة الطلبات المحفوظة
-        // مثلاً: processSavedRequests();
-    })
-    .catch((err) => {
-        console.warn("⚠️ 36: الخريطة ليست جاهزة بعد لمعالجة الطلبات المحفوظة. سيتم تأجيلها.", err);
-        return;
-    });
-
-
-
-
-        console.log("⚡ 79 الخريطة جاهزة. بدء معالجة الطلبات المحفوظة...");
-
-        // معالجة الطلبات المحفوظة إذا كانت موجودة
-        while (savedRequests.length > 0) {
-            const request = savedRequests.shift();
-
-            // التحقق من صحة بيانات الطلب
-            if (!request || !request.requestData || !request.requestId) {
-                console.error("🚨 41 بيانات غير صحيحة في الطلب:", request);
-if (!request) {
-    console.error("🚨 155 الطلب غير موجود أو تم حذفه من Firebase.");
-}      continue; // تجاوز الطلب إذا كان غير صحيح
-            }
-
-            const { requestData, requestId } = request;
-            console.log(`⚙️ 42 معالجة الطلب المحفوظ: ${requestId}`);
-
-            // التحقق من حالة الطلب
-            if (requestData.status === 'pending') {
-                try {
-                    console.log(`⌛ 33 تفعيل المهلة الزمنية للطلب ${requestId}.`);
-                    startRequestTimeout(requestId, 10); // تفعيل المهلة الزمنية
-                    showJobDetails(requestData); // عرض تفاصيل الطلب
-                } catch (error) {
-                    console.error(`🚨 34 خطأ أثناء معالجة الطلب ${requestId}:`, error);
-                }
-            } else {
-                console.warn(`⚠️ 35 الطلب ${requestId} ليس في حالة 'pending'.`);
-            }
-        }
-
-        console.log("✅ 74 تمت معالجة جميع الطلبات المحفوظة بنجاح.");
-    } catch (error) {
-        console.error("🚨 75 خطأ أثناء معالجة الطلبات المحفوظة:", error);
-    }
-}
-
-// دالة لحفظ الطلبات إذا لم تكن الخريطة جاهزة
-function saveRequestForLater(requestData, requestId) {
-    if (!requestData || !requestId) {
-        console.error("🚨 80 بيانات الطلب غير صحيحة. لا يمكن حفظ الطلب:", { requestData, requestId });
-        return;
-    }
-    console.log(`📋 81 تم حفظ الطلب ${requestId} للتعامل لاحقًا:`, requestData);
-    savedRequests.push({ requestData, requestId });
-}
-
-
-
-
-
-
-// تعديل مستمع الطلبات
-const requestRef = database.ref('workRequests');
-requestRef.on('child_added', (snapshot) => {
-    const requestData = snapshot.val();
-    const requestId = snapshot.key;
-
-    // إضافة: تعيين currentRequestId للطلب الجديد
-    currentRequestId = requestId;
-    console.log("✅ تم تعيين currentRequestId للطلب الجديد:", currentRequestId);
-
-    // التحقق من صحة بيانات الطلب
-    if (!requestData || !requestId) {
-        console.error("🚨 38 بيانات الطلب غير صحيحة من قاعدة البيانات:", { requestData, requestId });
-        return;
-    }
-    // تحقق من أن موقع العامل الحالي متوفر
-    if (!window.currentWorkerLocation) {
-        console.error("🚨 210 موقع العامل الحالي غير متوفر.");
-        return;
-    }
-    // حساب المسافة بين موقع العامل الحالي وموقع الطلب
-    const distance = calculateDistance(window.currentWorkerLocation, requestData.location);
-    console.log(` 211 المسافة بين العامل والطلب ${requestId}: ${distance.toFixed(2)} كم`);
-    // إذا كانت المسافة أكبر من 15 كم، لا يتم معالجة الطلب
-    if (distance > 15) {
-        console.warn(`⚠️ الطلب ${requestId} بعيد عن نطاق الـ 15 كم، لن يتم عرضه.`);
-        return;
-    }
-    // الانتظار حتى تكون الخريطة جاهزة لمعالجة الطلب
-    waitUntilMapReady()
-        .then(() => {
-            console.log(`🎉 40 الخريطة جاهزة لمعالجة الطلب ${requestId}.`);
-            // معالجة الطلب إذا كان في حالة "pending"
-            if (requestData.status === 'pending') {
-                try {
-                    console.log(`⚙️ 44 بدء معالجة الطلب ${requestId}.`);
-                    startRequestTimeout(requestId, 10); // تفعيل المهلة الزمنية
-                    showJobDetails(requestData); // عرض تفاصيل الطلب
-                } catch (error) {
-                    console.error(`🚨 72 خطأ أثناء معالجة الطلب ${requestId}:`, error);
-                }
-            } else {
-                console.warn(`⚠️ 73 الطلب ${requestId} ليس في حالة 'pending'.`);
-            }
-        })
-        .catch((err) => {
-            console.warn(`⚠️ 39: الخريطة ليست جاهزة بعد. سيتم تأجيل التعامل مع الطلب ${requestId}.`, err);
-            saveRequestForLater(requestData, requestId);
-            return;
-        });
-});
-
-
-
-
-
-
-
-// إضافة إعادة محاولة عند فشل تحميل النمط
-let retryCount = 0; // عدد المحاولات
-const maxRetries = 3; // الحد الأقصى للمحاولات
-
-function checkMapStyleLoaded() {
-    if (!map) {
-        console.error("🚨 82 الكائن map غير مهيأ. تأكد من تهيئته قبل استدعاء checkMapStyleLoaded.");
-        return;
-    }
-
-    if (map.isStyleLoaded()) {
-    isMapReady = true;
-    console.log("🎉 157 الخريطة جاهزة.");
-    processSavedRequests(); // معالجة الطلبات المحفوظة
-} else if (retryCount < maxRetries) {
-    retryCount++;
-    console.warn(`⚠️ 48 المحاولة رقم ${retryCount}: النمط لم يتم تحميله. سيتم إعادة المحاولة (${retryCount}/${maxRetries}).`);
-    setTimeout(() => {
-        checkMapStyleLoaded(); // إعادة المحاولة
-    }, 2000); // تقليل التأخير إلى ثانيتين
-} else {
-    console.error("🚨 49 فشل تحميل النمط بعد عدة محاولات. يرجى التحقق من إعدادات الخريطة أو اتصال الشبكة.");
-    alert("⚠️ 86 حدثت مشكلة أثناء تحميل النمط. حاول إعادة تحميل الصفحة.");
-console.error("🚨 156 فشل تحميل النمط بعد عدة محاولات. تأكد من اتصال الشبكة.");
-}
-
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-// كائن لتخزين معرفات المؤقت لكل طلب
-const timeoutIntervals = {};
-
-// دالة تحديد مهلة زمنية لقبول الطلب بعد التعديل
-function startRequestTimeout(requestId, timeoutMinutes = 10) {
-    const timeoutTime = Date.now() + timeoutMinutes * 60 * 1000;
-    const requestRef = database.ref(`workRequests/${requestId}`);
-
-    // تخزين معرف المؤقت في كائن timeoutIntervals باستخدام requestId كمفتاح
-    timeoutIntervals[requestId] = setInterval(() => {
-        requestRef.once('value').then((snapshot) => {
-            const requestData = snapshot.val();
-            console.log(`[Timeout Checker] التحقق من حالة الطلب ${requestId} في ${new Date().toLocaleTimeString()}: ${requestData.status}`);
-            // إضافة شرط لعدم تحديث الحالة إذا كان acceptedBy موجودًا
-            if (Date.now() > timeoutTime && requestData.status === 'pending' && !requestData.acceptedBy) {
-                requestRef.update({ status: 'timeout' });
-                clearInterval(timeoutIntervals[requestId]);
-                console.log(`الطلب ${requestId} انتهت مهلة قبوله وتم تغيير حالته إلى timeout.`);
-            }
-        });
-    }, 10000);
-}
-
-// دالة قبول الطلب بعد التعديل
-function acceptRequest(requestId, workerId) {
-    const requestRef = database.ref(`workRequests/${requestId}`); // ✅ تصحيح بناء السلسلة النصية
-
-    requestRef.update({
-        status: 'accepted',
-        acceptedBy: workerId  // إضافة الحقل acceptedBy
-    }).then(() => {
-        alert('تم قبول الطلب بنجاح.');
-        console.log(`📢 تم قبول الطلب ${requestId} من العامل ${workerId} في ${new Date().toLocaleTimeString()}`);
-        
-        // إلغاء مؤقت المهلة عند قبول الطلب
-        if (timeoutIntervals[requestId]) {
-            clearInterval(timeoutIntervals[requestId]);
-            console.log(`تم إلغاء مؤقت الطلب ${requestId} بعد القبول.`);
-            delete timeoutIntervals[requestId];
-        }
-    }).catch((error) => {
-        console.error(`❌ فشل في قبول الطلب ${requestId}:`, error);
-    });
-}
-
-
-
-
-
-    // دالة لإضافة عامل جديد إلى قاعدة البيانات
-    function addWorker(workerId, workerName, lng, lat) {
-      workersRef.child(workerId).set({
-        name: workerName,
-        location: {
-          lng: lng,
-          lat: lat
-        }
-      });
-    }
-
-    // دالة لتخصيص معرّف لعامل معين
-    function assignWorkerId(workerName, lng, lat) {
-    database.ref('availableWorkerIds').orderByChild('used').equalTo(false).limitToFirst(1).once('value')
-        .then((snapshot) => {
-            if (snapshot.exists()) {
-                const workerId = Object.keys(snapshot.val())[0]; // أول معرّف غير مستخدم
-
-                // تحديث حالة المعرّف إلى "مستخدم"
-                database.ref(`availableWorkerIds/${workerId}`).update({ used: true });
-
-                // تسجيل العامل في قاعدة البيانات
-                database.ref(`workers/${workerId}`).set({
-                    name: workerName,
-                    assignedAt: new Date().toISOString(),
-                    location: { lng: lng, lat: lat }
-                });
-
-                console.log(`تم تخصيص المعرّف ${workerId} للعامل: ${workerName}`);
-            } else {
-                console.log("لا توجد معرّفات متاحة.");
-            }
-        })
-        .catch((error) => console.error("خطأ أثناء تخصيص المعرّف:", error));
-}
-
-// دالة تسجيل الدخول باستخدام معرّف العامل
-// تعريف المتغير العام في بداية الملف
-var currentWorkerId;
-
-function loginWorker(workerId) {
-    database.ref(`workers/${workerId}`).once('value')
-        .then((snapshot) => {
-            if (snapshot.exists()) {
-                const workerData = snapshot.val();
-                console.log(`✅ 96 تم تسجيل الدخول بنجاح: ${workerData.name}`);
-                
-                // حفظ معرف العامل في متغير عام
-                currentWorkerId = workerId;
-                
-                // إخفاء نافذة تسجيل الدخول
-                document.getElementById('loginPopup').style.display = 'none';
-
-                // 🔍 استدعاء التركيز على موقع العامل
-                focusOnWorkerLocation(workerId);
-            } else {
-                console.warn("⚠️ 97 المعرّف غير صالح أو غير موجود في قاعدة البيانات.");
-                alert(" 100 المعرّف غير صالح، يرجى التحقق.");
-            }
-        })
-        .catch((error) => console.error("❌ 98 خطأ أثناء تسجيل الدخول:", error));
-}
-
-
-
-
-
-function sendNotificationToNearbyWorkers(requestData, userLocation) {
-    const radius = 15;  // تم تعديل نصف القطر إلى 15 كم
-    console.log("تم ضبط نصف القطر على:", radius, "كم");
-    // مرجع العمال في Firebase
-    const workersRef = database.ref('workers');
-    workersRef.once('value', (snapshot) => {
-        snapshot.forEach((workerSnapshot) => {
-            const worker = workerSnapshot.val();
-            if (!worker || !worker.location) {
-                console.error("🚨 بيانات العامل غير متوفرة أو الموقع غير صالح:", workerSnapshot.key);
-                return;
-            }
-            const distance = calculateDistance(userLocation, worker.location);
-            console.log(`المسافة للعامل ${workerSnapshot.key}: ${distance.toFixed(2)} كم`);
-            console.log("الموقع المُرسل:", userLocation, "وموقع العامل:", worker.location);
-    
-            if (distance <= radius) {
-                console.log(`📢 العامل ${workerSnapshot.key} داخل النطاق وسيتم إرسال إشعار.`);
-                // إرسال الإشعار باستخدام Pusher Beams
-                sendPusherNotification(workerSnapshot.key, `طلب ${requestData.workType} في منطقتك.`, "طلب جديد متاح!");
-            } else {
-                console.warn(`⚠️ العامل ${workerSnapshot.key} خارج نطاق الـ 15 كم.`);
-            }
-        });
-    });
-}
-
-
-
-
-
-
-
-if (!window.activeListeners) {
-    window.activeListeners = {}; // التأكد من وجود الكائن لتتبع المستمعين
-}
-
-
-function startTracking(workerId) {
-    const workerLocationRef = database.ref(`workers/${workerId}/location`);
-    if (window.activeListeners[workerId]) {
-        console.warn(`⚠️ المستمع للعامل ${workerId} مضاف بالفعل.`);
-        return;
-    }
-    
-    // إنشاء مرجع خاص لكل عامل باستخدام workerId
-    const currentWorkerRef = database.ref(`workers/${workerId}`);
-    currentWorkerRef.on('value', (snapshot) => {
-        const data = snapshot.val();
-        const location = data && data.location;
-        if (location && location.lat && location.lng) {
-            console.log(`🤷‍♂️تم تحديث موقع العامل ${workerId}:`, location);
-            waitUntilMapReady()
-                .then(() => {
-                    updateWorkerMarker(location, workerId);
-                })
-                .catch((err) => {
-                    console.error("⚠️ 2: الخريطة غير مهيأة أو النمط غير محمل.", err);
-                });
-        } else {
-            console.error(`🚨 83 بيانات موقع العامل ${workerId} غير صحيحة:`, location);
-        }
-    });
-    
-    window.activeListeners[workerId] = true;
-}
-
-
-
-
-
-
-
-workerRef.child('currentRequest').on('value', (snapshot) => {
-    const requestData = snapshot.val();
-    if (requestData) {
-        console.log(`تم تحديث حالة الطلب للعامل ${workerId}:`, requestData);
-    } else {
-        console.warn(`لا توجد طلبات مرتبطة بالعامل ${workerId}. تأكد من تسجيل الطلب بشكل صحيح.`);
-    }
-});
-
-
-    // دالة لتحديث العلامة على الخريطة لكل عامل
-    function updateWorkerMarker(location, workerId) {
-    waitUntilMapReady()
-        .then(() => {
-            // التأكد من أن قائمة العلامات موجودة
-            if (!window.workerMarkers) {
-                window.workerMarkers = {};
-            }
-            try {
-                // إضافة أو تحديث العلامة على الخريطة
-                if (!window.workerMarkers[workerId]) {
-                    window.workerMarkers[workerId] = new mapboxgl.Marker()
-                        .setLngLat([location.lng, location.lat])
-                        .addTo(map);
-                    console.log(`✔️ 17 تم إضافة العلامة للعامل ${workerId}.`);
-                } else {
-                    window.workerMarkers[workerId].setLngLat([location.lng, location.lat]);
-                    console.log(`✔️ 15 تم تحديث موقع العلامة للعامل ${workerId}.`);
-                }
-            } catch (error) {
-                console.error(`🚨 16 خطأ أثناء تحديث العلامة للعامل ${workerId}:`, error);
-            }
-        })
-        .catch((err) => {
-            console.error("⚠️ 18 لا يمكن تحديث العلامة لأن الخريطة لم تجهز بعد:", err);
-        });
-}
-
-
-
-
-
-    // استدعاء startTracking لكل عامل عند إضافته أو تحديثه
-    workersRef.on('child_added', (snapshot) => {
-    const workerId = snapshot.key; // معرف العامل
-    startTracking(workerId);
-
-    // إضافة مستمع لتحديث الطلبات
-    const workerRequestsRef = database.ref(`workers/${workerId}/currentRequest`); // ✅ استخدام اسم واضح
-    workerRef.child('currentRequest').on('value', (snapshot) => {
-        const requestData = snapshot.val();
-        if (requestData) {
-            console.log(` 84 تم تحديث حالة الطلب للعامل ${workerId}: ${requestData.status}`);
-        } else {
-            console.log(`85 لا توجد طلبات حاليًا للعامل ${workerId}`);
-        }
-    });
-});
-
-    // التحقق من تحميل مكتبة Mapbox
-    if (typeof mapboxgl === 'undefined') {
-        console.error("لم يتم تحميل مكتبة Mapbox بنجاح.");
-    } else {
-        console.log("تم تحميل مكتبة Mapbox بنجاح:", mapboxgl);
-    }
-
-        // مفتاح Mapbox
-        const mapboxToken = "pk.eyJ1IjoiY2hvb3NlbWUiLCJhIjoiY20wZnVpemI2MHpreTJqcjR4ZThuam9pYyJ9.F1CjHrnJ7m-VwM_LHt0Q9Q";
-        mapboxgl.accessToken = mapboxToken;
-
-        // إعداد الأنماط المختلفة للخريطة
-        const styles = {
-    streets: 'mapbox://styles/mapbox/streets-v11',
-    satellite: 'mapbox://styles/mapbox/satellite-v9',
-    outdoors: 'mapbox://styles/mapbox/outdoors-v11',
-    hybrid: 'mapbox://styles/mapbox/satellite-streets-v11',
-    dark: 'mapbox://styles/mapbox/dark-v10',
-    light: 'mapbox://styles/mapbox/light-v10'
-};
-
-
-
-
-
-        function initializeMap() {
-    console.log("🔄 110 بدء تهيئة الخريطة...");
-
-    try {
-        // التحقق مما إذا كانت الخريطة قد تم تهيئتها بالفعل لمنع التكرارات
-        if (typeof map !== 'undefined' && map instanceof mapboxgl.Map) {
-            console.warn("⚠️ 117 الخريطة مهيأة بالفعل. لن يتم إعادة إنشائها.");
-            return;
-        }
-
-        // تفريغ محتوى الخريطة قبل إعادة التهيئة لمنع التكرارات
-        const mapContainer = document.getElementById('map');
-        if (mapContainer) {
-            mapContainer.innerHTML = '';
-        } else {
-            console.error("🚨 118 لم يتم العثور على العنصر 'map'. تأكد من وجود العنصر في DOM.");
-            return;
-        }
-
-        // إنشاء الخريطة
-        map = new mapboxgl.Map({
-            container: 'map',
-            style: styles.hybrid,
-            center: [13.1913, 32.8872],
-            zoom: 2
-        });
-
-        let retryCount = 0; // عدد المحاولات
-        const maxRetries = 3; // الحد الأقصى لعدد المحاولات
-
-        function handleMapLoad() {
-            console.log('32 تم تحميل الخريطة باستخدام handleMapLoad.');
-
-            if (map.isStyleLoaded()) {
-                isMapReady = true;
-                console.log("🎉 3 الخريطة جاهزة والنمط محمل. يمكن الآن التعامل مع الطلبات أو العلامات.");
-                addMarkersToMap();
-            } else if (retryCount < maxRetries) {
-                console.warn(`⚠️ 4 فشل تحميل النمط. إعادة المحاولة (${retryCount + 1}/${maxRetries}) بعد 5 ثوانٍ...`);
-                retryCount++;
-                setTimeout(handleMapLoad, 5000);
-            } else {
-                console.error("🚨 23 فشل تحميل النمط بعد استنفاد المحاولات.");
-                alert("⚠️ 24 حدثت مشكلة أثناء تحميل الخريطة. يرجى التحقق من اتصالك بالإنترنت أو إعادة تحميل الصفحة.");
-            }
-        }
-
-        map.on('load', () => {
-            console.log("⚡109 تم استدعاء map.on('load').");
-
-            // التحقق من تعريف المتغير isMapReady
-            if (typeof isMapReady === 'undefined') {
-                console.error("🚨 76 المتغير isMapReady غير مهيأ بشكل صحيح.");
-                return;
-            }
-
-            if (map.isStyleLoaded()) {
-                isMapReady = true;
-                isMapInitialized = true;
-                console.log("🎉 47 الخريطة جاهزة والنمط محمل.");
-               
-         // هنا نضيف console.log لعرض القيم المحدثة
-        console.log("✅ 158 isMapReady:", isMapReady, "isMapInitialized:", isMapInitialized);
-
-                processSavedRequests();
-            } else {
-                console.warn("⚠️ 59 النمط لم يتم تحميله بالكامل. سيتم إعادة المحاولة.");
-                handleMapLoad();
-            }
-
-            console.log("⚙️ 78 جاري تنفيذ الخطوات الأخيرة بعد تحميل الخريطة...");
-        });
-
-        map.on('error', (e) => {
-            console.error("🚨 112 خطأ أثناء تحميل الخريطة:", e);
-        });
-
-    } catch (error) {
-        console.error("🚨 113 خطأ أثناء إنشاء الخريطة:", error);
-    }
-}
-
-
-
-
-
-
-
-function ensureMapInitialized() {
-    if (!isMapInitialized) {
-        console.log("🔄 82 بدء تهيئة الخريطة لأول مرة...");
-        initializeMap();
-        isMapInitialized = true;
-    } else {
-        console.log("✅ 83 الخريطة مهيأة بالفعل.");
-    }
-}
-
-
-
-document.addEventListener('DOMContentLoaded', () => {
-    console.log("✔️ 120 تم تحميل DOM بنجاح. بدء التهيئة...");
-
-    // ✅ تحقق من تحميل Firebase و Mapbox قبل استخدامها
-    if (typeof firebase === 'undefined' || typeof mapboxgl === 'undefined') {
-        console.error("🚨 165 لم يتم تحميل Firebase أو Mapbox. يرجى التحقق من الروابط.");
-        return;
-    }
-    
-    // ★ إضافة: بدء تتبع الموقع مبكرًا
-    console.log("🔄 بدء تتبع الموقع مبكرًا");
-    updateLocationWithGPS('worker_123'); // استبدل 'worker_123' بمعرف العامل الفعلي
-
-    // ✅ تهيئة الخريطة فقط إذا لم تكن مهيأة
-    if (!isMapInitialized) {
-        console.log("🔄 168 بدء تهيئة الخريطة...");
-        initializeMap();
-        isMapInitialized = true;
-    } else {
-        console.log("✅ 169 الخريطة مهيأة بالفعل.");
-    }
-
-    // ✅ تأكيد تحميل جميع العناصر قبل إضافة الأحداث
-    const acceptJobButton = document.getElementById('acceptJobButton');
-    const locateButton = document.getElementById('locateButton');
-    const styleSelector = document.getElementById('styleSelector');
-    const loginButton = document.getElementById('loginWorkerButton');
-
-    if (!acceptJobButton || !locateButton || !styleSelector || !loginButton) {
-        console.error("🚨 170 بعض العناصر غير موجودة في DOM. تأكد من تحميل الصفحة بالكامل.");
-        return;
-    }
-
-    
-
-    styleSelector.addEventListener('change', function () {
-        const selectedStyle = this.value;
-        if (styles[selectedStyle]) {
-            map.setStyle(styles[selectedStyle]);
-            console.log(`✔️ 171 تم تغيير النمط إلى: ${selectedStyle}`);
-        } else {
-            console.error(`⚠️ 172 النمط "${selectedStyle}" غير معروف.`);
-        }
-    });
-
-    loginButton.addEventListener('click', () => {
-        const workerId = document.getElementById('workerLoginId').value;
-        if (workerId) {
-            console.log(`🔵 173 محاولة تسجيل الدخول للعامل: ${workerId}`);
-            loginWorker(workerId);
-        } else {
-            console.warn('⚠️ 174 يرجى إدخال معرّف العامل.');
-            alert('⚠️ 175 يرجى إدخال معرّف العامل.');
-        }
-    });
-});
-
-
-
-
-
-
-    // إضافة مستمع الزر هنا
-    const acceptJobButton = document.getElementById('acceptJobButton');
-    if (acceptJobButton) {
-        acceptJobButton.addEventListener('click', () => {
-            // تحقق من جاهزية الخريطة
-            if (!isMapReady) {
-                console.error("⚠️ 52 لا يمكن قبول الطلب قبل أن تصبح الخريطة جاهزة.");
-                return;
-            }
-
-            // منطق القبول: عرض التنبيه وإغلاق النافذة
-            alert(' تم قبول العمل بنجاح');
-            document.getElementById('jobDetailsPopup').style.display = 'none';
-
-            // منطق عرض المسار: استبدل القيم بقيم ديناميكية عند الحاجة
-            const workerLocation = { lng: 13.1913, lat: 32.8872 }; // موقع العامل
-            const jobLocation = { lng: 13.2, lat: 32.9 }; // موقع العمل
-            showRoute(workerLocation, jobLocation);
-        });
-    } else {
-        console.error("🚨 55 الزر 'acceptJobButton' غير موجود في DOM.");
-    }
-;
-
-
-
-
-
-
-if (!isMapInitialized) {
-    console.log(" 146 تهيئة الخريطة لأول مرة.");
-    initializeMap();
-    isMapInitialized = true;
-} else {
-    console.log(" 147 الخريطة مهيأة بالفعل.");
-}
-
-
-
-
-
-function addMarkersToMap() {
-    const requestsRef = database.ref('workRequests');
-    requestsRef.on('child_added', (data) => {
-        // التأكد من جاهزية الخريطة قبل محاولة إضافة العلامات
-        waitUntilMapReady()
-            .then(() => {
-                // استكمال إضافة العلامة على الخريطة
-            })
-            .catch((err) => {
-                console.error("⚠️ 19: الخريطة غير جاهزة أو النمط غير محمل. سيتم تجاهل إضافة العلامة.", err);
-                return;
-            });
-        
-        const request = data.val();
-        if (request && request.location && request.location.lng && request.location.lat) {
-            try {
-                // إنشاء الماركر بدون تعيين Popup افتراضي
-                const marker = new mapboxgl.Marker()
-                    .setLngLat([request.location.lng, request.location.lat])
-                    .addTo(map);
-                
-                // إضافة مستمع للنقر على الماركر لعرض نافذة التفاصيل الكاملة
-                marker.getElement().addEventListener('click', () => {
-                    // حفظ معرف الطلب الحالي للاستخدام لاحقاً (مثلاً عند قبول الطلب)
-                    currentRequestId = data.key;
-                    showJobDetails(request);
-                });
-                
-                console.log(`تمت إضافة الطلب ${data.key} إلى الخريطة.`);
-            } catch (error) {
-                console.error("🚨 خطأ أثناء إضافة العلامة إلى الخريطة:", error);
-            }
-        } else {
-            console.warn("بيانات الطلب غير كافية أو الموقع غير صحيح:", data.key);
-        }
-    });
-}
-
-
-
-
-
-
-// إعداد التحكم في البحث
-const geocoder = new MapboxGeocoder({
-    accessToken: mapboxgl.accessToken,
-    language: "ar",
-    marker: true,
-    mapboxgl: mapboxgl
-});
-
-if (typeof map === 'undefined') {
-    console.error("الكائن map غير معرّف. تأكد من استدعاء initializeMap أولاً.");
-} else {
-    map.addControl(geocoder);
-}
-
-// إعداد التحكم في تحديد الموقع
-const locateControl = new mapboxgl.GeolocateControl({
-    positionOptions: {
-        enableHighAccuracy: true
-    },
-    trackUserLocation: true,
-    showUserHeading: true,
-    fitBoundsOptions: {
-        maxZoom: 18
-    }
-});
-
-// متغير للتحكم في إعادة التمركز
-let autoCenterEnabled = false;
-
-// عند الضغط على زر "تحديد موقعي" نفعّل إعادة التمركز
-const locateBtn = document.getElementById('locateButton');
-if (!locateBtn) {
-    console.error(" 🔻 201 عنصر locateButton غير موجود.");
-} else {
-    locateBtn.addEventListener('click', () => {
-        autoCenterEnabled = true; // تفعيل إعادة التمركز عند الضغط على الزر
-        locateControl.trigger();
-        console.log(" 🔻 202 تم الضغط على زر تحديد موقعي وتفعيل إعادة التمركز.");
-    });
-}
-
-
-// عند سحب الخريطة يدويًا، نوقف إعادة التمركز التلقائي
-map.on('dragstart', () => {
-    if (autoCenterEnabled) {
-        console.log(" 🔻203 تم تعطيل إعادة التمركز تلقائيًا بسبب سحب الخريطة يدويًا.");
-    }
-    autoCenterEnabled = false;
-});
-
-locateControl.on('geolocate', (e) => {
-    console.log(" 🔻 204 تم تحديد الموقع: ", e.coords);
-    if (autoCenterEnabled) {
-        map.flyTo({
-            center: [e.coords.longitude, e.coords.latitude],
-            zoom: 18,    // قيمة التكبير المطلوبة؛ يمكنك تعديلها حسب الحاجة
-            speed: 1.0   // سرعة الانتقال (اختيارية)
-        });
-    } else {
-        console.log(" 🔻 205 إعادة التمركز معطلة؛ المستخدم تحكم يدويًا في موقع العرض.");
-    }
-});
-
-// عند الحصول على الموقع من locateControl، نُعيد التمركز فقط إذا كان autoCenterEnabled true
-locateControl.on('geolocate', (e) => {
-    console.log("تم تحديد الموقع: ", e.coords);
-    if (autoCenterEnabled) {
-        map.flyTo({
-            center: [e.coords.longitude, e.coords.latitude],
-            zoom: 18,    // قيمة التكبير المطلوبة؛ يمكنك تعديلها حسب الحاجة
-            speed: 1.0   // سرعة الانتقال (اختيارية)
-        });
-    } else {
-        console.log("إعادة التمركز معطلة؛ المستخدم تحكم يدويًا في موقع العرض.");
-    }
-});
-
-map.on('load', () => {
-    console.log(" 28 تم تحميل الخريطة بنجاح.", { style: map.getStyle(), center: map.getCenter() });
-
-    if (map && typeof map.isStyleLoaded === 'function' && map.isStyleLoaded()) {
-        console.log("🎉 29 مشكلة isStyleLoaded تم حلها بالكامل! الخريطة جاهزة للعمل.");
-        map.flyTo({ center: [13.1913, 32.8872], zoom: 10, speed: 0.2 });
-        if (isMapReady) {
-            addMarkersToMap(); // استدعاء دالة إضافة العلامات فقط إذا كانت الخريطة جاهزة
-        }
-    } else {
-        console.error("⚠️ 5 الخريطة غير جاهزة أو النمط لم يتم تحميله.");
-    }
-
-    // إضافة عناصر التحكم
-    map.addControl(locateControl);
-});
-
-
-
-
-
-
-
-// إضافة الأزرار للتبديل بين الأنماط
-document.getElementById('styleSelector').addEventListener('change', function () {
-    const selectedStyle = this.value;
-    if (styles[selectedStyle]) {
-        if (map.isStyleLoaded()) {
-            map.setStyle(styles[selectedStyle]);
-            console.log(`✔️ 11 تم تغيير النمط إلى: ${selectedStyle}`);
-        } else {
-            console.warn(`⚠️ 12 النمط الحالي لم يتم تحميله بالكامل. انتظر حتى يتم تحميله.`);
-        }
-    } else {
-        console.error(`⚠️ 87 النمط "${selectedStyle}" غير موجود.`);
-    }
-});
-
-
-
-// إعادة إضافة طبقة المسار بعد تحميل النمط الجديد
-map.on('style.load', () => {
-    if (window.currentRouteData) {
-        if (!map.getSource('route')) {
-            map.addLayer({
-                id: 'route',
-                type: 'line',
-                source: {
-                    type: 'geojson',
-                    data: window.currentRouteData
-                },
-                layout: { 'line-join': 'round', 'line-cap': 'round' },
-                paint: { 'line-color': '#3887be', 'line-width': 5 }
-            });
-            console.log("✔️ تم إعادة إضافة طبقة المسار بعد تغيير النمط.");
-        }
-    }
-});
-
-
-// تعريف المتغيرات العامة (يجب أن تُحدد في مكان مناسب من الكود، مثل بداية الملف)
-// تعريف المتغيرات العامة
-var currentRequestId = null;
-var currentWorkerId = "worker_123"; // تعيين معرف عامل ثابت للاختبار
-
-// مستمع الضغط على زر قبول الطلب
-document.getElementById('acceptJobButton').addEventListener('click', function() {
-    // طلب تأكيد من المستخدم قبل قبول الطلب
-    if (!confirm("هل تريد قبول هذا الطلب؟")) {
-        return; // إذا اختار المستخدم "لا" فإن العملية تُلغى
-    }
-    
-    console.log("بدء عملية قبول الطلب...");
-    
-    if (!currentRequestId) {
-        console.error("معرّف الطلب غير متوفر. يرجى التأكد من وجود طلب نشط.");
-        return;
-    }
-    
-    if (!currentWorkerId) {
-        console.error("معرّف العامل غير متوفر. يرجى تسجيل الدخول أولاً.");
-        alert("يرجى تسجيل الدخول قبل قبول الطلب.");
-        return;
-    }
-    
-    console.log("بيانات الطلب ومعرف العامل متوفرة. جاري استدعاء دالة acceptRequest...");
-    acceptRequest(currentRequestId, currentWorkerId);
-    
-    if (!currentWorkerLocation || !jobLocation) {
-        console.error("بيانات الموقع للعامل أو الطلب غير متوفرة.");
-        return;
-    }
-    
-    if (typeof showRoute === "function") {
-        showRoute(currentWorkerLocation, jobLocation);
-        console.log("تم استدعاء دالة showRoute لعرض الاتجاه والمسافة على الخريطة");
-    } else {
-        console.error("وظيفة showRoute غير معرفة");
-    }
-    
-    // بدء تتبع ETA في الوقت الحقيقي وتحديث لوحة etaPanel
-    startRealTimeETATracking(currentWorkerLocation, jobLocation);
-    
-    // بدء العد التنازلي لمدة 3 ساعات (3 * 60 * 60 * 1000 ملّي ثانية)
-    const countdownElement = document.getElementById('countdownTimer');
-    if (countdownElement) {
-        startCountdown(3 * 60 * 60 * 1000, countdownElement, function() {
-            cancelRequestDueToTimeout(currentRequestId);
-        });
-    } else {
-        console.error("عنصر 'countdownTimer' غير موجود في الصفحة");
-    }
-    
-    document.getElementById('jobDetailsPopup').style.display = 'none';
-});
-
-
-
-
-
-        document.getElementById('assignIdButton').addEventListener('click', () => {
-  const workerId = document.getElementById('workerIdInput').value;
-  const workerName = document.getElementById('workerNameInput').value;
-  const userLocation = map.getCenter();
-
-  if (workerId && workerName) {
-    fetch('/assign-id', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        workerId: workerId,
-        workerName: workerName,
-        location: { lng: userLocation.lng, lat: userLocation.lat },
-      }),
-    })
-      .then((response) => {
-        if (response.ok) {
-          alert('تم تخصيص المعرّف بنجاح!');
-        } else {
-          alert('حدث خطأ أثناء تخصيص المعرّف.');
-        }
-      })
-      .catch((error) => console.error('Error:', error));
-  } else {
-    alert('يرجى ملء جميع الحقول.');
-  }
-});
-
-// التأكد من أن الكود يعمل فقط إذا تم تعريف map
-if (typeof map !== 'undefined' && map instanceof mapboxgl.Map) {
-    map.on('load', () => {
-        console.log("⚡50 تم استدعاء map.on('load').");
-        checkMapStyleLoaded();
-    });
-} else {
-    console.error("🚨 51 الكائن map غير مهيأ أو غير معرّف.");
-}
-
-
-        // تأكيد وضع العلامة
-        document.getElementById('confirmYes').addEventListener('click', () => {
-            const userLocation = map.getCenter();
-            // إضافة العلامة في الموقع الحالي
-            new mapboxgl.Marker()
-                .setLngLat(userLocation)
-                .addTo(map);
-            // عرض نافذة إدخال الاسم ورقم الهاتف
-            document.getElementById('inputPopup').style.display = 'block';
-            document.getElementById('confirmationPopup').style.display = 'none';
-        });
-
-        // إلغاء وضع العلامة
-        document.getElementById('confirmNo').addEventListener('click', () => {
-            document.getElementById('confirmationPopup').style.display = 'none';
-        });
-
-        // إرسال المعلومات المدخلة إلى Firebase
-        document.getElementById('submitInfo').addEventListener('click', () => {
-            const name = document.getElementById('nameInput').value;
-            const phone = document.getElementById('phoneInput').value;
-            if (name && phone) {
-                const markerData = {
-                    name: name,
-                    phone: phone,
-                    location: {
-                        lng: map.getCenter().lng,
-                        lat: map.getCenter().lat
-                    }
-                };
-                const markersRef = database.ref('markers');
-                markersRef.push(markerData)
-                    .then(() => {
-                        alert('تم حفظ العلامة بنجاح.');
-                        document.getElementById('inputPopup').style.display = 'none';
-                        document.getElementById('nameInput').value = '';
-                        document.getElementById('phoneInput').value = '';
-                    })
-                    .catch((error) => {
-                        alert('حدث خطأ: ' + error.message);
-                    });
-            } else {
-                alert('يرجى ملء جميع الحقول.');
-            }
-        });
-
-        // إلغاء نافذة إدخال المعلومات
-        document.getElementById('cancelInput').addEventListener('click', () => {
-            document.getElementById('inputPopup').style.display = 'none';
-        });
-
-
-        // عرض معلومات عن العمال
-        document.getElementById('requestWater').addEventListener('click', () => {
-            const workerInfo = document.getElementById('workerInfo');
-            workerInfo.innerText = 'العمال المتاحين هنا...';
-            workerInfo.style.display = workerInfo.style.display === 'block' ? 'none' : 'block';
-        });
-
-
-        function cancelRequestDueToTimeout(requestId) {
-    const requestRef = database.ref(`workRequests/${requestId}`);
-    requestRef.update({ status: 'cancelled' })  // أو 'timeout' حسب منطق التطبيق
-        .then(() => {
-            console.log(`تم إلغاء الطلب ${requestId} بسبب انتهاء وقت الوصول.`);
-            alert("انتهى الوقت المسموح للوصول، تم إلغاء الطلب.");
-        })
-        .catch((error) => {
-            console.error(`خطأ أثناء إلغاء الطلب ${requestId}:`, error);
-        });
-}
 
 
 
