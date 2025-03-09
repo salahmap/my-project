@@ -1382,32 +1382,44 @@ const styles = {
 };
 
 
-        // إنشاء الخريطة مع زوم منخفض جدًا كأنك ترى الأرض من الفضاء
-        map = new mapboxgl.Map({
+// إنشاء الخريطة مع ضبط الإعدادات للعمل على الهواتف
+map = new mapboxgl.Map({
   container: 'map',
   style: 'mapbox://styles/mapbox/satellite-streets-v11',
   center: [0, 0],
-  zoom: 1,
-  projection: 'globe'
+  zoom: window.innerWidth < 768 ? 3 : 4, // تكبير أقل على الشاشات الصغيرة
+  projection: 'globe',
+  maxBounds: [[-180, -85], [180, 85]], // تقييد التحرك خارج الكرة الأرضية
+  interactive: true, // السماح بالتفاعل اللمسي
+  attributionControl: false // إزالة شعار Mapbox لتحسين تجربة المستخدم
 });
 
-map.on('style.load', () => { 
-  map.setFog({}); 
+// تحسين الأداء عند التحميل
+map.on('style.load', () => {
+  map.setFog({ range: [0.5, 10] }); // ضبط تأثير الضباب ليكون أخف على الهواتف
 });
 
+// تنفيذ تأثير التحرك بعد تحميل الخريطة
 map.on('load', () => {
   waitUntilMapReady().then(() => {
     map.flyTo({
       center: [13.1913, 32.8872],
-      zoom: 12,
-      pitch: 60,      // زاوية ميل تعطي عمقاً ثلاثي الأبعاد
-      bearing: 45,    // دوران لطيف يعزز الإحساس بالحركة
-      speed: 0.3,
-      curve: 1.8,
-      easing: function(t) { return t*t; }
+      zoom: window.innerWidth < 768 ? 10 : 12, // تقليل التكبير قليلاً للهواتف
+      pitch: window.innerWidth < 768 ? 45 : 60, // زاوية ميل أقل على الأجهزة المحمولة
+      bearing: 30, // دوران لطيف للخريطة
+      speed: 0.4, // تقليل السرعة لجعل التنقل أكثر سلاسة
+      curve: 1.5,
+      easing: t => t * t
     });
   });
 });
+
+// تحسين تجربة اللمس على الأجهزة المحمولة
+if (window.innerWidth < 768) {
+  map.touchZoomRotate.enable(); // تفعيل اللمس
+  map.doubleClickZoom.disable(); // تعطيل التكبير بالنقر المزدوج
+}
+
 
 
 
