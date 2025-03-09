@@ -55,11 +55,11 @@
             cursor: pointer;
             margin: 5px 0;
             transition: background-color 0.3s ease;
-            width: 100%;
-            font-size: 14px;
+            width: 90%;
+            font-size: 13px;
         }
         .controlButton:hover {
-            background-color: rgba(30, 144, 255, 1);
+            background-color: rgb(49, 255, 30);
         }
         .controls {
             position: absolute;
@@ -111,24 +111,31 @@
 
 
         .mapboxgl-ctrl-geocoder {
-  width: 150px !important;  /* ضبط عرض مربع البحث */
-  height: 30px !important;  /* ضبط ارتفاع مربع البحث */
-  border-radius: 5px;        /* جعل الحواف مستديرة */
-  font-size: 14px;           /* تعديل حجم النص داخل المربع */
-  display: flex;             /* جعل العنصر يستخدم نظام Flexbox */
-  align-items: center;       /* محاذاة النص عموديًا في المنتصف */
-  justify-content: center;   /* جعل النص في المنتصف أفقيًا */
+  width: 200px !important;  
+  height: 35px !important;  
+  border-radius: 5px;        
+  font-size: 14px;           
+  display: flex;             
+  align-items: center;       
+  justify-content: center;   
+  position: relative; /* تأكد من ضبط الموضع */
+  z-index: 10; /* تأكد من أن مربع البحث فوق العناصر الأخرى */
 }
 
-.mapboxgl-ctrl-geocoder input {
-  height: 100%;              /* التأكد من أن حقل الإدخال يأخذ الارتفاع بالكامل */
-  padding: 10px;             /* ضبط المسافات الداخلية */
-  line-height: normal;       /* التأكد من عدم وجود ارتفاع خط إضافي */
-  font-size: 14px;           /* ضبط حجم الخط */
+/* جعل قائمة البحث تظهر فوق جميع العناصر */
+.mapboxgl-ctrl-geocoder .suggestions {
+  position: absolute !important;
+  z-index: 9999 !important; /* رفع القائمة فوق أي عنصر آخر */
+  background-color: white; /* الحفاظ على وضوح القائمة */
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
 }
 .mapboxgl-ctrl-geocoder .mapboxgl-ctrl-geocoder--icon {
   display: none !important; /* إخفاء الأيقونات (X والدائرة) */
 }
+
 
     </style>
 </head>
@@ -158,7 +165,7 @@
         <button id="requestWater" class="controlButton">طلب ماء</button>
 
         <!-- NEW CODE: زر مراجعة/تعديل الطلب -->
-        <button id="reviewRequestButton" class="controlButton">عرض التفاصيل/تعديل الطلب</button>
+        <button id="reviewRequestButton" class="controlButton">عرض التفاصيل / تعديل الطلب</button>
 
 <!-- إضافة زر الإلغاء في واجهة المستخدم -->
 <div id="cancelRequestContainer" style="display:none; position: fixed; bottom: 20px; right: 20px; z-index: 1000;">
