@@ -108,6 +108,28 @@
         #locateButton:hover {
             background-color: rgba(30, 144, 255, 1);
         }
+
+
+        .mapboxgl-ctrl-geocoder {
+  width: 150px !important;  /* ضبط عرض مربع البحث */
+  height: 30px !important;  /* ضبط ارتفاع مربع البحث */
+  border-radius: 5px;        /* جعل الحواف مستديرة */
+  font-size: 14px;           /* تعديل حجم النص داخل المربع */
+  display: flex;             /* جعل العنصر يستخدم نظام Flexbox */
+  align-items: center;       /* محاذاة النص عموديًا في المنتصف */
+  justify-content: center;   /* جعل النص في المنتصف أفقيًا */
+}
+
+.mapboxgl-ctrl-geocoder input {
+  height: 100%;              /* التأكد من أن حقل الإدخال يأخذ الارتفاع بالكامل */
+  padding: 10px;             /* ضبط المسافات الداخلية */
+  line-height: normal;       /* التأكد من عدم وجود ارتفاع خط إضافي */
+  font-size: 14px;           /* ضبط حجم الخط */
+}
+.mapboxgl-ctrl-geocoder .mapboxgl-ctrl-geocoder--icon {
+  display: none !important; /* إخفاء الأيقونات (X والدائرة) */
+}
+
     </style>
 </head>
 <body>
@@ -1399,9 +1421,6 @@ map.on('style.load', () => {
   map.setFog({
     range: [1, 8],  // تقليل مدى الضباب حتى يظهر الفضاء بوضوح
     color: 'rgba(10, 10, 25, 0.5)', // جعل لون الغلاف الجوي داكنًا أكثر ليظهر الفضاء
-    horizonBlend: 0.1, // تقليل التوهج عند الأفق لجعل النجوم واضحة
-    spaceColor: 'rgb(0, 0, 0)', // تعتيم خلفية الفضاء لرؤية النجوم بوضوح
-    starIntensity: 0.8 // زيادة وضوح النجوم في الخلفية
   });
 });
 
@@ -1427,6 +1446,7 @@ if (window.innerWidth < 768) {
   map.touchZoomRotate.enable(); // تفعيل التكبير والتدوير باللمس
   map.doubleClickZoom.disable(); // تعطيل التكبير بالنقر المزدوج
 }
+
 
 
 
