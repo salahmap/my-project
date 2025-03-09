@@ -388,7 +388,7 @@ const requestsRef = database.ref('workRequests'); // تأكد من تعريف ه
 
 // دالة مراقبة حالة الطلب (لا حاجة لتعديلها)
 function monitorRequestStatus(requestId) {
-    const requestRef = database.ref(`workRequests/${requestId}`);
+    const requestRef = firebase.database().ref(`workRequests/${requestId}`);
     console.log("📡 بدء مراقبة حالة الطلب:", requestId);
 
     requestRef.on('value', (snapshot) => {
@@ -430,6 +430,9 @@ function monitorRequestStatus(requestId) {
                             startWorkerTracking(acceptedWorkerId, userLocation, workerName);
                             trackWorkerArrival(acceptedWorkerId, userLocation);
                             console.log("📡 تم استدعاء trackWorkerArrival لمراقبة وصول العامل");
+
+                            // ✅ بدء مراقبة نشاط العامل
+                            monitorWorkerActivity(acceptedWorkerId, requestId);
                         });
                 })
                 .catch((error) => {
@@ -440,10 +443,8 @@ function monitorRequestStatus(requestId) {
             alert('🎉 تم إكمال الطلب.');
         
         } else if (requestData.status && requestData.status.trim() === 'canceled_by_worker') {
-            // ✅ التعامل مع حالة إلغاء الطلب من قبل العامل
             console.log("🚨 تم استلام حالة 'canceled_by_worker'");
 
-            // ✅ إظهار إشعار بالإلغاء
             alert("❌ تم إلغاء الطلب من قبل العامل.");
 
             // ✅ إخفاء واجهة تتبع العامل
@@ -469,7 +470,6 @@ function monitorRequestStatus(requestId) {
                 console.log("🛑 تم إخفاء معلومات العامل بعد إلغاء الطلب.");
             }
 
-            // ✅ إزالة الطلب من قائمة الطلبات المفتوحة (إن وجدت)
             const jobDetails = document.getElementById('jobDetails');
             if (jobDetails) {
                 jobDetails.style.display = 'none';
@@ -477,12 +477,47 @@ function monitorRequestStatus(requestId) {
             }
 
             return; // ✅ منع أي عمليات أخرى على الطلب الملغي
+        } 
+        else if (requestData.status === 'pending' && requestData.note) {
+            // ✅ التعامل مع حالة إعادة تعيين الطلب بسبب انقطاع اتصال العامل
+            console.warn("⚠️ تمت إعادة تعيين الطلب بسبب انقطاع اتصال العامل:", requestData.note);
+            alert("تنبيه: لم يتم استكمال الطلب من قبل العامل بسبب فقدان الاتصال. سيتم إعادة عرض الطلب.");
+
         } else {
             console.log(`🔄 حالة الطلب الحالية: ${requestData.status}`);
         }
     });
 }
 
+
+function monitorWorkerActivity(workerId, requestId) {
+    const workerRef = firebase.database().ref(`workers/${workerId}/lastActive`);
+    workerRef.on('value', snapshot => {
+        const lastActive = snapshot.val();
+        if (lastActive) {
+            const elapsed = Date.now() - lastActive;
+            console.log(`⏳ العامل ${workerId} آخر نشاط منذ ${Math.round(elapsed / 1000)} ثانية.`);
+            
+            if (elapsed > 2 * 60 * 1000) { // إذا كان العامل غير نشط لأكثر من دقيقتين
+                console.warn(`⚠️ العامل ${workerId} غير نشط لأكثر من دقيقتين.`);
+                
+                // إعادة تعيين الطلب تلقائيًا
+                firebase.database().ref(`workRequests/${requestId}`).update({
+                    status: 'pending',
+                    note: 'تم إعادة تعيين الطلب بسبب عدم نشاط العامل'
+                })
+                .then(() => {
+                    alert("تنبيه: العامل لم يتفاعل مع الطلب لفترة طويلة. سيتم إعادة عرضه لعمال آخرين.");
+                })
+                .catch((error) => {
+                    console.error("❌ خطأ أثناء إعادة تعيين الطلب:", error);
+                });
+            }
+        } else {
+            console.error(`❌ لا يوجد سجل lastActive للعامل ${workerId}`);
+        }
+    });
+}
 
 
 
