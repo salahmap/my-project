@@ -1383,25 +1383,30 @@ const styles = {
 
 
         // إنشاء الخريطة مع زوم منخفض جدًا كأنك ترى الأرض من الفضاء
-        const map = new mapboxgl.Map({
-            container: 'map', 
-            style: styles.hybrid, 
-            center: [13.1913, 32.8872], // إحداثيات طرابلس
-            zoom: 2 // زوم 2 لعرض العالم من بعيد
-        });
+        map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/mapbox/satellite-streets-v11',
+  center: [0, 0],
+  zoom: 2,
+  projection: 'globe'
+});
 
-        // بعد تحميل الخريطة، قم بالتحرك تدريجيًا نحو طرابلس
-        map.on('load', () => {
-            waitUntilMapReady()
-    .then(() => {
-        map.flyTo({ center: [13.1913, 32.8872], zoom: 10, speed: 0.2 });
-    })
-    .catch((err) => {
-        console.error("⚠️: 186 تعذر التحرك إلى الموقع لأن الخريطة ليست جاهزة.", err);
+map.on('style.load', () => { 
+  map.setFog({}); 
+});
+
+map.on('load', () => {
+  waitUntilMapReady().then(() => {
+    map.flyTo({
+      center: [13.1913, 32.8872],
+      zoom: 12,
+      pitch: 60,      // زاوية ميل تعطي عمقاً ثلاثي الأبعاد
+      bearing: 45,    // دوران لطيف يعزز الإحساس بالحركة
+      speed: 0.3,
+      curve: 1.8,
+      easing: function(t) { return t*t; }
     });
-
-    // استدعاء دالة عرض العمال
-    showPublicWorkers();
+  });
 });
 
 
@@ -1529,10 +1534,15 @@ locateControl.on('geolocate', (e) => {
     console.log("تم تحديد الموقع: ", e.coords);
     if (autoCenterEnabled) {
         map.flyTo({
-            center: [e.coords.longitude, e.coords.latitude],
-            zoom: 18,    // قيمة التكبير المطلوبة؛ يمكنك تعديلها حسب الحاجة
-            speed: 1.0   // سرعة الانتقال (اختيارية)
-        });
+  center: [longitude, latitude],
+  zoom: 14,      // تكبير أكثر مع تغيير بسيط في الزوم
+  speed: 0.8,    // تباطؤ الحركة لنعومة الانتقال
+  curve: 1.5,    // زيادة انحناء المسار لتحسين الإحساس بالحركة
+  easing: function (t) {
+    return t;  // دالة تخفيف بسيطة يمكن تعديلها لمزيد من التأثير
+  }
+});
+
     } else {
         console.log("إعادة التمركز معطلة؛ المستخدم تحكم يدويًا في موقع العرض.");
     }
