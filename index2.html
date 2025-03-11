@@ -53,7 +53,7 @@
   border-radius: 50%; /* لضمان ظهور الزر بشكل دائري ورقيق */
 }
 
-/* تنسيق لوحة الطلبات */
+/* تنسيق لوحة الطلبات مع تأثير انتقالي */
 #ordersPanel {
   position: absolute;
   top: 60px;
@@ -67,7 +67,19 @@
   padding: 10px;
   display: none;
   z-index: 10;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+  transform: translateX(100%);
+  opacity: 0;
 }
+
+/* 🔥 الفئة التي ستُضاف عند إظهار اللوحة */
+#ordersPanel.show {
+  display: block;
+  transform: translateX(0);
+  opacity: 1;
+}
+
+
 .orderItem {
   border-bottom: 1px solid #ddd;
   padding: 8px;
@@ -168,25 +180,48 @@
     <h1 id="title" style="display: none;">تطبيق الخريطة المحسن</h1>
     <div id="map"></div>
 
-<!-- نافذة تفاصيل العمل بعد التعديل بدون زر الإلغاء -->
-<div id="jobDetailsPopup" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; border-radius:10px; padding:20px; z-index:3;">
+<!-- نافذة تفاصيل العمل المحدثة مع حدود واضحة -->
+<div id="jobDetailsPopup" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%);
+ background:white; border-radius:10px; padding:20px; z-index:1100; 
+ border: 3px solid #000000; /* حد أزرق واضح */
+ box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2); /* ظل خفيف لإبراز النافذة */">
+    
     <h2>تفاصيل العمل</h2>
     <p id="jobDescription"></p>
     <p id="userPhone"></p>
+
     <!-- عنصر عرض الصورة -->
     <img id="jobImage" src="" alt="صورة العمل" style="max-width:100%; height:auto; display:none;">
+
     <p id="jobLocation"></p>
     <p id="jobDuration"></p>
     <p id="jobBudget"></p>
     <p id="jobDistance"></p>
     <p id="estimatedArrivalTime"></p>
+
+    <!-- إضافة ملاحظات هامة -->
+    <div id="jobNotes" style="margin-top: 10px; padding: 10px; border-top: 1px solid #ccc; font-size: 14px; color: #555;">
+        <p><strong>ملاحظات هامة:</strong></p>
+        <p>- يتم تسجيل جميع إجراءات القبول والرفض في قاعدة البيانات.</p>
+        <p>- عند الاقتراب إلى أقل من 500 متر من موقع الطلب، لن تتمكن من إلغاء الطلب.</p>
+        <p>- إذا لم يرد العميل عند الاتصال، يرجى إرسال رسالة نصية إلى الشركة تتضمن اسم ورقم المستخدم، أو إبلاغ الفرع عند الحضور بنهاية الشهر.</p>
+        <p>نلتزم بالجودة والاحترافية لضمان سير العمل بكفاءة.</p>
+    </div>
+
+    <!-- قسم جديد لعرض خريطة مصغرة -->
+    <div id="miniMap" style="width:100%; height:auto; margin-top:10px;"></div>
+
     <button id="acceptJobButton">قبول الطلب</button>
     <button onclick="document.getElementById('jobDetailsPopup').style.display='none'">إغلاق</button>
 </div>
 
+
+  
+
 <!-- زر إلغاء الطلب الآن موجود على الشاشة الرئيسية -->
 <div id="cancelJobContainer" style="display:none; position: fixed; bottom: 20px; left: 20px; z-index: 1000;">
     <button id="cancelJobButton" class="controlButton" style="background-color: #d9534f;">إلغاء الطلب</button>
+    
 </div>
 
 
@@ -214,10 +249,33 @@
     <div id="workerInfo"></div>
   </div>
   
-  <!-- إضافة لوحة عرض الطلبات المعلقة -->
-  <div id="ordersPanel">
-    <!-- سيتم تعبئتها ديناميكياً ببيانات الطلبات -->
+<!-- لوحة عرض الطلبات -->
+<div id="ordersPanel" style="position: absolute; top: 10px; right: 10px; width: 300px; height: 400px; z-index: 1000; border: 1px solid #ccc; border-radius: 5px; background: #fff; overflow: hidden;">
+    <!-- رأس النافذة -->
+    <div class="ordersHeader" style="height: 60px; padding: 10px; box-sizing: border-box; display: flex; justify-content: space-between; align-items: center; background: #fff;">
+      <div>
+        <input type="text" id="orderSearch" placeholder="ابحث عن طلب..." style="width:60%; padding:5px; border:1px solid #ccc; border-radius:5px;" />
+        <select id="orderSort" style="width:35%; padding:5px; border:1px solid #ccc; border-radius:5px;">
+          <option value="timestamp">الأحدث أولاً</option>
+          <option value="distance">الأقرب</option>
+          <option value="status">حسب الحالة</option>
+        </select>
+      </div>
+      <span id="closeOrdersPanel" onclick="toggleOrdersPanel()" style="cursor:pointer; font-size: 20px; color: #d9534f;">
+        <i class="fas fa-times"></i>
+      </span>
+    </div>
+    <!-- منطقة الطلبات -->
+    <div id="ordersList" style="height: calc(100% - 60px); overflow-y: auto; padding: 10px;">
+      <!-- محتوى قائمة الطلبات -->
+    </div>
   </div>
+  
+
+
+  
+  
+  
   
 
 
@@ -687,6 +745,52 @@ function calculateDistance(loc1, loc2) {
 }
 
 
+
+
+
+
+// ✅ دالة للتحقق من حالة الطلب وتحديثها إذا اقترب العامل من موقع العمل
+function checkAndUpdateOrderStatus() {
+    console.log("📢 215 استدعاء checkAndUpdateOrderStatus() ✅"); // هذه السطر يظهر في كل مرة تعمل فيها الدالة
+
+    if (!currentRequestId) {
+        console.warn("⚠️ 218 لا يوجد طلب نشط حاليًا لتحديث حالته.");
+        return;
+    }
+    
+    firebase.database().ref(`workRequests/${currentRequestId}`).once("value")
+        .then(snapshot => {
+            const order = snapshot.val();
+            if (!order || !order.location) {
+                console.error("🚨 213 بيانات الطلب غير متوفرة أو غير صحيحة.");
+                return;
+            }
+
+            // التأكد من أن الطلب في حالة "accepted"
+            if (order.status === "accepted") {
+                if (!window.currentWorkerLocation) {
+                    console.error("🚨 214 موقع العامل غير متاح بعد، لن يتم تحديث حالة الطلب.");
+                    return;
+                }
+                
+                const distance = calculateDistance(window.currentWorkerLocation, order.location);
+                console.log(`📡 المسافة الحالية إلى موقع الطلب: ${distance.toFixed(2)} كم`);
+
+                // إذا كان العامل على بعد 500 متر أو أقل، يتم تحديث الحالة
+                if (distance <= 0.5) {
+                    firebase.database().ref(`workRequests/${currentRequestId}`).update({
+                        status: 'finished', // أو يمكنك استخدام "completed"
+                        completedAt: Date.now()
+                    }).then(() => {
+                        console.log("✅ 216 تم تحديث حالة الطلب إلى finished لأن العامل اقترب من موقع العمل.");
+                    }).catch(error => console.error("🚨 خطأ في تحديث حالة الطلب:", error));
+                }
+            }
+        })
+        .catch(error => console.error("🚨 217 خطأ في جلب بيانات الطلب:", error));
+}
+
+
 // إضافة دالة getWorkerDistance للتحقق من المسافة بين موقع العامل وموقع الطلب
 function getWorkerDistance() {
     // تأكد من أن المتغيرات currentWorkerLocation و jobLocation معرّفة بشكل صحيح
@@ -951,11 +1055,6 @@ function loginWorker() {
 
 
 
-
-
-
-
-
 // دالة لتحديث activeWorkers مع معالجة الأخطاء
 function updateActiveWorkerLocation(workerId, location) {
     try {
@@ -969,38 +1068,46 @@ function updateActiveWorkerLocation(workerId, location) {
     }
 }
 
-// دالة تحديث الموقع باستخدام GPS (تم تعديلها لتشمل تحديث activeWorkers)
 function updateLocationWithGPS(workerId) {
     if (navigator.geolocation) {
+        // ✅ الحصول على الموقع الأولي للعامل
         navigator.geolocation.getCurrentPosition((position) => {
             const initialLocation = {
                 lat: position.coords.latitude,
                 lng: position.coords.longitude,
             };
-            console.log("✅ 90 Pre-cached location:", initialLocation);
+            console.log("📍90 الموقع الأولي:", initialLocation);
             updateWorkerLocation(workerId, initialLocation);
             updateActiveWorkerLocation(workerId, initialLocation);
         }, (error) => {
-            console.error("🚨 91 Error pre-fetching location:", error);
+            console.error("🚨 91 خطأ أثناء جلب الموقع الأولي:", error);
         }, { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 });
-        
-        navigator.geolocation.watchPosition((position) => {
-    const newLocation = {
-        lat: position.coords.latitude,
-        lng: position.coords.longitude,
-    };
-    console.log("📡 93 Updating location with watchPosition:", newLocation);
-    window.currentWorkerLocation = newLocation;
-    updateWorkerLocation(workerId, newLocation);
-    updateActiveWorkerLocation(workerId, newLocation);
-    // استدعاء الدالة لفحص المسافة وتحديث ظهور زر الإلغاء
-    checkDistanceAndToggleCancelButton();
-}, (error) => {
-    console.error("🚨 197 Error during continuous location tracking:", error);
-}, { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 });
 
+        // ✅ مراقبة التغيرات في الموقع بشكل مستمر
+        navigator.geolocation.watchPosition((position) => {
+            const newLocation = {
+                lat: position.coords.latitude,
+                lng: position.coords.longitude,
+            };
+            console.log("📡 93 تحديث الموقع أثناء الحركة:", newLocation);
+            
+            // تحديث الموقع الحالي في الذاكرة
+            window.currentWorkerLocation = newLocation;
+            
+            // تحديث Firebase بالموقع الجديد للعامل
+            updateWorkerLocation(workerId, newLocation);
+            updateActiveWorkerLocation(workerId, newLocation);
+            
+            // استدعاء دالة فحص المسافة لتحديث حالة الطلب
+            checkAndUpdateOrderStatus();
+            
+            // استدعاء دالة أخرى للتحكم في إظهار زر الإلغاء
+            checkDistanceAndToggleCancelButton();
+        }, (error) => {
+            console.error("🚨 197 خطأ أثناء تتبع الموقع:", error);
+        }, { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 });
     } else {
-        console.error("🚨 198 Geolocation is not supported in this browser.");
+        console.error("🚨 198 المتصفح لا يدعم تحديد الموقع الجغرافي (Geolocation).");
     }
 }
 
@@ -1184,19 +1291,88 @@ document.getElementById('cancelJobButton').addEventListener('click', function() 
 });
 
 
+function showNotification(message) {
+    // إنشاء عنصر الإشعار
+    const notification = document.createElement('div');
+    notification.innerText = message;
+    // تنسيق بسيط للإشعار
+    notification.style.position = 'fixed';
+    notification.style.top = '20px';
+    notification.style.right = '20px';
+    notification.style.backgroundColor = '#f44336';
+    notification.style.color = '#fff';
+    notification.style.padding = '10px';
+    notification.style.borderRadius = '5px';
+    notification.style.boxShadow = '0px 2px 6px rgba(0, 0, 0, 0.3)';
+    notification.style.zIndex = '10000';
+    document.body.appendChild(notification);
+    // إزالة الإشعار بعد 3 ثوانٍ
+    setTimeout(() => {
+       notification.remove();
+    }, 3000);
+}
+
+
+function handleShowJobDetails(jobData) {
+    console.log("handleShowJobDetails: تم النقر على زر عرض تفاصيل الطلب", jobData);
+    
+    // التأكد من أن المعطى عبارة عن كائن وليس سلسلة نصية
+    if (typeof jobData === 'string') {
+        try {
+            jobData = JSON.parse(jobData);
+            console.log("handleShowJobDetails: تم تحويل السلسلة إلى كائن بنجاح", jobData);
+        } catch (e) {
+            console.error("handleShowJobDetails: فشل تحويل السلسلة إلى كائن JSON", e);
+            showNotification("حدث خطأ في بيانات الطلب");
+            return;
+        }
+    }
+    
+    // التحقق من تسجيل الدخول وعدم فتح تفاصيل الطلب إذا لم يكن المستخدم مسجلاً
+    if (!currentWorkerId) {
+        console.error("handleShowJobDetails: المستخدم غير مسجل الدخول");
+        // عرض إشعار بدلاً من فتح نافذة التفاصيل
+        alert("يجب تسجيل الدخول أولاً لعرض المميزات");
+        // فتح نافذة تسجيل الدخول تلقائيًا
+        document.getElementById('loginPopup').style.display = 'flex';
+        return;
+    }
+    
+    console.log("handleShowJobDetails: المستخدم مسجل الدخول بنجاح، currentWorkerId =", currentWorkerId);
+    // استدعاء دالة عرض تفاصيل الطلب فقط إذا كان المستخدم مسجلاً للدخول
+    showJobDetails(jobData);
+}
 
 
 
 
- 
+document.addEventListener("DOMContentLoaded", function() {
+    // محاولة جلب الموقع الحالي للمستخدم حتى وإن لم يتم تسجيل الدخول
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            function(position) {
+                window.currentWorkerLocation = {
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude
+                };
+                console.log("تم الحصول على الموقع الحالي عند تحميل الصفحة:", window.currentWorkerLocation);
+            },
+            function(error) {
+                console.error("خطأ أثناء جلب الموقع عند تحميل الصفحة:", error);
+            },
+            { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+        );
+    } else {
+        console.error("المتصفح لا يدعم Geolocation.");
+    }
+});
+
 
         // دالة لعرض تفاصيل العمل
         // دالة لعرض تفاصيل العمل مع حساب المسافة
         function showJobDetails(jobData) {
-    // عرض تفاصيل العمل
+    console.log("showJobDetails: بدأ عرض تفاصيل الطلب", jobData);
     document.getElementById('jobDescription').innerText = `وصف العمل: ${jobData.description || jobData.workType}`;
-    
-    // إعداد البيانات مثل رقم الهاتف والصورة والموقع
     const fullPhone = jobData.phone || "غير متوفر";
     window.fullPhone = fullPhone;
     let maskedPhone = fullPhone;
@@ -1204,7 +1380,6 @@ document.getElementById('cancelJobButton').addEventListener('click', function() 
        maskedPhone = fullPhone.substr(0, 5) + "*****";
     }
     document.getElementById('userPhone').innerText = `رقم الهاتف: ${maskedPhone} (سيظهر الرقم الكامل عند الاقتراب 500 متر)`;
-    
     if (jobData.imageUrl) {
         const jobImage = document.getElementById('jobImage');
         jobImage.src = jobData.imageUrl;
@@ -1212,25 +1387,43 @@ document.getElementById('cancelJobButton').addEventListener('click', function() 
     } else {
         document.getElementById('jobImage').style.display = 'none';
     }
-    
     document.getElementById('jobLocation').innerText = jobData.region 
         ? `الموقع: ${jobData.region}` 
         : `الموقع: (${jobData.location.lat}, ${jobData.location.lng})`;
-    
     document.getElementById('jobDuration').innerText = `المدة: ${jobData.time}`;
     document.getElementById('jobBudget').innerText = `المبلغ: ${jobData.budget}`;
     
     window.jobLocation = jobData.location;
     
+    // إذا لم يكن currentWorkerLocation معرفًا، نحاول جلبه الآن
     if (typeof currentWorkerLocation === 'undefined') {
-        console.error("currentWorkerLocation غير معرف لحساب المسافة");
+        console.warn("currentWorkerLocation غير معرف، محاولة جلب الموقع الآن...");
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    currentWorkerLocation = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    };
+                    console.log("تم الحصول على الموقع الحالي في showJobDetails:", currentWorkerLocation);
+                    updateDistanceAndETA();
+                },
+                function(error) {
+                    console.error("خطأ أثناء جلب الموقع في showJobDetails:", error);
+                    document.getElementById('jobDistance').innerText = "المسافة: غير متوفرة";
+                }
+            );
+        }
     } else {
+        updateDistanceAndETA();
+    }
+    
+    function updateDistanceAndETA() {
         const distance = calculateDistance(currentWorkerLocation, jobData.location);
         const distanceElem = document.getElementById('jobDistance');
         if (distanceElem) {
             distanceElem.innerText = `المسافة: ${distance.toFixed(2)} كم`;
         }
-        // استدعاء حساب ETA وتحديث العرض
         calculateETA(currentWorkerLocation, jobData.location, (err, data) => {
             if (err) {
                 console.error("خطأ في حساب ETA أثناء عرض تفاصيل العمل", err);
@@ -1243,6 +1436,7 @@ document.getElementById('cancelJobButton').addEventListener('click', function() 
             }
         });
     }
+
     
     // تعديل مظهر زر "قبول الطلب" بناءً على حالة الطلب
     const acceptBtn = document.getElementById('acceptJobButton');
@@ -1374,50 +1568,58 @@ function saveRequestForLater(requestData, requestId) {
 
 // تعديل مستمع الطلبات
 const requestRef = database.ref('workRequests');
+let initialRequestsLoaded = false;
+
+// تحميل البيانات الأولية وتعيين العلم عند الانتهاء
+requestRef.once('value', () => {
+    initialRequestsLoaded = true;
+});
+
 requestRef.on('child_added', (snapshot) => {
+    // تجاهل الأحداث التي تأتي من التحميل الأولي
+    if (!initialRequestsLoaded) return;
+
     const requestData = snapshot.val();
     const requestId = snapshot.key;
 
-    // إضافة: تعيين currentRequestId للطلب الجديد
+    // تعيين الطلب الحالي
     currentRequestId = requestId;
     console.log("✅ تم تعيين currentRequestId للطلب الجديد:", currentRequestId);
 
-    // ***** إضافة شرط التحقق من وجود طلب نشط مسبقاً *****
+    // شرط التحقق من وجود طلب نشط مسبقاً
     if (activeRequestExists) {
         console.log("⚠️ العامل لديه طلب نشط بالفعل. تم تجاهل الطلب الجديد.");
-        // يمكنك هنا تحديث نافذة التفاصيل برسالة توضيحية إن رغبت (مثلاً تحديث innerHTML)
         return;
     }
-    // *****************************************************
 
-    // التحقق من صحة بيانات الطلب
-    if (!requestData || !requestId) {
-        console.error("🚨 38 بيانات الطلب غير صحيحة من قاعدة البيانات:", { requestData, requestId });
-        return;
-    }
-    // تحقق من أن موقع العامل الحالي متوفر
+    // التأكد من توفر موقع العامل وحساب المسافة
     if (!window.currentWorkerLocation) {
         console.error("🚨 210 موقع العامل الحالي غير متوفر.");
         return;
     }
-    // حساب المسافة بين موقع العامل الحالي وموقع الطلب
     const distance = calculateDistance(window.currentWorkerLocation, requestData.location);
     console.log(` 211 المسافة بين العامل والطلب ${requestId}: ${distance.toFixed(2)} كم`);
-    // إذا كانت المسافة أكبر من 15 كم، لا يتم معالجة الطلب
     if (distance > 15) {
         console.warn(`⚠️ الطلب ${requestId} بعيد عن نطاق الـ 15 كم، لن يتم عرضه.`);
         return;
     }
-    // الانتظار حتى تكون الخريطة جاهزة لمعالجة الطلب
+
     waitUntilMapReady()
         .then(() => {
             console.log(`🎉 40 الخريطة جاهزة لمعالجة الطلب ${requestId}.`);
-            // معالجة الطلب إذا كان في حالة "pending"
             if (requestData.status === 'pending') {
                 try {
                     console.log(`⚙️ 44 بدء معالجة الطلب ${requestId}.`);
                     startRequestTimeout(requestId, 10); // تفعيل المهلة الزمنية
-                    showJobDetails(requestData); // عرض تفاصيل الطلب
+
+                    // التحقق من تسجيل الدخول قبل عرض تفاصيل الطلب
+                    if (currentWorkerId) {
+                        showJobDetails(requestData); // عرض تفاصيل الطلب
+                    } else {
+                        // إذا لم يكن المستخدم مسجلاً، عرض إشعار وتنبيه لتسجيل الدخول
+                        alert("يجب تسجيل الدخول أولاً لعرض تفاصيل الطلب");
+                        document.getElementById('loginPopup').style.display = 'flex';
+                    }
                 } catch (error) {
                     console.error(`🚨 72 خطأ أثناء معالجة الطلب ${requestId}:`, error);
                 }
@@ -1431,6 +1633,8 @@ requestRef.on('child_added', (snapshot) => {
             return;
         });
 });
+
+
 
 
 
@@ -1652,53 +1856,139 @@ if (currentWorkerLocation && jobLocation) {
 // دالة تبديل عرض/إخفاء لوحة الطلبات
 function toggleOrdersPanel() {
   const panel = document.getElementById("ordersPanel");
-  if (panel.style.display === "none" || panel.style.display === "") {
-    panel.style.display = "block";
-    console.log("Orders panel shown.");
+
+  if (!panel.classList.contains("show")) {
+    panel.classList.add("show");
+    console.log("✅ تم فتح لوحة الطلبات.");
     fetchPendingOrders();
   } else {
-    panel.style.display = "none";
-    console.log("Orders panel hidden.");
+    panel.classList.remove("show");
+    console.log("❌ تم إغلاق لوحة الطلبات.");
   }
 }
 
+
+
 // دالة لجلب الطلبات المعلقة من Firebase وتحديث اللوحة
 function fetchPendingOrders() {
-  const ordersPanel = document.getElementById("ordersPanel");
-  ordersPanel.innerHTML = ""; // تفريغ المحتوى القديم
+  // تحديد العنصر الخاص بقائمة الطلبات
+  const ordersList = document.getElementById("ordersList");
+  ordersList.innerHTML = ""; // تفريغ المحتوى القديم
+
   firebase.database().ref("workRequests")
     .orderByChild("status").equalTo("pending")
     .once("value", function(snapshot) {
       if (!snapshot.exists()) {
-        ordersPanel.innerHTML = "<p>لا يوجد طلبات</p>";
+        ordersList.innerHTML = "<p>لا يوجد طلبات</p>";
         console.log("No pending orders found.");
         updateOrdersBadge(0);
         return;
       }
+
       let orders = [];
       snapshot.forEach(function(childSnapshot) {
         const order = childSnapshot.val();
         order.orderId = childSnapshot.key;
         orders.push(order);
       });
-      // ترتيب الطلبات تنازلياً حسب التاريخ (الأحدث أولاً)
-      orders.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-      orders.forEach(function(order) {
-        const orderItem = document.createElement("div");
-        orderItem.className = "orderItem";
-        orderItem.innerHTML = `
-          <p><strong>وقت التقديم:</strong> ${order.timestamp || "غير متوفر"}</p>
-          <p><strong>نوع العمل:</strong> ${order.workType || "غير محدد"}</p>
-          <p><strong>الحالة:</strong> ${order.status === "pending" ? "في انتظار" : order.status}</p>
-          <button onclick="acceptOrder('${order.orderId}')">قبول</button>
-        `;
-        ordersPanel.appendChild(orderItem);
-      });
-      updateOrdersBadge(orders.length);
+
+      // تطبيق البحث والفرز
+      applySearchAndSort(orders);
     }, function(error) {
       console.error("Error fetching pending orders:", error);
     });
 }
+
+// دالة لتطبيق البحث والفرز وعرض الطلبات
+// دالة لتطبيق البحث والفرز وعرض الطلبات (بعد التعديل)
+function applySearchAndSort(orders) {
+  const searchValue = document.getElementById('orderSearch').value.toLowerCase();
+  const sortBy = document.getElementById('orderSort').value;
+  const threeDaysInMs = 3 * 24 * 60 * 60 * 1000; // 3 أيام بالمللي ثانية
+
+  // تصفية الطلبات بناءً على البحث والوقت
+  let filteredOrders = orders.filter(order => {
+    // البحث بحسب نوع العمل أو المنطقة
+    const matchesSearch = order.workType.toLowerCase().includes(searchValue) ||
+                          (order.region && order.region.toLowerCase().includes(searchValue));
+    if (!matchesSearch) return false;
+
+    // عرض الطلبات إذا كانت قيد الانتظار أو مقبولة
+    if (order.status === "pending" || order.status === "accepted") {
+      return true;
+    }
+    // إذا كان الطلب مكتمل، يتم عرضه إذا مضى عليه أقل من 3 أيام
+    if ((order.status === "finished" || order.status === "completed") && order.completedAt) {
+      return (Date.now() - order.completedAt) < threeDaysInMs;
+    }
+    return false;
+  });
+
+  // فرز الطلبات بناءً على الخيار المحدد
+  if (sortBy === 'timestamp') {
+    // استخدام submittedAt إذا وُجد، أو fallback إلى timestamp
+    filteredOrders.sort((a, b) => (b.submittedAt || b.timestamp || 0) - (a.submittedAt || a.timestamp || 0));
+  } else if (sortBy === 'distance') {
+    filteredOrders.sort((a, b) => {
+      const distA = calculateDistance(window.currentWorkerLocation, a.location);
+      const distB = calculateDistance(window.currentWorkerLocation, b.location);
+      return distA - distB;
+    });
+  } else if (sortBy === 'status') {
+    filteredOrders.sort((a, b) => a.status.localeCompare(b.status));
+  }
+
+  // عرض الطلبات في العنصر ordersList
+  const ordersList = document.getElementById("ordersList");
+  ordersList.innerHTML = "";
+  filteredOrders.forEach(function(order) {
+    const orderItem = document.createElement("div");
+    orderItem.className = "orderItem";
+
+    // أيقونات لحالة الطلب
+    let statusIcon = "";
+    if (order.status === "pending") {
+      statusIcon = '<i class="fas fa-hourglass-half" style="color:orange;"></i>';
+    } else if (order.status === "accepted") {
+      statusIcon = '<i class="fas fa-check-circle" style="color:green;"></i>';
+    } else if (order.status === "finished" || order.status === "completed") {
+      statusIcon = '<i class="fas fa-flag-checkered" style="color:blue;"></i>';
+    }
+
+    // حساب المسافة بين موقع العامل وموقع الطلب
+    const distance = calculateDistance(window.currentWorkerLocation, order.location).toFixed(2);
+
+    // عرض الحالة مع تعديل عند الطلب المكتمل
+    const displayStatus = order.status === "pending" ? "في انتظار" :
+                          (order.status === "finished" || order.status === "completed" ? "تم إنجازه" : order.status);
+
+    orderItem.innerHTML = `
+      <p><strong>وقت التقديم:</strong> ${order.submittedAt ? new Date(order.submittedAt).toLocaleString() : "غير متوفر"} ${statusIcon}</p>
+      <p><strong>نوع العمل:</strong> ${order.workType || "غير محدد"}</p>
+      <p><strong>الحالة:</strong> ${displayStatus}</p>
+      <p><strong>الميزانية:</strong> ${order.budget || "غير محددة"}</p>
+      <p><strong>الوصف:</strong> ${order.description || "غير متوفر"}</p>
+      <p><strong>المسافة:</strong> ${distance} كم</p>
+<button onclick='handleShowJobDetails(${JSON.stringify(order).replace(/"/g, "&quot;")})'>عرض تفاصيل الطلب</button>
+    `;
+    ordersList.appendChild(orderItem);
+  });
+
+  updateOrdersBadge(filteredOrders.length);
+}
+
+
+
+// إضافة مستمعات (event listeners) لتحديث القائمة عند إدخال البحث أو تغيير الفرز
+document.getElementById('orderSearch').addEventListener('input', function() {
+  fetchPendingOrders();
+  console.log("🔍 تم تحديث البحث في الطلبات.");
+});
+document.getElementById('orderSort').addEventListener('change', function() {
+  fetchPendingOrders();
+  console.log("📊 تم تغيير خيار الفرز في الطلبات.");
+});
+
 
 // دالة لتحديث شارة عدد الطلبات على زر "عرض الطلبات"
 function updateOrdersBadge(count) {
@@ -1731,9 +2021,10 @@ document.addEventListener("click", function(event) {
 
 // ربط حدث النقر على زر "عرض الطلبات" بالدالة
 document.getElementById("toggleOrdersButton").addEventListener("click", function(event) {
-  event.stopPropagation(); // منع وصول الحدث إلى document
+  event.stopPropagation(); // منع إغلاق اللوحة عند النقر داخلها
   toggleOrdersPanel();
 });
+
 
 
 
@@ -2112,12 +2403,34 @@ if (!isMapInitialized) {
 
 
 
-
+function handleOrderMarkerClick(orderData) {
+    console.log("handleOrderMarkerClick: تم النقر على أيقونة الطلب", orderData);
+    
+    // التحقق مما إذا كان المستخدم مسجلاً للدخول
+    if (!currentWorkerId) {
+        console.error("handleOrderMarkerClick: المستخدم غير مسجل الدخول");
+        alert("يجب تسجيل الدخول أولاً لعرض المميزات");
+        // فتح نافذة تسجيل الدخول تلقائيًا
+        document.getElementById('loginPopup').style.display = 'flex';
+        return;
+    }
+    
+    console.log("handleOrderMarkerClick: المستخدم مسجل الدخول بنجاح، currentWorkerId =", currentWorkerId);
+    
+    // استدعاء دالة عرض تفاصيل الطلب
+    showJobDetails(orderData);
+}
 
 function addMarkersToMap() {
     const requestsRef = database.ref('workRequests');
+    let initialLoadCompleted = false;
+    
+    // عند انتهاء تحميل البيانات الأولية، يتم تعيين العلم إلى true
+    requestsRef.once('value', () => {
+         initialLoadCompleted = true;
+    });
+    
     requestsRef.on('child_added', (data) => {
-        // التأكد من جاهزية الخريطة قبل محاولة إضافة العلامات
         waitUntilMapReady()
             .then(() => {
                 // استكمال إضافة العلامة على الخريطة
@@ -2130,33 +2443,37 @@ function addMarkersToMap() {
         const request = data.val();
         if (request && request.location && request.location.lng && request.location.lat) {
             try {
-                // إنشاء الماركر بدون تعيين Popup افتراضي
+                // إنشاء الماركر وإضافته إلى الخريطة
                 const marker = new mapboxgl.Marker({ color: 'green' })
-    .setLngLat([request.location.lng, request.location.lat])
-    .addTo(map);
-
+                    .setLngLat([request.location.lng, request.location.lat])
+                    .addTo(map);
                 
-                // NEW CODE: تخزين الماركر في كائن عام لتسهيل الإزالة لاحقاً
+                // تخزين الماركر في كائن عام لتسهيل إزالته لاحقاً
                 if (!window.requestMarkers) {
                     window.requestMarkers = {};
                 }
                 window.requestMarkers[data.key] = marker;
                 
-                // تعديل مستمع النقر بحيث يعيد جلب البيانات المحدثة من Firebase
+                // إضافة مستمع النقر على الماركر مع التحقق من انتهاء التحميل الأولي
                 marker.getElement().addEventListener('click', () => {
+                    // إذا لم ينتهي التحميل الأولي، لا تقم بأي إجراء
+                    if (!initialLoadCompleted) return;
+                    
                     currentRequestId = data.key;
                     firebase.database().ref('workRequests/' + data.key).once('value')
-                    .then((snapshot) => {
-                        const updatedRequest = snapshot.val();
-                        console.log("تم جلب بيانات الطلب المحدثة:", updatedRequest);
-                        showJobDetails(updatedRequest);
-                    })
-                    .catch((error) => {
-                        console.error("خطأ أثناء جلب بيانات الطلب:", error);
-                        alert("حدث خطأ أثناء جلب بيانات الطلب.");
-                    });
+                        .then((snapshot) => {
+                            const updatedRequest = snapshot.val();
+                            console.log("🔍 تم جلب بيانات الطلب المحدثة:", updatedRequest);
+    
+                            // استدعاء الدالة الخاصة بالتأكد من تسجيل الدخول وعرض تفاصيل الطلب
+                            handleOrderMarkerClick(updatedRequest);
+                        })
+                        .catch((error) => {
+                            console.error("⚠️ خطأ أثناء جلب بيانات الطلب:", error);
+                            alert("حدث خطأ أثناء جلب بيانات الطلب.");
+                        });
                 });
-                
+    
                 console.log(`تمت إضافة الطلب ${data.key} إلى الخريطة.`);
             } catch (error) {
                 console.error("🚨 خطأ أثناء إضافة العلامة إلى الخريطة:", error);
@@ -2166,6 +2483,7 @@ function addMarkersToMap() {
         }
     });
 }
+
 
 
 
@@ -2402,27 +2720,29 @@ if (acceptJobButton) {
                 acceptedBy: currentWorkerId
             });
 
-            alert("✅ تم قبول الطلب بنجاح.");
-            console.log(`📢 تم قبول الطلب ${currentRequestId} بواسطة العامل ${currentWorkerId}`);
+// بعد تحديث حالة الطلب في Firebase واستلام النجاح
+alert("✅ تم قبول الطلب بنجاح.");
+console.log(`📢 تم قبول الطلب ${currentRequestId} بواسطة العامل ${currentWorkerId}`);
 
-            activeRequestExists = true;
+activeRequestExists = true;
 
-            // إخفاء نافذة تفاصيل الطلب
-            document.getElementById('jobDetailsPopup').style.display = 'none';
+// إخفاء نافذة تفاصيل الطلب وشريط الطلبات معاً
+document.getElementById('jobDetailsPopup').style.display = 'none';
+document.getElementById('ordersPanel').style.display = 'none';
 
-            // تنفيذ الدوال الإضافية بعد قبول الطلب
-            if (currentWorkerLocation && jobLocation) {
-                if (typeof showRoute === "function") {
-                    showRoute(currentWorkerLocation, jobLocation);
-                    console.log("🚗 تم استدعاء دالة showRoute لعرض الاتجاه والمسافة على الخريطة.");
-                } else {
-                    console.error("⚠️ وظيفة showRoute غير معرفة.");
-                }
+// متابعة تنفيذ الدوال الأخرى مثل عرض المسار وتحديث ETA وغيرها...
+if (currentWorkerLocation && jobLocation) {
+    if (typeof showRoute === "function") {
+        showRoute(currentWorkerLocation, jobLocation);
+        console.log("🚗 تم استدعاء دالة showRoute لعرض الاتجاه والمسافة على الخريطة.");
+    } else {
+        console.error("⚠️ وظيفة showRoute غير معرفة.");
+    }
+    startRealTimeETATracking(currentWorkerLocation, jobLocation);
+} else {
+    console.error("❌ بيانات الموقع للعامل أو الطلب غير متوفرة.");
+}
 
-                startRealTimeETATracking(currentWorkerLocation, jobLocation);
-            } else {
-                console.error("❌ بيانات الموقع للعامل أو الطلب غير متوفرة.");
-            }
 
             // التحقق من المسافة لتحديث زر الإلغاء
             const distance = getWorkerDistance();
