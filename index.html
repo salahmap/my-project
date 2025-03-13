@@ -163,10 +163,30 @@
     <h1 id="title" style="display: none;">تطبيق الخريطة المحسن</h1>
     <div id="map"></div>
 
- 
-</body>
-
     
+ 
+<!-- نموذج عرض عرض التفاوض للمستخدم -->
+<div id="negotiationResponsePopup" style="display:none; position: fixed; top:50%; left:50%; transform: translate(-50%, -50%); background:white; padding:20px; border-radius:10px; z-index:1100;">
+    <h2>عرض تفاوضي جديد</h2>
+    <p id="negotiationDetails"></p>
+    <button onclick="respondToNegotiation('accept')">قبول العرض</button>
+    <button onclick="respondToNegotiation('reject')">رفض العرض</button>
+    <button onclick="respondToNegotiation('counter')" title="يمكنك اقتراح سعر بديل إذا لم يناسب العرض الحالي">اقتراح سعر جديد</button>
+</div>
+
+    <!-- نموذج تقديم العرض المضاد -->
+<div id="counterOfferPopup" style="display:none; position: fixed; top:50%; left:50%; transform: translate(-50%, -50%); background:white; padding:20px; border-radius:10px; z-index:1100;">
+    <h2>تقديم عرض مضاد</h2>
+    <label for="counterPrice">السعر المقترح:</label>
+    <input type="number" id="counterPrice" placeholder="أدخل السعر">
+    <br><br>
+    <label for="counterMessage">الرسالة:</label>
+    <textarea id="counterMessage" placeholder="أدخل رسالتك"></textarea>
+    <br><br>
+    <button onclick="submitCounterOffer()">إرسال العرض المضاد</button>
+    <button onclick="closeCounterOfferForm()">إغلاق</button>
+  </div>
+  
 
     <div class="controls">
         <button id="toggleWeather" class="iconButton">
@@ -719,25 +739,37 @@ function submitRequest() {
 
 
 
-
 function pushRequestData(requestData, userLocation) {
     requestsRef.push(requestData)
         .then((newRequestRef) => {
-            currentRequestId = newRequestRef.key;
-            // حفظ معرف الطلب في localStorage ليستمر بعد إعادة تحميل الصفحة
-            localStorage.setItem('currentRequestId', currentRequestId);
-            console.log("تم إنشاء معرف الطلب:", currentRequestId);
+            const newRequestId = newRequestRef.key;
+            localStorage.setItem('currentRequestId', newRequestId);
+            console.log("تم إنشاء معرف الطلب:", newRequestId);
             alert('تم إرسال الطلب بنجاح.');
-            document.getElementById('requestPopup').style.display = 'none';
-            document.getElementById('reviewRequestButton').style.display = 'block';
-            monitorRequestStatus(currentRequestId);
-            sendNotificationsToNearbyWorkers(requestData, userLocation);
+            monitorRequestStatus(newRequestId);
+            // استدعاء دالة عروض التفاوض باستخدام المعرف الموحد
+            listenForNegotiationOffers(newRequestId);
         })
         .catch((error) => {
-            console.error('خطأ في إرسال الطلب إلى Firebase:', error);
-            alert('حدث خطأ أثناء إرسال الطلب. يرجى المحاولة مرة أخرى لاحقًا.');
+            console.error('خطأ في إرسال الطلب:', error);
         });
 }
+
+// دالة موحدة لاسترجاع عروض التفاوض من Firebase باستخدام مسار موحد
+function listenForNegotiationOffers(requestId) {
+    const negotiationRef = firebase.database().ref(`workRequests/negotiations/${requestId}`);
+    negotiationRef.on('value', snapshot => {
+        const negotiationData = snapshot.val();
+        if (negotiationData) {
+            console.log("تم استرجاع عروض التفاوض:", negotiationData);
+            // تحديث الواجهة أو تنفيذ إجراءات أخرى بناءً على بيانات المفاوضة
+        } else {
+            console.warn("لا توجد عروض تفاوضية لهذا الطلب.");
+        }
+    });
+}
+
+
 
 
 document.getElementById('submitRequest').addEventListener('click', submitRequest);
@@ -810,6 +842,7 @@ function startWorkerTracking(workerId, userLocation, workerName) {
 }
 
 
+// عند تحميل الصفحة: استرجاع currentRequestId من localStorage ومتابعة حالة الطلب
 document.addEventListener("DOMContentLoaded", () => {
     const storedRequestId = localStorage.getItem('currentRequestId');
     if (storedRequestId) {
@@ -819,6 +852,14 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById('reviewRequestButton').style.display = 'block';
     }
 });
+
+// دالة فتح نموذج التفاوض مع تمرير المعرف وحفظه في متغير عام
+function openNegotiationForm(requestId) {
+    console.log("فتح نافذة التفاوض للطلب:", requestId);
+    document.getElementById("negotiationPopup").style.display = "block";
+    window.currentNegotiationRequestId = requestId; // حفظ المعرّف في متغير عام
+}
+
 
 // NEW CODE: دوال مراجعة وتعديل الطلب
 
@@ -1355,6 +1396,126 @@ function displayNotification(message, workerPhone) {
     document.body.appendChild(notification);
     console.log("تم عرض الإشعار بنجاح.");
 }
+
+// دالة الاستماع لعروض التفاوض الخاصة بالطلب الحالي
+function listenForNegotiationOffers(requestId) {
+    console.log("استدعاء الاستماع لعروض التفاوض للطلب:", requestId);
+    firebase.database().ref(`negotiations/${requestId}`).on('child_added', snapshot => {
+        const negotiation = snapshot.val();
+        console.log("تم استلام عرض تفاوض جديد:", snapshot.key, negotiation);
+        showNegotiationResponsePopup(negotiation, snapshot.key, requestId);
+    }, error => {
+        console.error("خطأ أثناء الاستماع لعروض التفاوض:", error);
+    });
+}
+
+
+// دالة عرض نافذة التفاوض للمستخدم عند ورود عرض تفاوضي جديد
+function showNegotiationResponsePopup(negotiation, negotiationId, requestId) {
+    if (!requestId || typeof requestId !== 'string') {
+        console.error("معرّف الطلب غير صالح:", requestId);
+        return;
+    }
+    const details = `السعر المقترح: ${negotiation.proposedPrice}\nالرسالة: ${negotiation.message}`;
+    document.getElementById('negotiationDetails').innerText = details;
+    // حفظ المعرفات لاستخدامها لاحقًا عند الرد
+    window.currentNegotiationId = negotiationId;
+    window.currentNegotiationRequestId = requestId;
+    // هنا نقوم بتحديث متغير currentRequestId الذي سيستخدم في ملف العمال
+    window.currentRequestId = requestId;
+    document.getElementById('negotiationResponsePopup').style.display = 'block';
+}
+
+
+// دالة للرد على عرض التفاوض (قبول، رفض، أو تقديم عرض مضاد)
+function respondToNegotiation(responseType) {
+    if (responseType === 'counter') {
+        // عند اختيار العرض المضاد، يتم عرض النموذج دون تحديث قاعدة البيانات الآن
+        openCounterOfferForm();
+        return; // إنهاء الدالة دون تحديث firebase
+    }
+    
+    const negotiationUpdate = {};
+    if (responseType === 'accept') {
+        negotiationUpdate.status = 'accepted';
+    } else if (responseType === 'reject') {
+        negotiationUpdate.status = 'rejected';
+    }
+    
+    negotiationUpdate.respondedAt = Date.now();
+    
+    firebase.database().ref(`negotiations/${window.currentNegotiationRequestId}/${window.currentNegotiationId}`)
+    .update(negotiationUpdate)
+    .then(() => {
+        
+        alert(`تم ${responseType === 'accept' ? 'قبول' : 'رفض'} العرض بنجاح.`);
+        document.getElementById('negotiationResponsePopup').style.display = 'none';
+    })
+    .catch(error => {
+        console.error("خطأ في تحديث حالة التفاوض:", error);
+        alert("حدث خطأ أثناء تحديث العرض.");
+    });
+}
+
+
+
+// دالة لفتح نموذج العرض المضاد
+function openCounterOfferForm() {
+    const counterOfferPopup = document.getElementById('counterOfferPopup');
+    if (counterOfferPopup) {
+        // إعادة تعيين الحقول للتأكد من بدء المستخدم بنموذج نظيف
+        document.getElementById('counterPrice').value = "";
+        document.getElementById('counterMessage').value = "";
+        counterOfferPopup.style.display = 'block';
+        console.log("تم فتح نموذج العرض المضاد وتفريغ الحقول السابقة.");
+    } else {
+        alert("نموذج تقديم العرض المضاد غير موجود. يرجى التأكد من إضافته في HTML.");
+    }
+}
+
+
+// دالة لإغلاق نموذج العرض المضاد
+function closeCounterOfferForm() {
+    const counterOfferPopup = document.getElementById('counterOfferPopup');
+    if (counterOfferPopup) {
+        counterOfferPopup.style.display = 'none';
+    }
+}
+
+// دالة لإرسال العرض المضاد بعد تعبئة النموذج
+function submitCounterOffer() {
+    const counterPrice = document.getElementById('counterPrice').value;
+    const counterMessage = document.getElementById('counterMessage').value;
+    
+    // التحقق من تعبئة الحقول المطلوبة
+    if (!counterPrice || !counterMessage) {
+        alert("يرجى إدخال السعر والرسالة.");
+        return;
+    }
+    
+    const negotiationUpdate = {
+        status: 'countered',
+        counterPrice: counterPrice,
+        counterMessage: counterMessage,
+        respondedAt: Date.now()
+    };
+    
+    firebase.database().ref(`negotiations/${window.currentNegotiationRequestId}/${window.currentNegotiationId}`)
+    .update(negotiationUpdate)
+    .then(() => {
+        console.log("تم تقديم العرض المضاد بنجاح.");  // تم إضافة هذا السطر لتسجيل الرسالة في الكونسول
+
+         alert("تم تقديم العرض المضاد بنجاح.");
+         closeCounterOfferForm(); // تأكد من أن هذه الدالة تقوم بإخفاء النموذج بشكل صحيح
+         // إخفاء نافذة التفاوض الرئيسية بعد النجاح
+         document.getElementById('negotiationResponsePopup').style.display = 'none';
+    })
+    .catch(error => {
+         console.error("خطأ في تحديث العرض المضاد:", error);
+         alert("حدث خطأ أثناء تحديث العرض المضاد.");
+    });
+}
+
 
 
 
