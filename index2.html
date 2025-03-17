@@ -186,13 +186,28 @@
  border: 3px solid #000000; /* حد أزرق واضح */
  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2); /* ظل خفيف لإبراز النافذة */">
     
+    
     <h2>تفاصيل العمل</h2>
+    <!-- نافذة عرض الصورة (Modal) مع أزرار التنقل -->
+<div id="imageModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); align-items:center; justify-content:center; z-index:9999;">
+    <button id="prevBtn" style="position:absolute; left:20px; background:transparent; border:none; font-size:2em; color:#fff; cursor:pointer;">&#10094;</button>
+    <img id="modalImage" src="" alt="عرض الصورة" style="max-width:90%; max-height:90%; border: 5px solid #fff; border-radius:5px;">
+    <button id="nextBtn" style="position:absolute; right:20px; background:transparent; border:none; font-size:2em; color:#fff; cursor:pointer;">&#10095;</button>
+  </div>
     <p id="jobDescription"></p>
     <p id="userPhone"></p>
 
     <!-- عنصر عرض الصورة -->
-    <img id="jobImage" src="" alt="صورة العمل" style="max-width:100%; height:auto; display:none;">
-
+    <div id="jobImagesContainer" style="max-width: 100%; overflow-x: auto; white-space: nowrap; padding: 10px;">
+        <!-- كل صورة تكون بحجم مناسب وتظهر في صف واحد -->
+        <img src="image1.jpg" alt="صورة العمل" style="width: 18%; height: auto; margin-right: 2%;">
+        <img src="image2.jpg" alt="صورة العمل" style="width: 18%; height: auto; margin-right: 2%;">
+        <img src="image3.jpg" alt="صورة العمل" style="width: 18%; height: auto; margin-right: 2%;">
+        <img src="image4.jpg" alt="صورة العمل" style="width: 18%; height: auto; margin-right: 2%;">
+        <img src="image5.jpg" alt="صورة العمل" style="width: 18%; height: auto; margin-right: 2%;">
+        <!-- إذا كان هناك أكثر من 5 صور، ستظهر مع إمكانية التمرير -->
+      </div>
+      
     <p id="jobLocation"></p>
     <p id="jobDuration"></p>
     <p id="jobBudget"></p>
@@ -212,8 +227,34 @@
     <div id="miniMap" style="width:100%; height:auto; margin-top:10px;"></div>
 
     <button id="acceptJobButton">قبول الطلب</button>
+    <button class="controlButton negotiateButton" 
+    data-request-id="${currentRequestId}" 
+    onclick="openNegotiationForm(this.dataset.requestId)">
+تفاوض
     <button onclick="document.getElementById('jobDetailsPopup').style.display='none'">إغلاق</button>
 </div>
+
+<div id="negotiationPopup" style="display:none; position: fixed; top:50%; left:50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 10px; z-index: 1100;">
+    <h2>عرض تفاوضي</h2>
+    <label for="proposedPrice">السعر المقترح:</label>
+    <input type="number" id="proposedPrice" placeholder="أدخل السعر">
+    <label for="negotiationMessage">رسالة (بدون بيانات تواصل مباشرة):</label>
+    <textarea id="negotiationMessage" placeholder="أدخل رسالتك"></textarea>
+    <button onclick="submitNegotiation()">إرسال العرض</button>
+    <button onclick="closeNegotiationForm()">إلغاء</button>
+</div>
+
+<!-- نافذة عرض العرض المضاد في ملف العمال بعد التعديل -->
+<div id="counterOfferDisplayPopup" style="display:none; position: fixed; top:50%; left:50%; transform: translate(-50%, -50%); background:white; padding:20px; border-radius:10px; z-index:1100;">
+    <h2>العرض المضاد الذي قدمه المستخدم</h2>
+    <!-- عنصر عرض وصف الطلب -->
+    <p id="orderDescriptionWorker">وصف الطلب: </p>
+    <p>السعر المقترح: <span id="counterFinalPrice"></span></p>
+    <p>الرسالة: <span id="counterFinalMessage"></span></p>
+    <button onclick="acceptCounterOffer()">قبول العرض</button>
+    <button onclick="rejectCounterOffer()">رفض العرض</button>
+</div>
+
 
 
   
@@ -334,6 +375,9 @@
     <button id="acceptDirectRequest">قبول الطلب</button>
     <button id="rejectDirectRequest">رفض الطلب</button>
 </div>
+
+<!-- منطقة إشعار للعامل -->
+<div id="workerNotification" style="display:none; position:fixed; top:20px; right:20px; background:#FFC107; padding:10px 20px; border-radius:5px; z-index:1000; font-weight:bold;"></div>
 
 
 
@@ -540,6 +584,23 @@ function showRoute(workerLocation, jobLocation) {
         .catch(console.error);
 }
 
+// دالة رفض العرض المضاد: تقوم بإخفاء النافذة
+function rejectCounterOffer() {
+    document.getElementById("counterOfferDisplayPopup").style.display = "none";
+}
+
+// دالة قبول العرض المضاد: تقوم بمحاكاة الضغط على زر قبول الطلب الموجود في نافذة "تفاصيل العمل"
+function acceptCounterOffer() {
+    // نحاول الحصول على زر قبول الطلب في نافذة تفاصيل العمل
+    var acceptButton = document.getElementById("acceptJobButton");
+    if (acceptButton) {
+        acceptButton.click();  // محاكاة الضغط على الزر
+    } else {
+        alert("زر قبول الطلب غير موجود.");
+    }
+    // بعد قبول العرض، يمكننا إخفاء نافذة العرض المضاد
+    document.getElementById("counterOfferDisplayPopup").style.display = "none";
+}
 
 
 function updateWorkerLocation(workerId, newLocation) {
@@ -951,37 +1012,44 @@ function sendPusherNotificationByWorker(workerId, message) {
 // تعريف المتغير بشكل عام بدون فحص مسبق
 let workerId = null;
 
-// دالة إنشاء جلسة العامل بعد تسجيل الدخول
-function initializeWorkerSession(workerId) {
-    // تأكيد أن workerId (أو currentWorkerId) يحتوي على القيمة الصحيحة
-    console.log("✅ currentWorkerId:", workerId);
-    
-    // إنشاء المراجع بناءً على معرّف العامل
-    window.workerRef = database.ref(`workers/${workerId}`);
-    window.workerReviewsRef = workerRef.child('reviews');
 
-    console.log("✅ workerRef:", workerRef.toString());
-    console.log("✅ workerReviewsRef:", workerReviewsRef.toString());
-    
-    // استدعاء الدوال التي تعتمد على المعرف
-    updateLocationWithGPS(workerId);
-    focusOnWorkerLocation(workerId);
-
-    // تسجيل مستمع لتحديث الطلبات للعامل الحالي
-    workerRef.child('currentRequest').on('value', (snapshot) => {
-        const requestData = snapshot.val();
-        if (requestData) {
-            console.log(`تم تحديث حالة الطلب للعامل ${workerId}: ${requestData.status}`);
-        } else {
-            console.log(`لا توجد طلبات حاليًا للعامل ${workerId}`);
+function updateCounterOfferUI(negotiation) {
+    if (!negotiation) {
+        console.error("❌ بيانات التفاوض غير متوفرة.");
+        return;
+    }
+    var counterPopup = document.getElementById("counterOfferDisplayPopup");
+    if (counterPopup) {
+        counterPopup.style.display = "block";
+        
+        // استخدام بيانات الطلب المخزنة في نافذة تفاصيل العمل
+        let orderDescription = "غير متوفر";
+        if (window.currentOrderData && window.currentOrderData.description) {
+            orderDescription = window.currentOrderData.description;
         }
-    });
+        document.getElementById("orderDescriptionWorker").innerText = "وصف الطلب: " + orderDescription;
+        
+        // تحديث باقي بيانات العرض
+        document.getElementById("counterFinalPrice").innerText = negotiation.proposedPrice || "غير متوفر";
+        document.getElementById("counterFinalMessage").innerText = negotiation.message || "غير متوفر";
+    }
 }
 
 
 
 
-// دالة تسجيل الدخول باستخدام معرّف العامل
+
+
+
+
+
+
+
+
+
+
+
+// تعريف متغير workerId العام (يمكن تعريفه في أعلى الملف)
 let currentWorkerId = null; // تعريف متغيّر عام لتخزين معرّف العامل
 let currentWorkerName = null; // تعريف متغيّر عام لتخزين اسم العامل
 let activeRequestExists = false; // لتحديد ما إذا كان للعامل طلب نشط بالفعل
@@ -994,6 +1062,9 @@ function loginWorker() {
         return;
     }
 
+    // تعيين قيمة workerId مباشرةً لضمان استخدامها في كافة الاستعلامات
+    workerId = inputId;
+
     // التحقق مما إذا كان المعرف موجودًا داخل "workers"
     database.ref(`workers/${inputId}`).once('value')
         .then((snapshot) => {
@@ -1001,15 +1072,21 @@ function loginWorker() {
                 const workerData = snapshot.val();
                 console.log(`✅ تم تسجيل الدخول بنجاح: ${workerData.name}`);
                 
-                // تعيين currentWorkerId و currentWorkerName بعد نجاح تسجيل الدخول
+                // تعيين currentWorkerId و currentWorkerName بالإضافة إلى workerId
                 currentWorkerId = inputId;
-                currentWorkerName = workerData.name; // إضافة تعيين اسم العامل
+                window.currentWorkerId = inputId;
+                workerId = inputId; // تأكيد تحديث المتغير العام workerId
+                currentWorkerName = workerData.name;
 
+                console.log("✅ currentWorkerId (local):", currentWorkerId);
+                console.log("✅ window.currentWorkerId:", window.currentWorkerId);
+                console.log("✅ workerId:", workerId);
+                
                 // إخفاء نافذة تسجيل الدخول
                 document.getElementById('loginPopup').style.display = 'none';
                 
-                // تهيئة جلسة العامل
-                initializeWorkerSession(currentWorkerId);
+                // تهيئة جلسة العامل باستخدام workerId
+                initializeWorkerSession(workerId);
             } else {
                 // التحقق من وجود المعرف داخل "availableWorkerIds"
                 database.ref(`availableWorkerIds/${inputId}`).once('value')
@@ -1034,13 +1111,19 @@ function loginWorker() {
                             }).then(() => {
                                 console.log(`✅ تم تخصيص المعرّف ${inputId} للعامل: ${workerName}`);
                                 
-                                // تعيين currentWorkerId و currentWorkerName بعد التخصيص
+                                // تعيين currentWorkerId و currentWorkerName بالإضافة إلى workerId
                                 currentWorkerId = inputId;
-                                currentWorkerName = workerName; // تعيين اسم العامل
+                                window.currentWorkerId = inputId;
+                                workerId = inputId; // تحديث المتغير العام workerId
+                                currentWorkerName = workerName;
+                                
+                                console.log("✅ currentWorkerId (local):", currentWorkerId);
+                                console.log("✅ window.currentWorkerId:", window.currentWorkerId);
+                                console.log("✅ workerId:", workerId);
                                 
                                 // تسجيل الدخول بعد التخصيص
                                 document.getElementById('loginPopup').style.display = 'none';
-                                initializeWorkerSession(currentWorkerId);
+                                initializeWorkerSession(workerId);
                             });
                         } else {
                             console.warn("⚠️ المعرّف غير صالح أو غير موجود في قاعدة البيانات.");
@@ -1052,6 +1135,278 @@ function loginWorker() {
         })
         .catch((error) => console.error("❌ خطأ أثناء تسجيل الدخول:", error));
 }
+
+
+
+
+// دالة إرسال عرض التفاوض بعد التعديل
+function submitNegotiation() {
+  const proposedPrice = document.getElementById('proposedPrice').value;
+  const negotiationMessage = document.getElementById('negotiationMessage').value;
+  
+  if (!proposedPrice || !negotiationMessage) {
+    console.error("حقل السعر أو الرسالة فارغة.");
+    alert('يرجى ملء جميع الحقول.');
+    return;
+  }
+  
+  if (!isValidNegotiationMessage(negotiationMessage)) {
+    console.error("الرسالة تحتوي على بيانات تواصل مباشرة.");
+    alert('لا يُسمح بإدخال بيانات تواصل مباشرة.');
+    return;
+  }
+  
+  const workerId = window.currentWorkerId || currentWorkerId;
+  if (!workerId) {
+    console.error("لم يتم تسجيل دخول العامل. لا يوجد workerId.");
+    alert("لم يتم تسجيل دخول العامل. يرجى تسجيل الدخول أولاً.");
+    return;
+  } else {
+    console.log("تم تسجيل الدخول بنجاح، workerId:", workerId);
+  }
+  
+  const negotiationData = {
+    workerId: workerId,
+    proposedPrice: proposedPrice,
+    message: negotiationMessage,
+    timestamp: Date.now(),
+    status: 'pending'
+  };
+  
+  if (!window.currentNegotiationRequestId) {
+    alert("⚠️ لا يوجد طلب تفاوض نشط!");
+    return;
+  }
+  
+  // تعطيل المستمع قبل عملية الإرسال
+  allowNegotiationListener = false;
+  
+  firebase.database().ref(`negotiations/${currentRequestId}`).push(negotiationData)
+    .then(() => {
+      // بعد انتهاء الإرسال، نعيد تفعيل المستمع
+      allowNegotiationListener = true;
+      console.log("تم إرسال عرض التفاوض بنجاح.");
+      alert('تم إرسال عرض التفاوض بنجاح!');
+      closeNegotiationForm();
+    })
+    .catch(error => {
+      console.error("خطأ في إرسال عرض التفاوض:", error);
+      alert('حدث خطأ أثناء الإرسال.');
+      // إعادة تفعيل المستمع حتى في حالة الخطأ
+      allowNegotiationListener = true;
+    });
+}
+
+
+function initializeWorkerSession(workerId) {
+    console.log("✅ تم تسجيل دخول العامل:", workerId);
+    
+    // إنشاء المراجع بناءً على معرّف العامل
+    window.workerRef = database.ref(`workers/${workerId}`);
+    window.workerReviewsRef = workerRef.child('reviews');
+
+    console.log("✅ workerRef:", workerRef.toString());
+    console.log("✅ workerReviewsRef:", workerReviewsRef.toString());
+    
+    // استدعاء الدوال التي تعتمد على معرّف العامل: تحديث الموقع وتركيز الخريطة
+    updateLocationWithGPS(workerId);
+    focusOnWorkerLocation(workerId);
+
+    // تسجيل مستمع لتحديث الطلبات للعامل الحالي من داخل عقد العامل
+    workerRef.child('currentRequest').on('value', (snapshot) => {
+        const requestData = snapshot.val();
+        if (requestData) {
+            console.log(`تم تحديث حالة الطلب للعامل ${workerId}: ${requestData.status}`);
+        } else {
+            console.log(`لا توجد طلبات حاليًا للعامل ${workerId}`);
+        }
+    });
+
+function listenForNegotiationOffers(requestId) {
+  console.log("📡 بدء الاستماع لعروض التفاوض للطلب:", requestId);
+  if (!requestId) {
+    console.error("⚠️ RequestId غير موجود!");
+    return;
+  }
+  
+  const negotiationRef = firebase.database().ref(`negotiations/${requestId}`);
+  
+  // استخدم حدث "value" مع ترتيب حسب "timestamp" لتحديد أحدث عرض
+  negotiationRef.orderByChild("timestamp").limitToLast(1).on("value", snapshot => {
+    snapshot.forEach(childSnapshot => {
+      const negotiation = childSnapshot.val();
+      if (negotiation) {
+        // إذا كان العرض في حالة pending، نقوم بتحديث الواجهة وتخزين المفتاح
+        if (negotiation.status === "pending") {
+          console.log("🔔 عرض تفاوضي جديد (pending):", childSnapshot.key, negotiation);
+          updateNegotiationUI(negotiation);
+          currentNegotiationOfferKey = childSnapshot.key;
+        } 
+        // إذا تغير العرض من pending إلى حالة أخرى، نقوم بمعالجة التحديث
+        else {
+          console.log("🔄 تحديث في العرض التفاوضي (غير pending):", childSnapshot.key, negotiation);
+          handleNegotiationUpdate(negotiation);
+        }
+      }
+    });
+  });
+}
+}
+
+
+
+
+
+
+function submitCounterOffer() {
+  const proposedPrice = document.getElementById('counterOfferPrice').value;
+  const negotiationMessage = document.getElementById('counterOfferMessage').value;
+  
+  if (!proposedPrice || !negotiationMessage) {
+    console.error("حقل السعر أو الرسالة فارغة.");
+    alert('يرجى ملء جميع الحقول.');
+    return;
+  }
+  
+  if (!isValidNegotiationMessage(negotiationMessage)) {
+    console.error("الرسالة تحتوي على بيانات تواصل مباشرة.");
+    alert('لا يُسمح بإدخال بيانات تواصل مباشرة.');
+    return;
+  }
+  
+  const workerId = window.currentWorkerId || currentWorkerId;
+  if (!workerId) {
+    console.error("لم يتم تسجيل دخول العامل. لا يوجد workerId.");
+    alert("لم يتم تسجيل دخول العامل. يرجى تسجيل الدخول أولاً.");
+    return;
+  }
+  
+  // تمت إضافة خاصية requestId إلى بيانات العرض المضاد
+  const counterOfferData = {
+    workerId: workerId,
+    proposedPrice: proposedPrice,
+    message: negotiationMessage,
+    timestamp: Date.now(),
+    status: 'counter',
+    requestId: window.currentNegotiationRequestId  // السطر المضاف
+  };
+  
+  if (!window.currentNegotiationRequestId) {
+    alert("⚠️ لا يوجد طلب تفاوض نشط!");
+    return;
+  }
+  
+  // يمكن تعطيل المستمع إذا لزم الأمر أثناء الإرسال
+  allowNegotiationListener = false;
+  
+  firebase.database().ref(`negotiations/${currentRequestId}`).push(counterOfferData)
+    .then(() => {
+      allowNegotiationListener = true;
+      console.log("تم إرسال العرض المضاد بنجاح.");
+      alert('تم إرسال العرض المضاد بنجاح!');
+      closeCounterOfferForm(); // دالة لإغلاق نافذة العرض المضاد
+    })
+    .catch(error => {
+      console.error("خطأ في إرسال العرض المضاد:", error);
+      alert('حدث خطأ أثناء الإرسال.');
+      allowNegotiationListener = true;
+    });
+}
+
+
+
+
+
+
+
+
+if (currentRequestId) {
+    listenForNegotiationOffers(currentRequestId);
+}
+
+
+
+
+
+
+
+
+
+
+
+// دالة لمعالجة تحديثات التفاوض
+function handleNegotiationUpdate(negotiation) {
+    if (!negotiation) return;
+    if (negotiation.status === "accepted") {
+        alert("✅ تم قبول العرض!");
+        // تحديث الواجهة عبر نافذة بدء التفاوض أو نافذة العرض حسب التصميم
+        updateNegotiationUI(negotiation);
+    } else if (negotiation.status === "rejected") {
+        alert("❌ تم رفض العرض!");
+        updateNegotiationUI(negotiation);
+    } else if (negotiation.status === "counter") {
+        alert("🔄 تم تقديم عرض مضاد.");
+        // استدعاء الدالة الجديدة لعرض العرض المضاد الذي قدمه المستخدم
+        updateCounterOfferUI(negotiation);
+    }
+}
+
+
+// إضافة مستمع لمتابعة كل التغييرات التي تحدث في `negotiations`
+function listenForNegotiationUpdates() {
+    console.log("📡 بدء الاستماع لتحديثات التفاوض في `negotiations`");
+
+    const negotiationsRef = firebase.database().ref("negotiations");
+
+    negotiationsRef.on("value", snapshot => {
+        if (!snapshot.exists()) return;
+
+        const negotiationsData = snapshot.val();
+        console.log("📡 تحديث في `negotiations`:", negotiationsData);
+
+        // المرور على جميع الطلبات
+        Object.keys(negotiationsData).forEach(requestId => {
+            if (requestId !== currentRequestId) return; // التحقق من أنه الطلب الحالي
+            
+            const negotiations = negotiationsData[requestId];
+
+            Object.keys(negotiations).forEach(negotiationId => {
+                const negotiation = negotiations[negotiationId];
+
+                // التحقق مما إذا كان العرض سابقًا في حالة "pending" قبل التغيير
+                const previousNegotiation = previousNegotiations[negotiationId]; // حفظ القيم السابقة
+                if (previousNegotiation && previousNegotiation.status === "pending" && negotiation.status !== "pending") {
+                    console.log("🔄 تغيرت حالة العرض:", negotiationId, "من pending إلى", negotiation.status);
+                    handleNegotiationUpdate(negotiation);
+                }
+
+                // تحديث القيمة المخزنة للعروض السابقة
+                previousNegotiations[negotiationId] = negotiation;
+            });
+        });
+    });
+}
+
+// تعريف متغير لتخزين القيم السابقة للعروض التفاوضية
+let previousNegotiations = {};
+
+
+
+
+// استدعاء المستمع عند تحميل الصفحة
+document.addEventListener("DOMContentLoaded", function () {
+    listenForNegotiationUpdates();
+});
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1368,34 +1723,69 @@ document.addEventListener("DOMContentLoaded", function() {
 });
 
 
-        // دالة لعرض تفاصيل العمل
-        // دالة لعرض تفاصيل العمل مع حساب المسافة
-        function showJobDetails(jobData) {
+
+// متغيرات لتخزين المصفوفة الحالية ومؤشر الصورة المعروضة
+let modalMediaArray = [];
+let modalCurrentIndex = 0;
+
+function showJobDetails(jobData) {
     console.log("showJobDetails: بدأ عرض تفاصيل الطلب", jobData);
-    document.getElementById('jobDescription').innerText = `وصف العمل: ${jobData.description || jobData.workType}`;
-    const fullPhone = jobData.phone || "غير متوفر";
-    window.fullPhone = fullPhone;
-    let maskedPhone = fullPhone;
-    if (fullPhone !== "غير متوفر" && fullPhone.length > 5) {
-       maskedPhone = fullPhone.substr(0, 5) + "*****";
-    }
-    document.getElementById('userPhone').innerText = `رقم الهاتف: ${maskedPhone} (سيظهر الرقم الكامل عند الاقتراب 500 متر)`;
-    if (jobData.imageUrl) {
-        const jobImage = document.getElementById('jobImage');
-        jobImage.src = jobData.imageUrl;
-        jobImage.style.display = 'block';
+
+    // 1️⃣ تحديث الصور أولًا قبل أي بيانات أخرى
+    const container = document.getElementById('jobImagesContainer');
+    container.innerHTML = ""; // مسح الصور السابقة
+
+    if (jobData.media && Array.isArray(jobData.media) && jobData.media.length > 0) {
+        console.log("روابط الصور المرسلة:", jobData.media);
+        modalMediaArray = jobData.media; 
+        jobData.media.forEach((url, index) => {
+            const img = document.createElement('img');
+            img.src = url.startsWith("http") ? url : `https://yourdomain.com${url}`;
+            img.alt = "صورة العمل";
+            img.style.width = "18%";
+            img.style.height = "auto";
+            img.style.marginRight = "2%";
+            img.style.cursor = "pointer";
+
+            img.addEventListener("click", function () {
+                openImageModal(index);
+            });
+
+            container.appendChild(img);
+        });
+
+        container.style.display = 'block'; 
     } else {
-        document.getElementById('jobImage').style.display = 'none';
+        container.style.display = 'none'; 
     }
-    document.getElementById('jobLocation').innerText = jobData.region 
-        ? `الموقع: ${jobData.region}` 
-        : `الموقع: (${jobData.location.lat}, ${jobData.location.lng})`;
-    document.getElementById('jobDuration').innerText = `المدة: ${jobData.time}`;
-    document.getElementById('jobBudget').innerText = `المبلغ: ${jobData.budget}`;
+
+    // 2️⃣ تحديث باقي البيانات بعد الصور
+    document.getElementById('jobDescription').innerText = `وصف العمل: ${jobData.description || "غير متوفر"}`;
+
+    const fullPhone = jobData.phone || "غير متوفر";
+    let maskedPhone = fullPhone.length > 5 ? fullPhone.substr(0, 5) + "*****" : fullPhone;
+    document.getElementById('userPhone').innerText = `رقم الهاتف: ${maskedPhone} (سيظهر الرقم الكامل عند الاقتراب 500 متر)`;
+
+    document.getElementById('jobLocation').innerText = `الموقع: ${jobData.region || "غير محدد"}`;
+    document.getElementById('jobDuration').innerText = `المدة: ${jobData.time || "غير محددة"}`;
+    document.getElementById('jobBudget').innerText = `المبلغ: ${jobData.budget || "غير محدد"}`;
+    document.getElementById('jobDistance').innerText = `المسافة: ${jobData.distance || "غير معروفة"} كم`;
+    document.getElementById('estimatedArrivalTime').innerText = `الوقت المقدر: ${jobData.eta || "غير محدد"}`;
+
+    // 3️⃣ عرض النافذة بعد تحديث جميع البيانات
+    document.getElementById('jobDetailsPopup').style.display = 'block';
+
+
+    if (!window.orderData) {
+        window.orderData = {};
+    }
+    if (jobData.requestId) {
+        window.orderData[jobData.requestId] = jobData;
+    } else {
+        console.warn("لم يتم تمرير requestId في بيانات الطلب");
+    }
     
-    window.jobLocation = jobData.location;
-    
-    // إذا لم يكن currentWorkerLocation معرفًا، نحاول جلبه الآن
+    // متابعة حساب المسافة والوقت المقدر
     if (typeof currentWorkerLocation === 'undefined') {
         console.warn("currentWorkerLocation غير معرف، محاولة جلب الموقع الآن...");
         if (navigator.geolocation) {
@@ -1417,7 +1807,58 @@ document.addEventListener("DOMContentLoaded", function() {
     } else {
         updateDistanceAndETA();
     }
-    
+
+
+// دالة لفتح نافذة عرض الصورة (Modal) مع تمرير المؤشر
+function openImageModal(index) {
+    modalCurrentIndex = index;
+    const modal = document.getElementById('imageModal');
+    const modalImg = document.getElementById('modalImage');
+    // التأكد من وجود المصفوفة وتعيين الصورة الحالية
+    if (modalMediaArray.length > 0) {
+        let url = modalMediaArray[modalCurrentIndex];
+        modalImg.src = url.startsWith("http") ? url : `https://yourdomain.com${url}`;
+    }
+    modal.style.display = 'flex';
+}
+
+// دوال التنقل بين الصور
+document.getElementById('prevBtn').addEventListener("click", function(e) {
+    e.stopPropagation(); // منع انتشار الحدث لإغلاق النافذة
+    if (modalMediaArray.length > 0) {
+        modalCurrentIndex = (modalCurrentIndex - 1 + modalMediaArray.length) % modalMediaArray.length;
+        updateModalImage();
+    }
+});
+
+document.getElementById('nextBtn').addEventListener("click", function(e) {
+    e.stopPropagation();
+    if (modalMediaArray.length > 0) {
+        modalCurrentIndex = (modalCurrentIndex + 1) % modalMediaArray.length;
+        updateModalImage();
+    }
+});
+
+// دالة لتحديث الصورة في المودال بناءً على المؤشر الحالي
+function updateModalImage() {
+    const modalImg = document.getElementById('modalImage');
+    let url = modalMediaArray[modalCurrentIndex];
+    modalImg.src = url.startsWith("http") ? url : `https://yourdomain.com${url}`;
+}
+
+// إغلاق النافذة عند النقر خارج الصورة
+document.getElementById('imageModal').addEventListener("click", function(e) {
+    if (e.target.id === 'imageModal') {
+        this.style.display = 'none';
+    }
+});
+
+
+
+
+
+
+
     function updateDistanceAndETA() {
         const distance = calculateDistance(currentWorkerLocation, jobData.location);
         const distanceElem = document.getElementById('jobDistance');
@@ -1436,9 +1877,7 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         });
     }
-
     
-    // تعديل مظهر زر "قبول الطلب" بناءً على حالة الطلب
     const acceptBtn = document.getElementById('acceptJobButton');
     if (jobData.status !== 'pending') {
         acceptBtn.style.display = 'inline-block';
@@ -1452,13 +1891,15 @@ document.addEventListener("DOMContentLoaded", function() {
         acceptBtn.disabled = false;
     }
     
-    // إظهار نافذة تفاصيل العمل
-    document.getElementById('jobDetailsPopup').style.display = 'block';
+    window.currentOrderData = jobData;
     
-    // **التعديل الجديد**: إظهار حاويات ETA والعد التنازلي عند وجود طلب نشط
+    // عرض النافذة واستكمال الحسابات...
+    document.getElementById('jobDetailsPopup').style.display = 'block';
     document.getElementById('etaPanel').style.display = 'block';
     document.getElementById('countdownPanel').style.display = 'block';
 }
+
+
 
 
 
@@ -1908,16 +2349,14 @@ function applySearchAndSort(orders) {
 
   // تصفية الطلبات بناءً على البحث والوقت
   let filteredOrders = orders.filter(order => {
-    // البحث بحسب نوع العمل أو المنطقة
     const matchesSearch = order.workType.toLowerCase().includes(searchValue) ||
                           (order.region && order.region.toLowerCase().includes(searchValue));
     if (!matchesSearch) return false;
 
-    // عرض الطلبات إذا كانت قيد الانتظار أو مقبولة
     if (order.status === "pending" || order.status === "accepted") {
       return true;
     }
-    // إذا كان الطلب مكتمل، يتم عرضه إذا مضى عليه أقل من 3 أيام
+
     if ((order.status === "finished" || order.status === "completed") && order.completedAt) {
       return (Date.now() - order.completedAt) < threeDaysInMs;
     }
@@ -1926,7 +2365,6 @@ function applySearchAndSort(orders) {
 
   // فرز الطلبات بناءً على الخيار المحدد
   if (sortBy === 'timestamp') {
-    // استخدام submittedAt إذا وُجد، أو fallback إلى timestamp
     filteredOrders.sort((a, b) => (b.submittedAt || b.timestamp || 0) - (a.submittedAt || a.timestamp || 0));
   } else if (sortBy === 'distance') {
     filteredOrders.sort((a, b) => {
@@ -1944,6 +2382,20 @@ function applySearchAndSort(orders) {
   filteredOrders.forEach(function(order) {
     const orderItem = document.createElement("div");
     orderItem.className = "orderItem";
+
+    // إنشاء قسم لعرض الصور (إذا وُجدت)
+    let imagesHTML = "";
+    if (order.media && Array.isArray(order.media) && order.media.length > 0) {
+      imagesHTML = `<div class="orderImagesContainer" style="overflow-x: auto; white-space: nowrap; margin-bottom: 10px;">`;
+      order.media.forEach((url, index) => {
+        const src = url.startsWith("http") ? url : `https://yourdomain.com${url}`;
+        imagesHTML += `<img src="${src}" alt="صورة الطلب"
+                        style="width: 60px; height: auto; margin-right: 5px; border-radius: 5px; cursor:pointer;"
+                        data-media='${JSON.stringify(order.media)}' data-index='${index}'
+                        onclick='openOrderImageModal(this)'>`;
+      });
+      imagesHTML += `</div>`;
+    }
 
     // أيقونات لحالة الطلب
     let statusIcon = "";
@@ -1963,19 +2415,98 @@ function applySearchAndSort(orders) {
                           (order.status === "finished" || order.status === "completed" ? "تم إنجازه" : order.status);
 
     orderItem.innerHTML = `
+      ${imagesHTML}
       <p><strong>وقت التقديم:</strong> ${order.submittedAt ? new Date(order.submittedAt).toLocaleString() : "غير متوفر"} ${statusIcon}</p>
       <p><strong>نوع العمل:</strong> ${order.workType || "غير محدد"}</p>
       <p><strong>الحالة:</strong> ${displayStatus}</p>
       <p><strong>الميزانية:</strong> ${order.budget || "غير محددة"}</p>
       <p><strong>الوصف:</strong> ${order.description || "غير متوفر"}</p>
       <p><strong>المسافة:</strong> ${distance} كم</p>
-<button onclick='handleShowJobDetails(${JSON.stringify(order).replace(/"/g, "&quot;")})'>عرض تفاصيل الطلب</button>
+      <button onclick='handleShowJobDetails(${JSON.stringify(order).replace(/"/g, "&quot;")})'>عرض تفاصيل الطلب</button>
     `;
     ordersList.appendChild(orderItem);
   });
 
   updateOrdersBadge(filteredOrders.length);
 }
+
+// دالة لفتح الصور في نافذة العرض مع إمكانية التنقل
+function openOrderImageModal(element) {
+  try {
+    const mediaArray = JSON.parse(element.getAttribute("data-media"));
+    const index = parseInt(element.getAttribute("data-index"), 10);
+
+    if (!Array.isArray(mediaArray) || mediaArray.length === 0) {
+      console.error("لا توجد صور متاحة لهذا الطلب.");
+      return;
+    }
+
+    modalMediaArray = mediaArray;
+    modalCurrentIndex = index;
+
+    console.log("تم فتح عرض الصور - الفهرس:", modalCurrentIndex, "مصفوفة الصور:", modalMediaArray);
+
+    openImageModal(modalCurrentIndex);
+  } catch (error) {
+    console.error("خطأ في جلب بيانات الصور:", error);
+  }
+}
+
+// دالة لفتح نافذة عرض الصور
+function openImageModal(index) {
+  modalCurrentIndex = index;
+  const modal = document.getElementById('imageModal');
+  const modalImg = document.getElementById('modalImage');
+
+  if (modalMediaArray.length > 0) {
+    let url = modalMediaArray[modalCurrentIndex];
+    modalImg.src = url.startsWith("http") ? url : `https://yourdomain.com${url}`;
+    modal.style.display = 'flex';
+  }
+}
+
+// دوال التنقل بين الصور
+function showPreviousImage() {
+  if (modalMediaArray.length > 0) {
+    modalCurrentIndex = (modalCurrentIndex - 1 + modalMediaArray.length) % modalMediaArray.length;
+    updateModalImage();
+  }
+}
+
+function showNextImage() {
+  if (modalMediaArray.length > 0) {
+    modalCurrentIndex = (modalCurrentIndex + 1) % modalMediaArray.length;
+    updateModalImage();
+  }
+}
+
+// تحديث الصورة في النافذة
+function updateModalImage() {
+  const modalImg = document.getElementById('modalImage');
+  let url = modalMediaArray[modalCurrentIndex];
+  modalImg.src = url.startsWith("http") ? url : `https://yourdomain.com${url}`;
+}
+
+// إضافة نافذة الصور إلى الـ HTML عند تحميل الصفحة
+document.addEventListener("DOMContentLoaded", function () {
+  const modalHTML = `
+    <div id="imageModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); align-items:center; justify-content:center; z-index:9999;">
+      <button id="prevBtn" style="position:absolute; left:20px; background:transparent; border:none; font-size:2em; color:#fff; cursor:pointer;">&#10094;</button>
+      <img id="modalImage" src="" alt="عرض الصورة" style="max-width:90%; max-height:90%; border: 5px solid #fff; border-radius:5px;">
+      <button id="nextBtn" style="position:absolute; right:20px; background:transparent; border:none; font-size:2em; color:#fff; cursor:pointer;">&#10095;</button>
+    </div>
+  `;
+  document.body.insertAdjacentHTML("beforeend", modalHTML);
+
+  document.getElementById('prevBtn').addEventListener("click", showPreviousImage);
+  document.getElementById('nextBtn').addEventListener("click", showNextImage);
+  document.getElementById('imageModal').addEventListener("click", function (e) {
+    if (e.target.id === 'imageModal') {
+      this.style.display = 'none';
+    }
+  });
+});
+
 
 
 
@@ -2008,6 +2539,33 @@ function acceptOrder(orderId) {
       console.error("Error accepting order:", error);
     });
 }
+
+
+function openNegotiationForm(requestId) {
+    console.log("فتح نافذة التفاوض للطلب:", requestId);
+    document.getElementById("negotiationPopup").style.display = "block";
+    window.currentNegotiationRequestId = requestId; // حفظ المعرّف في متغير عام
+}
+
+
+function closeNegotiationForm() {
+    document.getElementById('negotiationPopup').style.display = 'none';
+}
+
+function isValidNegotiationMessage(message) {
+    const phoneRegex = /\d{8,}/; // منع إدخال أرقام تشبه أرقام الهواتف
+    return !phoneRegex.test(message);
+}
+
+
+
+
+
+
+
+
+
+
 
 // إخفاء لوحة الطلبات عند النقر خارجها
 document.addEventListener("click", function(event) {
@@ -2100,6 +2658,19 @@ function startTracking(workerId) {
 
 
 
+// دالة لعرض إشعار للعامل
+function showWorkerNotification(message) {
+    var notificationDiv = document.getElementById("workerNotification");
+    if (notificationDiv) {
+        notificationDiv.innerText = message;
+        notificationDiv.style.display = "block";
+        // إخفاء الإشعار بعد 5 ثوانٍ
+        setTimeout(function() {
+            notificationDiv.style.display = "none";
+        }, 5000);
+    }
+}
+
 
 
 
@@ -2141,7 +2712,6 @@ function startTracking(workerId) {
 
 
 
-// ملاحظة: يُفترض أن دالة loginWorker بعد التحقق من تسجيل الدخول تقوم باستدعاء initializeWorkerSession
 
 
     // التحقق من تحميل مكتبة Mapbox
@@ -2500,6 +3070,38 @@ database.ref('workRequests').on('child_removed', (snapshot) => {
     }
 });
 
+
+// إضافة مستمع لتحديثات عقد التفاوض في Firebase
+firebase.database().ref(`negotiations/${currentRequestId}`).on('value', (snapshot) => {
+    const negotiationData = snapshot.val();
+    if (negotiationData) {
+        console.log("تم تحديث بيانات التفاوض:", negotiationData);
+        // يمكن تحديث واجهة العامل مثلاً بإظهار إشعار أو تغيير زر التفاوض
+        updateNegotiationUI(negotiationData);
+    }
+});
+
+function updateNegotiationUI(data) {
+    // التأكد من وجود بيانات التفاوض
+    if (!data) {
+         console.error("بيانات التفاوض غير موجودة.");
+         return;
+    }
+    
+    // مثال: إذا تغيرت الحالة إلى "counter"، عرض رسالة توضيحية
+    if (data.status === 'counter') {
+         alert("لقد قام المستخدم باقتراح سعر جديد.");
+    }
+    
+    // تحديث وصف الطلب باستخدام بيانات الطلب المخزنة عالميًا
+    const orderData = window.currentOrderData || {};
+    const orderDescription = orderData.description ? orderData.description : "غير متوفر";
+    document.getElementById("orderDescriptionWorker").innerText = "وصف الطلب: " + orderDescription;
+    
+    // تحديث باقي البيانات (السعر والرسالة)
+    document.getElementById("counterFinalPrice").innerText = data.proposedPrice || "";
+    document.getElementById("counterFinalMessage").innerText = data.message || "";
+}
 
 
 
