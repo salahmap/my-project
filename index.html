@@ -608,27 +608,31 @@ function monitorWorkerActivity(workerId, requestId) {
   const formData = new FormData();
   formData.append('image', file);
   
-  // إعادة الوعد من fetch
-  return fetch('/upload', { // تأكد من أن الخادم يستمع على هذا الـ endpoint
+  return fetch('/upload', {
     method: 'POST',
     body: formData
   })
   .then(response => response.json())
   .then(data => {
-    if (data.secure_url) {
-      console.log("✅ تم رفع الصورة بنجاح:", data.secure_url);
-      // إرجاع الرابط حتى يتمكن الكود الذي يستدعي الدالة من التعامل معه
-      return data.secure_url;
+    console.log("Response from upload:", data);
+    let imageUrl = data.secure_url;
+    if (imageUrl) {
+      // إذا كان الرابط نسبيًا، نضيف له النطاق المناسب
+      if (!imageUrl.startsWith("http")) {
+        imageUrl = "https://yourdomain.com" + imageUrl; // استبدل https://yourdomain.com بنطاق موقعك
+      }
+      console.log("الرابط النهائي للصورة:", imageUrl);
+      return imageUrl;
     } else {
-      console.error("❌ خطأ في رفع الصورة:", data);
-      throw new Error("خطأ في رفع الصورة");
+      throw new Error("Upload failed: No secure_url in response");
     }
   })
   .catch(error => {
-    console.error("❌ خطأ في رفع الصورة:", error);
+    console.error("❌ Upload error:", error);
     throw error;
   });
 }
+
 
   
   // ربط حدث الضغط على زر الرفع
@@ -680,92 +684,101 @@ function submitRequest() {
                 return;
             }
 
-            console.log("المستخدم يمكنه تقديم طلب جديد:", currentUserId);
+            console.log("✅ المستخدم يمكنه تقديم طلب جديد:", currentUserId);
             navigator.geolocation.getCurrentPosition(
                 (position) => {
                     const userLocation = {
                         lat: position.coords.latitude,
                         lng: position.coords.longitude
                     };
-                    console.log("تم الحصول على موقع المستخدم:", userLocation);
+                    console.log("📍 تم الحصول على موقع المستخدم:", userLocation);
 
                     const workType = document.getElementById('workTypeInput').value;
                     const budget = document.getElementById('budgetInput').value;
                     const time = document.getElementById('timeInput').value;
                     const description = document.getElementById('descriptionInput').value;
-                    const phone = document.getElementById('phoneInputRequest')
-                        ? document.getElementById('phoneInputRequest').value
+                    const phone = document.getElementById('phoneInputRequest') 
+                        ? document.getElementById('phoneInputRequest').value 
                         : "";
 
-                    if (workType && budget && time && userLocation.lng && userLocation.lat) {
-                        // استدعاء خدمة عكس التكويد للحصول على اسم المنطقة
-                        const reverseGeocodeUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${userLocation.lng},${userLocation.lat}.json?access_token=${mapboxgl.accessToken}&types=region&language=ar`;
-                        fetch(reverseGeocodeUrl)
-                            .then(response => response.json())
-                            .then(geoData => {
-                                let regionName = "";
-                                if (geoData.features && geoData.features.length > 0) {
-                                    regionName = geoData.features[0].place_name;
-                                }
-                                // إعداد بيانات الطلب مع تضمين معرف العامل المختار (إذا وُجد)
-                                const requestData = {
-                                    workType: workType,
-                                    budget: budget,
-                                    time: time,
-                                    description: description,
-                                    phone: phone,
-                                    // سيتم تعبئة الحقل بعد رفع الملفات
-                                    media: [],
-                                    location: {
-                                        lng: parseFloat(userLocation.lng),
-                                        lat: parseFloat(userLocation.lat)
-                                    },
-                                    region: regionName,
-                                    status: "pending",
-                                    workerId: window.selectedWorkerId || null,
-                                    userId: currentUserId,
-                                    submittedAt: Date.now()
-                                };
-
-                                // التعامل مع الملفات المتعددة (صور/فيديو)
-                                const mediaFiles = document.getElementById('mediaInput').files;
-                                if (mediaFiles.length > 0) {
-                                    // استخدام Promise.all لرفع كل ملف على حدة
-                                    const uploadPromises = Array.from(mediaFiles).map(file => uploadFile(file)); // تأكد من وجود دالة uploadFile تقوم برفع الملف وتعيد الرابط
-                                    Promise.all(uploadPromises)
-                                        .then(urls => {
-                                            // تخزين جميع الروابط في مصفوفة media داخل requestData
-                                            requestData.media = urls;
-                                            pushRequestData(requestData, userLocation);
-                                        })
-                                        .catch(error => {
-                                            console.error('خطأ في رفع الملفات:', error);
-                                            alert('حدث خطأ أثناء رفع الملفات.');
-                                        });
-                                } else {
-                                    pushRequestData(requestData, userLocation);
-                                }
-                            })
-                            .catch(err => {
-                                console.error("خطأ في استرجاع اسم المنطقة:", err);
-                                alert("حدث خطأ أثناء تحديد المنطقة.");
-                            });
-                    } else {
-                        alert('يرجى ملء جميع الحقول وتحديد موقع صحيح.');
+                    // التحقق من صحة القيم المدخلة
+                    if (!workType || !budget || !time || isNaN(userLocation.lng) || isNaN(userLocation.lat)) {
+                        alert('⚠️ يرجى ملء جميع الحقول وإدخال موقع صحيح.');
+                        return;
                     }
-                },
-                (error) => {
-                    console.error("فشل الحصول على موقع المستخدم:", error);
-                    alert("تعذر الحصول على موقعك الحالي. يرجى المحاولة مرة أخرى.");
-                },
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-            );
-        })
-        .catch((error) => {
-            console.error("خطأ أثناء التحقق من عدد الطلبات المعلقة:", error);
-            alert("حدث خطأ أثناء التحقق، يرجى المحاولة لاحقاً.");
-        });
-}
+
+                    // استدعاء خدمة عكس التكويد للحصول على اسم المنطقة
+                    const reverseGeocodeUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${userLocation.lng},${userLocation.lat}.json?access_token=${mapboxgl.accessToken}&types=region&language=ar`;
+                    console.log("🔗 Reverse Geocode URL:", reverseGeocodeUrl);
+
+                    fetch(reverseGeocodeUrl)
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(geoData => {
+        console.log("🌍 GeoData Response:", geoData);
+        let regionName = "";
+        if (geoData.features && geoData.features.length > 0) {
+            regionName = geoData.features[0].place_name;
+        } else {
+            console.warn("⚠️ لم يتم العثور على بيانات للمنطقة.");
+        }
+
+        // إعداد بيانات الطلب
+        const requestData = {
+            workType: workType,
+            budget: budget,
+            time: time,
+            description: description,
+            phone: phone,
+            media: [],
+            location: {
+                lng: parseFloat(userLocation.lng),
+                lat: parseFloat(userLocation.lat)
+            },
+            region: regionName,
+            status: "pending",
+            workerId: window.selectedWorkerId || null,
+            userId: currentUserId,
+            submittedAt: Date.now()
+        };
+
+        console.log("📝 بيانات الطلب قبل رفع الملفات:", requestData);
+
+        // التعامل مع رفع الملفات (صور/فيديو)
+        const mediaFiles = document.getElementById('mediaInput').files;
+        if (mediaFiles.length > 0) {
+            console.log(`📂 عدد الملفات المرفوعة: ${mediaFiles.length}`);
+            const uploadPromises = Array.from(mediaFiles).map(file => uploadImage(file));
+            
+            Promise.all(uploadPromises)
+                .then(urls => {
+                    requestData.media = urls;
+                    console.log("✅ تم رفع الملفات:", urls);
+                    pushRequestData(requestData, userLocation);
+                })
+                .catch(error => {
+                    console.error('🚨 خطأ في رفع الملفات:', error);
+                    alert('حدث خطأ أثناء رفع الملفات.');
+                });
+        } else {
+            pushRequestData(requestData, userLocation);
+        }
+    })
+    .catch(err => {
+        console.error("🚨 خطأ في استرجاع اسم المنطقة:", err);
+        alert("حدث خطأ أثناء تحديد المنطقة. الرجاء المحاولة مرة أخرى.");
+    });
+});
+});
+};
+
+
+
+
 
 
 
