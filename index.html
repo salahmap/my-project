@@ -271,8 +271,8 @@
     <label for="phoneInputRequest">رقم الهاتف:</label>
     <input type="text" id="phoneInputRequest" placeholder="أدخل رقم الهاتف">
     <!-- الحقل الجديد لرفع صورة العمل -->
-    <label for="imageInput">صورة العمل:</label>
-    <input type="file" id="imageInput">
+    <label for="mediaInput">إرفاق ملفات (صور/فيديو):</label>
+    <input type="file" id="mediaInput" accept="image/*,video/*" multiple>    
     <button id="submitRequest">إرسال الطلب</button>
     <button id="cancelRequest">إلغاء</button>
 </div>
@@ -675,10 +675,10 @@ function submitRequest() {
     canSubmitNewRequest(currentUserId)
         .then((canSubmit) => {
             if (!canSubmit) {
-    console.error("تم تقديم طلب واحد بالفعل للمستخدم:", currentUserId);
-    alert("لقد قمت بتقديم طلب واحد بالفعل. يرجى إنهاء الطلب الحالي أو إلغاؤه قبل تقديم طلب جديد.");
-    return;
-}
+                console.error("تم تقديم طلب واحد بالفعل للمستخدم:", currentUserId);
+                alert("لقد قمت بتقديم طلب واحد بالفعل. يرجى إنهاء الطلب الحالي أو إلغاؤه قبل تقديم طلب جديد.");
+                return;
+            }
 
             console.log("المستخدم يمكنه تقديم طلب جديد:", currentUserId);
             navigator.geolocation.getCurrentPosition(
@@ -693,10 +693,9 @@ function submitRequest() {
                     const budget = document.getElementById('budgetInput').value;
                     const time = document.getElementById('timeInput').value;
                     const description = document.getElementById('descriptionInput').value;
-                    const phone = document.getElementById('phoneInputRequest') 
-                                  ? document.getElementById('phoneInputRequest').value 
-                                  : "";
-                    const imageFile = document.getElementById('imageInput').files[0];
+                    const phone = document.getElementById('phoneInputRequest')
+                        ? document.getElementById('phoneInputRequest').value
+                        : "";
 
                     if (workType && budget && time && userLocation.lng && userLocation.lat) {
                         // استدعاء خدمة عكس التكويد للحصول على اسم المنطقة
@@ -710,34 +709,38 @@ function submitRequest() {
                                 }
                                 // إعداد بيانات الطلب مع تضمين معرف العامل المختار (إذا وُجد)
                                 const requestData = {
-    workType: workType,
-    budget: budget,
-    time: time,
-    description: description,
-    phone: phone,
-    imageUrl: "",
-    location: {
-         lng: parseFloat(userLocation.lng),
-         lat: parseFloat(userLocation.lat)
-    },
-    region: regionName,
-    status: "pending",
-    workerId: window.selectedWorkerId || null,
-    userId: currentUserId,
-    submittedAt: Date.now()
-};
+                                    workType: workType,
+                                    budget: budget,
+                                    time: time,
+                                    description: description,
+                                    phone: phone,
+                                    // سيتم تعبئة الحقل بعد رفع الملفات
+                                    media: [],
+                                    location: {
+                                        lng: parseFloat(userLocation.lng),
+                                        lat: parseFloat(userLocation.lat)
+                                    },
+                                    region: regionName,
+                                    status: "pending",
+                                    workerId: window.selectedWorkerId || null,
+                                    userId: currentUserId,
+                                    submittedAt: Date.now()
+                                };
 
-
-                                // إذا كان هناك ملف صورة، نقوم برفع الصورة أولاً
-                                if (imageFile) {
-                                    uploadImage(imageFile)
-                                        .then((imageUrl) => {
-                                            requestData.imageUrl = imageUrl;
+                                // التعامل مع الملفات المتعددة (صور/فيديو)
+                                const mediaFiles = document.getElementById('mediaInput').files;
+                                if (mediaFiles.length > 0) {
+                                    // استخدام Promise.all لرفع كل ملف على حدة
+                                    const uploadPromises = Array.from(mediaFiles).map(file => uploadFile(file)); // تأكد من وجود دالة uploadFile تقوم برفع الملف وتعيد الرابط
+                                    Promise.all(uploadPromises)
+                                        .then(urls => {
+                                            // تخزين جميع الروابط في مصفوفة media داخل requestData
+                                            requestData.media = urls;
                                             pushRequestData(requestData, userLocation);
                                         })
-                                        .catch((error) => {
-                                            console.error('خطأ في رفع الصورة:', error);
-                                            alert('حدث خطأ أثناء رفع الصورة.');
+                                        .catch(error => {
+                                            console.error('خطأ في رفع الملفات:', error);
+                                            alert('حدث خطأ أثناء رفع الملفات.');
                                         });
                                 } else {
                                     pushRequestData(requestData, userLocation);
@@ -763,6 +766,7 @@ function submitRequest() {
             alert("حدث خطأ أثناء التحقق، يرجى المحاولة لاحقاً.");
         });
 }
+
 
 
 
