@@ -177,6 +177,18 @@
     </style>
 </head>
 <body>
+
+
+    <!-- عنصر الخريطة أو محتويات الصفحة -->
+<div id="map"></div>
+
+<!-- نافذة عرض الصورة (Modal) العامة -->
+<div id="imageModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); align-items:center; justify-content:center; z-index:9999;">
+    <button id="prevBtn" style="position:absolute; left:20px; background:transparent; border:none; font-size:2em; color:#fff; cursor:pointer;">&#10094;</button>
+    <img id="modalImage" src="" alt="عرض الصورة" style="max-width:90%; max-height:90%; border: 5px solid #fff; border-radius:5px;">
+    <button id="nextBtn" style="position:absolute; right:20px; background:transparent; border:none; font-size:2em; color:#fff; cursor:pointer;">&#10095;</button>
+</div>
+
     <h1 id="title" style="display: none;">تطبيق الخريطة المحسن</h1>
     <div id="map"></div>
 
@@ -186,33 +198,31 @@
  border: 3px solid #000000; /* حد أزرق واضح */
  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2); /* ظل خفيف لإبراز النافذة */">
     
-    
     <h2>تفاصيل العمل</h2>
     <!-- نافذة عرض الصورة (Modal) مع أزرار التنقل -->
-<div id="imageModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); align-items:center; justify-content:center; z-index:9999;">
-    <button id="prevBtn" style="position:absolute; left:20px; background:transparent; border:none; font-size:2em; color:#fff; cursor:pointer;">&#10094;</button>
-    <img id="modalImage" src="" alt="عرض الصورة" style="max-width:90%; max-height:90%; border: 5px solid #fff; border-radius:5px;">
-    <button id="nextBtn" style="position:absolute; right:20px; background:transparent; border:none; font-size:2em; color:#fff; cursor:pointer;">&#10095;</button>
-  </div>
-    <p id="jobDescription"></p>
-    <p id="userPhone"></p>
-
-    <!-- عنصر عرض الصورة -->
+    <div id="imageModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); align-items:center; justify-content:center; z-index:9999;">
+        <button id="prevBtn" style="position:absolute; left:20px; background:transparent; border:none; font-size:2em; color:#fff; cursor:pointer;">&#10094;</button>
+        <img id="modalImage" src="" alt="عرض الصورة" style="max-width:90%; max-height:90%; border: 5px solid #fff; border-radius:5px;">
+        <button id="nextBtn" style="position:absolute; right:20px; background:transparent; border:none; font-size:2em; color:#fff; cursor:pointer;">&#10095;</button>
+    </div>
+    
+    <!-- عنصر عرض الصورة أصبح الآن في الأعلى -->
     <div id="jobImagesContainer" style="max-width: 100%; overflow-x: auto; white-space: nowrap; padding: 10px;">
-        <!-- كل صورة تكون بحجم مناسب وتظهر في صف واحد -->
         <img src="image1.jpg" alt="صورة العمل" style="width: 18%; height: auto; margin-right: 2%;">
         <img src="image2.jpg" alt="صورة العمل" style="width: 18%; height: auto; margin-right: 2%;">
         <img src="image3.jpg" alt="صورة العمل" style="width: 18%; height: auto; margin-right: 2%;">
         <img src="image4.jpg" alt="صورة العمل" style="width: 18%; height: auto; margin-right: 2%;">
         <img src="image5.jpg" alt="صورة العمل" style="width: 18%; height: auto; margin-right: 2%;">
-        <!-- إذا كان هناك أكثر من 5 صور، ستظهر مع إمكانية التمرير -->
-      </div>
-      
+    </div>
+    
+    <p id="jobDescription"></p>
+    <p id="userPhone"></p>
     <p id="jobLocation"></p>
     <p id="jobDuration"></p>
     <p id="jobBudget"></p>
     <p id="jobDistance"></p>
     <p id="estimatedArrivalTime"></p>
+    
 
     <!-- إضافة ملاحظات هامة -->
     <div id="jobNotes" style="margin-top: 10px; padding: 10px; border-top: 1px solid #ccc; font-size: 14px; color: #555;">
@@ -419,7 +429,47 @@ if (!firebase || !PusherPushNotifications) {
 
 
 
+  // تعريف متغيرات لتخزين إحداثيات اللمسة
+  let touchStartX = 0;
+  let touchEndX = 0;
+  // عتبة التحسس (عدد البيكسلات اللازمة لتحديد أن الحركة سحب)
+  const swipeThreshold = 50;
 
+  // الحصول على الحاوية التي تحتوي الصور
+  const container = document.getElementById('jobImagesContainer');
+
+  // عند بدء اللمس
+  container.addEventListener('touchstart', function(event) {
+    touchStartX = event.changedTouches[0].screenX;
+  }, false);
+
+  // عند انتهاء اللمس
+  container.addEventListener('touchend', function(event) {
+    touchEndX = event.changedTouches[0].screenX;
+    handleGesture();
+  }, false);
+
+  // دالة تقوم بتحديد اتجاه السحب وتنفيذ الإجراء المناسب
+  function handleGesture() {
+    if (touchEndX < touchStartX - swipeThreshold) {
+      // السحب إلى اليسار: الانتقال للصورة التالية
+      openNextImage();
+    }
+    if (touchEndX > touchStartX + swipeThreshold) {
+      // السحب إلى اليمين: الانتقال للصورة السابقة
+      openPrevImage();
+    }
+  }
+
+  // دالة لاستدعاء زر الصورة التالية (يمكنك تعديلها لتناسب منطق التنقل الحالي)
+  function openNextImage() {
+    document.getElementById('nextBtn').click();
+  }
+
+  // دالة لاستدعاء زر الصورة السابقة
+  function openPrevImage() {
+    document.getElementById('prevBtn').click();
+  }
 
 
 
