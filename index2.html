@@ -3063,15 +3063,13 @@ function addMarkersToMap() {
         const request = data.val();
         if (request && request.location && request.location.lng && request.location.lat) {
             try {
-                // إنشاء الماركر وإضافته إلى الخريطة
+                // إنشاء الماركر وإضافته إلى الخريطة مع اللون الافتراضي (أخضر)
                 const marker = new mapboxgl.Marker({ color: 'green' })
                     .setLngLat([request.location.lng, request.location.lat])
                     .addTo(map);
                 
-                // تخزين الماركر في كائن عام لتسهيل إزالته لاحقاً
-                if (!window.requestMarkers) {
-                    window.requestMarkers = {};
-                }
+                // تخزين الماركر في كائن عام لتسهيل إزالته أو تحديثه لاحقاً
+                window.requestMarkers = window.requestMarkers || {};
                 window.requestMarkers[data.key] = marker;
                 
                 // إضافة مستمع النقر على الماركر مع التحقق من انتهاء التحميل الأولي
@@ -3103,6 +3101,15 @@ function addMarkersToMap() {
         }
     });
 }
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3256,17 +3263,22 @@ map.on('load', () => {
 });
 
 // NEW CODE: مستمع لتحديث بيانات الطلب عند حدوث تغيير
+// مستمع تغيُّر بيانات الطلب (child_changed) مع استدعاء دالة تحديث لون الماركر
 database.ref('workRequests').on('child_changed', (snapshot) => {
     const updatedData = snapshot.val();
     const requestKey = snapshot.key;
     console.log(`تم تحديث بيانات الطلب ${requestKey}:`, updatedData);
-    // في حالة كان المستخدم ينقر على الماركر لعرض التفاصيل، يمكنك تحديث النافذة مباشرة
-    // أو تحديث متغير global يحتفظ ببيانات الطلب
-    // مثال: إذا كان currentRequestId يساوي requestKey، يمكنك إعادة عرض النافذة:
+    
+    // استدعاء الدالة لتحديث لون الماركر وفقًا للحالة الجديدة
+    updateMarkerStatus(requestKey, updatedData.status);
+    
+    // إذا كان الطلب الحالي هو الذي تغير، نقوم بعرض تفاصيله
     if (currentRequestId === requestKey) {
         showJobDetails(updatedData);
     }
 });
+
+
 
 
 
@@ -3437,7 +3449,6 @@ if (currentWorkerLocation && jobLocation) {
 
 
 
-
 // التأكد من أن الكود يعمل فقط إذا تم تعريف map
 if (typeof map !== 'undefined' && map instanceof mapboxgl.Map) {
     map.on('load', () => {
@@ -3448,19 +3459,122 @@ if (typeof map !== 'undefined' && map instanceof mapboxgl.Map) {
     console.error("🚨 51 الكائن map غير مهيأ أو غير معرّف.");
 }
 
+// دالة لتحديد اللون بناءً على حالة الطلب
+function getMarkerColor(status) {
+    if (status === 'pending') {
+        return 'green';  // حالة الانتظار
+    } else if (status === 'accepted') {
+        return 'yellow'; // حالة القبول
+    } else if (status === 'timeout') {
+        return 'red';    // انتهاء وقت الطلب
+    } else {
+        return 'gray';   // لون افتراضي للحالات غير المعروفة
+    }
+}
 
-        // تأكيد وضع العلامة
-        document.getElementById('confirmYes').addEventListener('click', () => {
-            const userLocation = map.getCenter();
-            // إضافة العلامة في الموقع الحالي
-            new mapboxgl.Marker({ color: 'green' })
-    .setLngLat(userLocation)
-    .addTo(map);
+// دالة للتحقق مما إذا كان المستخدم مسجل الدخول باستخدام معرف العامل الذي يتم تعيينه بعد التسجيل
+function isUserLoggedIn() {
+    // تأكد من أن currentWorkerId موجود وغير فارغ
+    return window.currentWorkerId !== undefined && window.currentWorkerId !== null;
+}
 
-            // عرض نافذة إدخال الاسم ورقم الهاتف
-            document.getElementById('inputPopup').style.display = 'block';
-            document.getElementById('confirmationPopup').style.display = 'none';
+// دالة لعرض تفاصيل الطلب إذا كان المستخدم مسجل الدخول
+function handleMarkerClick(order) {
+    if (isUserLoggedIn()) {
+        showJobDetails(order); // استدعاء الدالة لعرض تفاصيل الطلب
+    } else {
+        alert("يجب تسجيل الدخول لعرض تفاصيل الطلب."); // رسالة تنبيه إذا لم يكن المستخدم مسجلًا
+    }
+}
+
+// كائن لتخزين الماركرات حسب معرف الطلب
+const markers = {};
+
+// عند تحميل الصفحة يتم جلب بيانات الطلبات من Firebase وإنشاء/تحديث الماركرات مع إمكانية النقر عليها
+document.addEventListener('DOMContentLoaded', function() {
+    // تعديل المسار حسب بنية قاعدة بياناتك (مثلاً "workRequests")
+    const orderRef = firebase.database().ref('workRequests');
+
+    // عند إضافة أو قراءة الطلبات الموجودة
+    orderRef.on('value', function(snapshot) {
+        snapshot.forEach(function(childSnapshot) {
+            const order = childSnapshot.val();
+            const orderId = childSnapshot.key;
+
+            // إزالة الماركر الحالي إن وجد (للتحديث الكامل عند إعادة تحميل البيانات)
+            if (markers[orderId]) {
+                markers[orderId].remove();
+            }
+
+            if (order && order.location) {
+                const markerColor = getMarkerColor(order.status);
+                const marker = new mapboxgl.Marker({ color: markerColor })
+                    .setLngLat([order.location.lng, order.location.lat])
+                    .addTo(map);
+
+                // إضافة حدث النقر للتحقق من تسجيل الدخول قبل عرض التفاصيل
+                marker.getElement().addEventListener('click', () => {
+                    handleMarkerClick(order);
+                });
+
+                markers[orderId] = marker;
+            }
         });
+    });
+
+    // الاستماع لتحديثات الطلبات (child_changed) لتحديث الماركرات عند تغير الحالة
+    orderRef.on('child_changed', function(snapshot) {
+        const order = snapshot.val();
+        const orderId = snapshot.key;
+
+        // إزالة الماركر القديم إن وجد
+        if (markers[orderId]) {
+            markers[orderId].remove();
+        }
+
+        if (order && order.location) {
+            const markerColor = getMarkerColor(order.status);
+            const marker = new mapboxgl.Marker({ color: markerColor })
+                .setLngLat([order.location.lng, order.location.lat])
+                .addTo(map);
+
+            // إعادة إضافة حدث النقر للتحقق من تسجيل الدخول قبل عرض التفاصيل
+            marker.getElement().addEventListener('click', () => {
+                handleMarkerClick(order);
+            });
+
+            markers[orderId] = marker;
+        }
+    });
+});
+
+// عند النقر على زر "confirmYes" لإنشاء طلب جديد
+document.getElementById('confirmYes').addEventListener('click', () => {
+    const userLocation = map.getCenter();
+    
+    // نفترض وجود متغير orderStatus (مأخوذ من مصدر آخر) يمثل الحالة الحالية للطلب الجديد
+    const markerColor = getMarkerColor(orderStatus);
+    
+    // إنشاء ماركر جديد في الموقع الحالي باستخدام اللون المناسب
+    const newMarker = new mapboxgl.Marker({ color: markerColor })
+        .setLngLat(userLocation)
+        .addTo(map);
+
+    // إضافة حدث النقر للتحقق من تسجيل الدخول قبل عرض تفاصيل الطلب الجديد
+    newMarker.getElement().addEventListener('click', () => {
+        if (isUserLoggedIn()) {
+            alert("تفاصيل الطلب الجديد: الحالة - " + orderStatus);
+        } else {
+            alert("يجب تسجيل الدخول لعرض تفاصيل الطلب.");
+        }
+    });
+
+    // عرض نافذة إدخال الاسم ورقم الهاتف وإخفاء نافذة التأكيد
+    document.getElementById('inputPopup').style.display = 'block';
+    document.getElementById('confirmationPopup').style.display = 'none';
+});
+
+
 
         // إلغاء وضع العلامة
         document.getElementById('confirmNo').addEventListener('click', () => {
@@ -3545,6 +3659,14 @@ if (typeof map !== 'undefined' && map instanceof mapboxgl.Map) {
 
 
 
+document.addEventListener("DOMContentLoaded", () => {
+    firebase.database().ref('workRequests').on('child_changed', (snapshot) => {
+        const updatedData = snapshot.val();
+        const requestKey = snapshot.key;
+        console.log("child_changed event for:", requestKey, updatedData);
+        updateMarkerStatus(requestKey, updatedData.status);
+    });
+});
 
 
 
