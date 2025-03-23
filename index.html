@@ -160,9 +160,14 @@
     </style>
 </head>
 <body>
+    <!-- نافذة إعلام بسياسة الكوكيز -->
+    <div id="cookieConsentPopup" class="notification" style="display:none; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);">
+        <p>يستخدم هذا الموقع الكوكيز لتحسين تجربتك. هل توافق على استخدامها؟</p>
+        <button id="acceptCookie">موافق</button>
+    </div>
+
     <h1 id="title" style="display: none;">تطبيق الخريطة المحسن</h1>
     <div id="map"></div>
-
     
  
 <!-- نافذة عرض التفاوض للمستخدم بعد التعديل -->
@@ -1850,10 +1855,75 @@ locateControl.on('geolocate', (e) => {
         map.addControl(locateControl);
 
         // إضافة الأزرار للتبديل بين الأنماط
-        document.getElementById('styleSelector').addEventListener('change', function () {
-            const selectedStyle = this.value;
-            map.setStyle(styles[selectedStyle]);
-        });
+// دوال المساعدة
+// دوال إدارة الكوكيز
+function setCookie(name, value, days) {
+    var expires = "";
+    if (days) {
+        var date = new Date();
+        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+        expires = "; expires=" + date.toUTCString();
+    }
+    document.cookie = name + "=" + (value || "") + expires + "; path=/";
+    console.log(`✔️ تم تعيين الكوكيز: ${name} = ${value} لمدة ${days} يوم`);
+}
+
+function getCookie(name) {
+    var nameEQ = name + "=";
+    var ca = document.cookie.split(';');
+    for (var i = 0; i < ca.length; i++) {
+        var c = ca[i].trim();
+        if (c.indexOf(nameEQ) === 0) {
+            console.log(`✔️ تم استرجاع الكوكيز: ${name} = ${c.substring(nameEQ.length)}`);
+            return c.substring(nameEQ.length);
+        }
+    }
+    console.warn(`⚠️ لم يتم العثور على الكوكيز: ${name}`);
+    return null;
+}
+
+// دالة تحميل الصورة المخصصة مع التحقق من نوع الملف
+function loadCustomImage(url) {
+    return new Promise((resolve, reject) => {
+        if (!url.match(/\.(png|jpg|jpeg)$/i)) {
+            const errorMsg = "⚠️ صيغة الصورة غير مدعومة. الرجاء استخدام PNG أو JPEG.";
+            console.error(errorMsg, url);
+            return reject(new Error(errorMsg));
+        }
+        const img = new Image();
+        img.onload = function () {
+            console.log("✔️ تم تحميل الصورة بنجاح:", url);
+            resolve(img);
+        };
+        img.onerror = function (err) {
+            console.error("⚠️ خطأ في تحميل الصورة. تأكد من استخدام PNG أو JPEG:", url, err);
+            reject(err);
+        };
+        img.src = url;
+    });
+}
+
+// استرجاع تفضيل نمط الخريطة من الكوكيز إذا وُجد عند تحميل الصفحة
+document.addEventListener("DOMContentLoaded", function () {
+    var savedStyle = getCookie("mapStyle_index"); // تغيير اسم الكوكيز
+    if (savedStyle) {
+        document.getElementById('styleSelector').value = savedStyle;
+        map.setStyle(styles[savedStyle]);
+        console.log("✔️ تم تطبيق تفضيل النمط من الكوكيز (index):", savedStyle);
+    } else {
+        console.warn("⚠️ لا يوجد تفضيل محفوظ في الكوكيز لنمط الخريطة.");
+    }
+});
+
+// عند تغيير المستخدم لنمط الخريطة، يتم تخزينه في الكوكيز الخاص بـ index.html
+document.getElementById('styleSelector').addEventListener('change', function () {
+    const selectedStyle = this.value;
+    map.setStyle(styles[selectedStyle]);
+    setCookie("mapStyle_index", selectedStyle, 30); // تغيير اسم الكوكيز
+    console.log("✔️ تم تغيير النمط وحفظه في كوكيز index:", selectedStyle);
+});
+
+
 
         map.on('style.load', function() {
     if (window.currentRouteToUserData) {
