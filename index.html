@@ -437,32 +437,31 @@ const database = firebase.database();
 
 
 
-// إعداد Service Worker لتسجيل التوكن
 if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/server1/custom-service-worker.js')
+  navigator.serviceWorker.register('/sw.js')
     .then((registration) => {
-        console.log('Custom Service Worker مسجل بنجاح:', registration);
+      console.log('Service Worker مسجل بنجاح:', registration);
 
-            // ربط Firebase Messaging مع Service Worker
-            messaging.useServiceWorker(registration);
+      // ربط Firebase Messaging مع Service Worker
+      messaging.useServiceWorker(registration);
 
-            // طلب الإذن بالحصول على التوكن
-            return messaging.requestPermission()
-                .then(() => messaging.getToken({ vapidKey: 'BC5AZjNwVnpdJTIpZuCYncnGggugQjxhwdhEos0IpVLKNt_6m9iSbAXzVlNav0MqvVZfMk431Ka_pLZ_BbLNyPA' }));
-        })
-        .then((token) => {
-            console.log('تم الحصول على التوكن:', token);
+      // طلب الإذن بالحصول على التوكن
+      return messaging.requestPermission()
+        .then(() => messaging.getToken({ vapidKey: 'BC5AZjNwVnpdJTIpZuCYncnGggugQjxhwdhEos0IpVLKNt_6m9iSbAXzVlNav0MqvVZfMk431Ka_pLZ_BbLNyPA' }));
+    })
+    .then((token) => {
+      console.log('تم الحصول على التوكن:', token);
 
-            // حفظ التوكن في قاعدة البيانات
-            const userId = "user_123"; // يجب تغيير هذا إلى معرف المستخدم الفعلي
-            const userRef = database.ref(`users/${userId}/notificationToken`);
-            return userRef.set(token);
-        })
-  .catch((error) => console.error('Failed to register Custom Service Worker:', error));
-
+      // حفظ التوكن في قاعدة البيانات
+      const userId = "user_123"; // تأكد من تحديث هذا المعرف للمستخدم الفعلي
+      const userRef = database.ref(`users/${userId}/notificationToken`);
+      return userRef.set(token);
+    })
+    .catch((error) => console.error('فشل تسجيل Service Worker:', error));
 } else {
-    console.warn('هذا المتصفح لا يدعم Service Workers.');
+  console.warn('هذا المتصفح لا يدعم Service Workers.');
 }
+
 
 
 
@@ -1667,7 +1666,7 @@ const styles = {
 };
 
 
-// إنشاء الخريطة مع ضبط الإعدادات للعمل على الهواتف والبدء من الفضاء
+// تهيئة الخريطة من "الفضاء"
 map = new mapboxgl.Map({
   container: 'map',
   style: 'mapbox://styles/mapbox/satellite-streets-v11',
