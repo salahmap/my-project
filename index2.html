@@ -497,7 +497,7 @@
         <h3>أدخل المعرّف الخاص بك للبدء</h3>
         <input type="text" id="workerLoginId" placeholder="أدخل معرّف العامل" style="margin-bottom: 10px; width: 200px; padding: 10px; border: 1px solid #ccc; border-radius: 5px;">
         <button id="loginWorkerButton" style="padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">تسجيل الدخول</button>
-    </div>
+      </div>
 </div>
 
 <!-- نافذة الطلب المباشر للعمال -->
@@ -549,15 +549,37 @@ if (!firebase || !PusherPushNotifications) {
     console.error('🚨 149 فشل تحميل مكتبات Firebase أو Pusher Beams.');
 }
 }
-    document.addEventListener('DOMContentLoaded', function() {
-           // تهيئة Firebase Auth
-           const auth = firebase.auth();
-        
-        // عرض نافذة تسجيل الدخول عند تحميل الصفحة
-    document.getElementById('loginPopup').style.display = 'flex';
+document.addEventListener('DOMContentLoaded', function() {
+  // تهيئة Firebase Auth
+  const auth = firebase.auth();
 
+  // عند تحميل الصفحة، تحقق من وجود بيانات تسجيل دخول محفوظة
+  var savedWorkerId = localStorage.getItem("workerId");
+  if (savedWorkerId) {
+    // تم تسجيل الدخول مسبقاً: استرجع بيانات المستخدم من قاعدة البيانات
+    workerId = savedWorkerId;
+    currentWorkerId = savedWorkerId;
+    window.currentWorkerId = savedWorkerId;
+    firebase.database().ref(`workers/${savedWorkerId}`).once('value')
+      .then((snapshot) => {
+        if (snapshot.exists()) {
+          var workerData = snapshot.val();
+          // تحديث واجهة المستخدم ببيانات العامل
+          document.getElementById("workerNameDisplay").textContent = workerData.name;
+          document.getElementById("workerIdDisplay").textContent = savedWorkerId;
+          document.getElementById("workerPhoneDisplay").textContent = workerData.phone || "غير متوفر";
+          // إخفاء نافذة تسجيل الدخول
+          document.getElementById("loginPopup").style.display = "none";
+          // تهيئة جلسة العامل
+          initializeWorkerSession(savedWorkerId);
+        }
+      });
+  } else {
+    // لم يتم تسجيل الدخول مسبقاً: عرض نافذة تسجيل الدخول
+    document.getElementById("loginPopup").style.display = "flex";
+  }
 
-
+  // باقي الكود الحالي
   // الحصول على العناصر
   const settingsBtn = document.getElementById('settingsBtn');
   const settingsPanel = document.getElementById('settingsPanel');
@@ -580,46 +602,46 @@ if (!firebase || !PusherPushNotifications) {
     event.stopPropagation();
   });
 
+  // إضافة دوال ومُستمعات اللمس لتحريك الصور أفقيًا
+  let touchStartX = 0;
+  let touchEndX = 0;
+  const swipeThreshold = 50; // عدد البيكسلات لتحديد أن الحركة سحب
 
+  // الحصول على حاوية معرض الصور
+  const imagesContainer = document.getElementById('jobImagesContainer');
+  if (imagesContainer) {
+    imagesContainer.addEventListener('touchstart', function(event) {
+      touchStartX = event.changedTouches[0].screenX;
+    }, false);
 
-// إضافة دوال ومُستمعات اللمس لتحريك الصور أفقيًا
-let touchStartX = 0;
-let touchEndX = 0;
-const swipeThreshold = 50; // عدد البيكسلات لتحديد أن الحركة سحب
-
-// الحصول على حاوية معرض الصور
-const imagesContainer = document.getElementById('jobImagesContainer');
-if (imagesContainer) {
-  imagesContainer.addEventListener('touchstart', function(event) {
-    touchStartX = event.changedTouches[0].screenX;
-  }, false);
-
-  imagesContainer.addEventListener('touchend', function(event) {
-    touchEndX = event.changedTouches[0].screenX;
-    handleGesture();
-  }, false);
-}
-
-// دالة تحليل اتجاه السحب وتنفيذ التنقل المناسب
-function handleGesture() {
-  if (touchEndX < touchStartX - swipeThreshold) {
-    // سحب لليسار: عرض الصورة التالية
-    openNextImage();
+    imagesContainer.addEventListener('touchend', function(event) {
+      touchEndX = event.changedTouches[0].screenX;
+      handleGesture();
+    }, false);
   }
-  if (touchEndX > touchStartX + swipeThreshold) {
-    // سحب لليمين: عرض الصورة السابقة
-    openPrevImage();
+
+  // دالة تحليل اتجاه السحب وتنفيذ التنقل المناسب
+  function handleGesture() {
+    if (touchEndX < touchStartX - swipeThreshold) {
+      // سحب لليسار: عرض الصورة التالية
+      openNextImage();
+    }
+    if (touchEndX > touchStartX + swipeThreshold) {
+      // سحب لليمين: عرض الصورة السابقة
+      openPrevImage();
+    }
   }
-}
 
-// دوال التنقل: تقوم بمحاكاة نقر زر التنقل في نافذة العرض (Modal)
-function openNextImage() {
-  document.getElementById('nextBtn').click();
-}
+  // دوال التنقل: تقوم بمحاكاة نقر زر التنقل في نافذة العرض (Modal)
+  function openNextImage() {
+    document.getElementById('nextBtn').click();
+  }
 
-function openPrevImage() {
-  document.getElementById('prevBtn').click();
-}
+  function openPrevImage() {
+    document.getElementById('prevBtn').click();
+  }
+
+
 
 
 
@@ -1064,37 +1086,39 @@ if (!firebase.apps.length) {
 
 
 function focusOnWorkerLocation(workerId) {
-  // التأكد من تمرير معرّف العامل 547
   if (!workerId) {
     console.error("🚨 190 لم يتم تمرير معرّف العامل.");
     return;
   }
   console.log(`🔍 191 بدء تنفيذ focusOnWorkerLocation للعامل ${workerId}`);
 
-  // استرجاع بيانات الموقع من Firebase
   database.ref(`workers/${workerId}/location`).once('value')
     .then((snapshot) => {
       const location = snapshot.val();
       console.log("📡 193 تم استرجاع البيانات من Firebase:", location);
 
-      // التحقق من وجود بيانات الموقع وصحتها
       if (location && location.lat && location.lng) {
         console.log(`📍 194 موقع العامل: ${location.lng}, ${location.lat}`);
 
-        // الانتظار حتى تكون الخريطة جاهزة للاستخدام
         waitUntilMapReady().then(() => {
-  console.log(`🗺️ سيتم تركيز الخريطة على موقع العامل ${workerId}`);
-  map.flyTo({
-    center: [location.lng, location.lat],
-    zoom: 15,
-    speed: 0.8,       // تباطؤ الحركة لنعومة أفضل
-    curve: 1.8,       // زيادة الانحناء لمنحنى أكثر سلاسة
-    easing: function(t) { return t; }  // يمكنك تعديل هذه الدالة لتأثير تخفيف مختلف
-  });
-}).catch(err => {
-  console.error("🚨 خطأ أثناء انتظار جاهزية الخريطة:", err);
+          // إضافة تأخير بسيط لجعل حركة الانتقال تبدو سلسة
+          setTimeout(() => {
+            console.log(`🗺️ سيتم تركيز الخريطة على موقع العامل ${workerId}`);
+            
+            map.flyTo({
+  center: [location.lng, location.lat],
+  zoom: 15,
+  speed: 0.2,      // لا يزال بالإمكان تعديلها، لكن لن تُستخدم إذا قمنا بتحديد duration
+  curve: 1.8,
+  duration: 5000,  // تحديد مدة الانتقال بـ 5 ثوانٍ
+  easing: function(t) { return t; }
 });
 
+
+          }, 1000); // تأخير لمدة 1 ثانية (1000 مللي ثانية)
+        }).catch(err => {
+          console.error("🚨 خطأ أثناء انتظار جاهزية الخريطة:", err);
+        });
       } else {
         console.error(`🚨 199 بيانات موقع العامل ${workerId} غير متوفرة أو غير صحيحة.`);
       }
@@ -1103,6 +1127,7 @@ function focusOnWorkerLocation(workerId) {
       console.error(`🚨 200 خطأ أثناء جلب موقع العامل ${workerId}:`, error);
     });
 }
+
 
 
 
@@ -1523,6 +1548,9 @@ function loginWorker() {
                 const workerData = snapshot.val();
                 console.log(`✅ تم تسجيل الدخول بنجاح: ${workerData.name}`);
                 
+                // *** حفظ معرّف العامل في localStorage ***
+                localStorage.setItem("workerId", inputId);
+                
                 // تعيين currentWorkerId و currentWorkerName بالإضافة إلى workerId
                 currentWorkerId = inputId;
                 window.currentWorkerId = inputId;
@@ -1575,6 +1603,9 @@ function loginWorker() {
                             }).then(() => {
                                 console.log(`✅ تم تخصيص المعرّف ${inputId} للعامل: ${workerName}`);
                                 
+                                // *** حفظ معرّف العامل في localStorage بعد التخصيص ***
+                                localStorage.setItem("workerId", inputId);
+                                
                                 // تعيين currentWorkerId و currentWorkerName بالإضافة إلى workerId
                                 currentWorkerId = inputId;
                                 window.currentWorkerId = inputId;
@@ -1608,6 +1639,22 @@ function loginWorker() {
 
 
 
+ // تعديل وظيفة زر "تسجيل خروج" لحذف حالة تسجيل الدخول من localStorage
+ document.getElementById("logoutBtn").addEventListener("click", function() {
+    if (confirm("هل أنت متأكد أنك تريد تسجيل الخروج؟")) {
+      // إزالة بيانات تسجيل الدخول من المتغيرات والتخزين المحلي
+      localStorage.removeItem("workerId");
+      workerId = null;
+      currentWorkerId = null;
+      window.currentWorkerId = null;
+      // إعادة تعيين عناصر واجهة المستخدم
+      document.getElementById("workerNameDisplay").textContent = "غير متوفر";
+      document.getElementById("workerIdDisplay").textContent = "غير متوفر";
+      document.getElementById("workerPhoneDisplay").textContent = "غير متوفر";
+      // إظهار نافذة تسجيل الدخول مرة أخرى
+      document.getElementById("loginPopup").style.display = "flex";
+    }
+  });
 
 
 
