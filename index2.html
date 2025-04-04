@@ -34,7 +34,7 @@
         }
         .controls {
             position: absolute;
-            top: 10px;
+            top: 60px;
             left: 10px;
             z-index: 1;
             max-width: 90%;
@@ -244,10 +244,59 @@
     width: 20px;
     height: 20px;
 }
+
+/* تنسيق لوحة الإعدادات */
+#settingsPanel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 300px;
+  height: 100%;
+  background-color: #fff;
+  box-shadow: 2px 0 5px rgba(0,0,0,0.3);
+  z-index: 1100;
+  transform: translateX(-100%);
+  transition: transform 0.3s ease;
+  overflow-y: auto;
+  padding: 10px;
+}
+
+/* حالة ظهور اللوحة */
+#settingsPanel.open {
+  transform: translateX(0);
+}
+
     </style>
 </head>
 <body>
 
+    <!-- أيقونة الإعدادات في أعلى اليسار -->
+<button id="settingsBtn" style="position: fixed; top: 10px; left: 10px; z-index: 1100; background: none; border: none; cursor: pointer;">
+    <i class="fas fa-cog" style="font-size: 24px; color: #007bff;"></i>
+  </button>
+
+<!-- لوحة الإعدادات المنبثقة -->
+<div id="settingsPanel">
+    <h2 style="margin-top: 20px; text-align: center;">الإعدادات</h2>
+    <p>اسم العامل: <span id="workerNameDisplay">غير متوفر</span></p>
+    <p>معرّف العامل: <span id="workerIdDisplay">غير متوفر</span></p>
+    <p>رقم الهاتف: <span id="workerPhoneDisplay">غير متوفر</span></p>
+    
+    <!-- نص الدعم الفني والشركة -->
+    <div style="margin-top: 530px; text-align: center;">
+        <p style="margin: 0;">الدعم الفني و الشركة : 0927781546</p>
+    </div>
+    
+    <!-- زر تسجيل الخروج موضوع في أسفل النافذة -->
+    <div style="position: absolute; bottom: 60px; left: 0; width: 100%; text-align: center;">
+        <button id="logoutBtn" style="margin-top: 10px; padding: 8px 12px; border: none; border-radius: 5px; background-color: #d9534f; color: #fff; cursor: pointer;">
+            تسجيل خروج
+        </button>
+    </div>
+  </div>
+  
+  
+  
 <!-- نافذة عرض الصورة (Modal) العامة -->
 <div id="imageModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); align-items:center; justify-content:center; z-index:9999;">
     <button id="prevBtn" style="position:absolute; left:20px; background:transparent; border:none; font-size:2em; color:#fff; cursor:pointer;">&#10094;</button>
@@ -363,7 +412,6 @@
     </button>
     <select id="styleSelector" class="controlButton">
       <option value="streets">شوارع</option>
-      <option value="satellite">الأقمار الصناعية</option>
       <option value="outdoors">خارجية</option>
       <option value="hybrid" selected>هايبرد</option>
       <option value="dark">الوضع الليلي</option>
@@ -510,6 +558,27 @@ if (!firebase || !PusherPushNotifications) {
 
 
 
+  // الحصول على العناصر
+  const settingsBtn = document.getElementById('settingsBtn');
+  const settingsPanel = document.getElementById('settingsPanel');
+
+  // عند النقر على أيقونة الإعدادات، يتم تبديل حالة ظهور اللوحة
+  settingsBtn.addEventListener('click', function(event) {
+    event.stopPropagation(); // منع انتشار النقر لباقي الصفحة
+    settingsPanel.classList.toggle('open');
+  });
+
+  // عند النقر خارج لوحة الإعدادات، إغلاقها
+  document.addEventListener('click', function(event) {
+    if (!settingsPanel.contains(event.target) && event.target !== settingsBtn) {
+      settingsPanel.classList.remove('open');
+    }
+  });
+
+  // لمنع إغلاق اللوحة عند النقر داخلها
+  settingsPanel.addEventListener('click', function(event) {
+    event.stopPropagation();
+  });
 
 
 
@@ -1100,6 +1169,9 @@ function checkAndUpdateOrderStatus() {
                     if (order.phone) {
                         showFinishedOrderPopup(order.phone);
                     }
+                    // إعادة تعيين العلم للسماح بقبول طلب جديد
+                    activeRequestExists = false;
+                    
                     // جدولة إزالة نوافذ العد التنازلي والETA وإزالة طبقة المسار بعد 30 دقيقة
                     console.log("ℹ️ بدء جدولة إزالة نوافذ العد التنازلي والETA وإزالة طبقة المسار بعد 30 دقيقة.");
                     setTimeout(() => {
@@ -1128,12 +1200,13 @@ function checkAndUpdateOrderStatus() {
                         } catch (e) {
                             console.error("🚨 خطأ أثناء جدولة إزالة العناصر:", e);
                         }
-                    }, 1800000); // 1800000 مللي ثانية = 30 دقيقة
+                    }, 1800000); // 30 دقيقة
                 }).catch(error => console.error("🚨 خطأ في تحديث حالة الطلب:", error));
             }
         }
     });
 }
+
 
 checkAndUpdateOrderStatus();
 
@@ -1248,38 +1321,111 @@ function startRealTimeETATracking(workerLocation, jobLocation) {
 }
 
 
-// دوال العد التنازلي
 function formatTime(ms) {
-    const totalSeconds = Math.floor(ms / 1000);
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-    return `${hours} ساعة ${minutes} دقيقة ${seconds} ثانية`;
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${hours} ساعة ${minutes} دقيقة ${seconds} ثانية`;
 }
 
-function startCountdown(duration, targetElement, onComplete) {
-    if (!targetElement) {
-        console.error("⚠️ عنصر 'countdownTimer' غير موجود في الصفحة.");
+// دالة التحقق وإلغاء الطلب عند انتهاء المهلة
+function checkAndCancelRequest() {
+  // جلب بيانات الطلب من Firebase
+  firebase.database().ref(`workRequests/${currentRequestId}`).once("value")
+    .then(snapshot => {
+      const order = snapshot.val();
+      // إذا كانت حالة الطلب finished بالفعل، فلا نقوم بأي إجراء
+      if (order && order.status === "finished") {
+        console.log("الطلب منتهي بالفعل (finished)، لن يتم تحويل حالته.");
         return;
-    }
-    let remaining = duration;
-    targetElement.innerText = formatTime(remaining);
-    const countdownInterval = setInterval(() => {
-        remaining -= 1000;
-        if (remaining <= 0) {
-            clearInterval(countdownInterval);
-            targetElement.innerText = "انتهى الوقت";
-            console.log("تم انتهاء العد التنازلي بنجاح");
-            onComplete();  // تنفيذ الإجراء عند انتهاء الوقت
-        } else {
-            targetElement.innerText = formatTime(remaining);
-        }
-    }, 1000);
-    console.log("تم بدء العد التنازلي");
-    // تخزين معرف المؤقت في متغير عام
-    window.countdownIntervalId = countdownInterval;
-    return countdownInterval;
+      }
+      
+      // التأكد من أن حالة الطلب ما زالت "accepted"
+      if (order && order.status === "accepted") {
+        // تغيير حالة الطلب إلى "pending"
+        firebase.database().ref(`workRequests/${currentRequestId}`).update({
+          status: "pending"
+        }).then(() => {
+          // إزالة نص المسار إذا كان موجوداً
+          if (window.routeTextPopup) {
+            window.routeTextPopup.remove();
+            window.routeTextPopup = null;
+            console.log("تم إزالة نص المسار من الخريطة.");
+          }
+          
+          // إخفاء طبقة المسار (خط المسار)
+          if (map && map.getLayer('route')) {
+            map.removeLayer('route');
+            map.removeSource('route');
+            console.log("تم إزالة طبقة المسار من الخريطة.");
+          }
+          // إخفاء زر إلغاء الطلب
+          const cancelContainer = document.getElementById('cancelJobContainer');
+          if (cancelContainer) {
+            cancelContainer.style.display = 'none';
+            console.log("تم إخفاء زر إلغاء الطلب.");
+          }
+          // إخفاء نافذة العد التنازلي
+          const countdownPanel = document.getElementById('countdownPanel');
+          if (countdownPanel) {
+            countdownPanel.style.display = 'none';
+            console.log("تم إخفاء نافذة العد التنازلي.");
+          }
+          // إخفاء نافذة حساب المسافة (مثلاً etaPanel)
+          const etaPanel = document.getElementById('etaPanel');
+          if (etaPanel) {
+            etaPanel.style.display = 'none';
+            console.log("تم إخفاء نافذة حساب المسافة.");
+          }
+          
+          // عرض التنبيه فقط إذا كانت الحالة "accepted" ولم تتحول إلى finished
+          alert("انتهى الوقت وتم إلغاء الطلب بسبب انتهاء المهلة المحددة (3 ساعات).");
+          console.log("تم إلغاء الطلب وتحويل حالته من accepted إلى pending.");
+          
+          // إعادة تعيين المتغيرات للسماح بقبول طلب جديد
+          activeRequestExists = false;
+          currentRequestId = null;
+          
+        }).catch(error => {
+          console.error("خطأ في تحديث حالة الطلب:", error);
+        });
+      } else {
+        console.log("الطلب إما أنه منتهي بالفعل أو حالته مختلفة.");
+      }
+    })
+    .catch(error => console.error("خطأ في جلب بيانات الطلب:", error));
 }
+
+
+function startCountdown(duration, targetElement, onComplete) {
+  if (!targetElement) {
+    console.error("⚠️ عنصر 'countdownTimer' غير موجود في الصفحة.");
+    return;
+  }
+  let remaining = duration;
+  targetElement.innerText = formatTime(remaining);
+  const countdownInterval = setInterval(() => {
+    remaining -= 1000;
+    if (remaining <= 0) {
+      clearInterval(countdownInterval);
+      targetElement.innerText = "انتهى الوقت";
+      console.log("تم انتهاء العد التنازلي بنجاح");
+      
+      // استدعاء الدالة للتحقق وإلغاء الطلب إذا كانت حالته "accepted"
+      checkAndCancelRequest();
+      
+      // تنفيذ الإجراء المحدد عند انتهاء الوقت
+      onComplete();
+    } else {
+      targetElement.innerText = formatTime(remaining);
+    }
+  }, 1000);
+  console.log("تم بدء العد التنازلي");
+  window.countdownIntervalId = countdownInterval;
+  return countdownInterval;
+}
+
 
 
 
@@ -1382,10 +1528,15 @@ function loginWorker() {
                 window.currentWorkerId = inputId;
                 workerId = inputId; // تأكيد تحديث المتغير العام workerId
                 currentWorkerName = workerData.name;
-
+                
                 console.log("✅ currentWorkerId (local):", currentWorkerId);
                 console.log("✅ window.currentWorkerId:", window.currentWorkerId);
                 console.log("✅ workerId:", workerId);
+                
+                // تحديث محتويات نافذة الإعدادات
+                document.getElementById("workerNameDisplay").textContent = workerData.name;
+                document.getElementById("workerIdDisplay").textContent = inputId;
+                document.getElementById("workerPhoneDisplay").textContent = workerData.phone || "غير متوفر";
                 
                 // إخفاء نافذة تسجيل الدخول
                 document.getElementById('loginPopup').style.display = 'none';
@@ -1434,6 +1585,11 @@ function loginWorker() {
                                 console.log("✅ window.currentWorkerId:", window.currentWorkerId);
                                 console.log("✅ workerId:", workerId);
                                 
+                                // تحديث محتويات نافذة الإعدادات
+                                document.getElementById("workerNameDisplay").textContent = workerName;
+                                document.getElementById("workerIdDisplay").textContent = inputId;
+                                document.getElementById("workerPhoneDisplay").textContent = workerPhone;
+                                
                                 // تسجيل الدخول بعد التخصيص
                                 document.getElementById('loginPopup').style.display = 'none';
                                 initializeWorkerSession(workerId);
@@ -1453,10 +1609,12 @@ function loginWorker() {
 
 
 
+
+
 // دالة إرسال عرض التفاوض بعد التعديل
 function submitNegotiation() {
   const proposedPrice = document.getElementById('proposedPrice').value;
-  const negotiationMessage = document.getElementById('negotiationMessage').value;
+  let negotiationMessage = document.getElementById('negotiationMessage').value;
   
   if (!proposedPrice || !negotiationMessage) {
     console.error("حقل السعر أو الرسالة فارغة.");
@@ -1466,8 +1624,15 @@ function submitNegotiation() {
   
   if (!isValidNegotiationMessage(negotiationMessage)) {
     console.error("الرسالة تحتوي على بيانات تواصل مباشرة.");
-    alert('لا يُسمح بإدخال بيانات تواصل مباشرة.');
+    alert('لا يُسمح بإدخال رقم الهاتف في رسالة الوصف   .');
     return;
+  }
+  
+  // فحص وحذف الأرقام التي تبدأ بـ "09"
+  const regex = /\b09\d+\b/g;
+  if (regex.test(negotiationMessage)) {
+    negotiationMessage = negotiationMessage.replace(regex, '').trim();
+    alert('تم إزالة رقم الهاتف لانه يمنع كتابته في رسالة التفاوض.');
   }
   
   const workerId = window.currentWorkerId || currentWorkerId;
@@ -1491,6 +1656,17 @@ function submitNegotiation() {
     alert("⚠️ لا يوجد طلب تفاوض نشط!");
     return;
   }
+  
+  firebase.database().ref(`negotiations/${currentRequestId}`).push(negotiationData)
+    .then(() => {
+      alert('تم إرسال عرض التفاوض بنجاح!');
+      closeNegotiationForm();
+    })
+    .catch(error => {
+      console.error("خطأ في إرسال عرض التفاوض:", error);
+      alert('حدث خطأ أثناء الإرسال.');
+    });
+
   
   // تعطيل المستمع قبل عملية الإرسال
   allowNegotiationListener = false;
@@ -1689,19 +1865,24 @@ if (currentRequestId) {
 // دالة لمعالجة تحديثات التفاوض
 function handleNegotiationUpdate(negotiation) {
     if (!negotiation) return;
+    
+    let orderDescription = window.currentOrderData?.description || "غير متوفر";
+    let message = "";
+    
     if (negotiation.status === "accepted") {
-        alert("✅ تم قبول العرض!");
-        // تحديث الواجهة عبر نافذة بدء التفاوض أو نافذة العرض حسب التصميم
-        updateNegotiationUI(negotiation);
+        message = `✅ تم قبول عرض تفاوضك!\nبخصوص هذا الطلب: ${orderDescription}`;
     } else if (negotiation.status === "rejected") {
-        alert("❌ تم رفض العرض!");
-        updateNegotiationUI(negotiation);
+        message = `❌ تم رفض عرض تفاوضك!\nبخصوص هذا الطلب: ${orderDescription}`;
     } else if (negotiation.status === "counter") {
         alert("🔄 تم تقديم عرض مضاد.");
-        // استدعاء الدالة الجديدة لعرض العرض المضاد الذي قدمه المستخدم
-        updateCounterOfferUI(negotiation);
+        return updateCounterOfferUI(negotiation);
     }
+    
+    alert(message);
+    updateNegotiationUI(negotiation);
 }
+
+
 
 
 // إضافة مستمع لمتابعة كل التغييرات التي تحدث في `negotiations`
@@ -1776,6 +1957,10 @@ function updateActiveWorkerLocation(workerId, location) {
     }
 }
 
+// متغير لتسجيل آخر حركة للعامل
+let lastMovementTime = Date.now();
+const cancelDelay = 15 * 60 * 1000; // 15 دقيقة بالمللي ثانية
+
 function updateLocationWithGPS(workerId) {
     if (navigator.geolocation) {
         // ✅ الحصول على الموقع الأولي للعامل
@@ -1787,6 +1972,7 @@ function updateLocationWithGPS(workerId) {
             console.log("📍90 الموقع الأولي:", initialLocation);
             updateWorkerLocation(workerId, initialLocation);
             updateActiveWorkerLocation(workerId, initialLocation);
+            window.currentWorkerLocation = initialLocation;
         }, (error) => {
             console.error("🚨 91 خطأ أثناء جلب الموقع الأولي:", error);
         }, { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 });
@@ -1798,6 +1984,26 @@ function updateLocationWithGPS(workerId) {
                 lng: position.coords.longitude,
             };
             console.log("📡 93 تحديث الموقع أثناء الحركة:", newLocation);
+            
+            // حساب المسافة المقطوعة وتحديث آخر حركة إذا تحركت أكثر من متر واحد
+            if (window.currentWorkerLocation) {
+                const distanceMoved = calculateDistance(window.currentWorkerLocation, newLocation); // المسافة بالكيلومتر
+                // إذا تحرك العامل أكثر من متر واحد، يتم تحديث آخر حركة
+                if (distanceMoved * 1000 >= 1) {
+                    lastMovementTime = Date.now();
+                }
+                // إذا كان الطلب في حالة "canceled" وأصبح المتصفح متصلاً (عودة الاتصال)
+                if (currentRequestId && navigator.onLine) {
+                    firebase.database().ref(`workRequests/${currentRequestId}`).once("value")
+                    .then(snapshot => {
+                        const order = snapshot.val();
+                        if (order && order.status === "canceled") {
+                            updateOrderToPending("تم إعادة الطلب إلى الانتظار بعد عودة الاتصال والحركة");
+                        }
+                    })
+                    .catch(error => console.error("خطأ أثناء جلب بيانات الطلب:", error));
+                }
+            }
             
             // تحديث الموقع الحالي في الذاكرة
             window.currentWorkerLocation = newLocation;
@@ -1818,6 +2024,164 @@ function updateLocationWithGPS(workerId) {
         console.error("🚨 198 المتصفح لا يدعم تحديد الموقع الجغرافي (Geolocation).");
     }
 }
+
+// دالة لتحديث حالة الطلب إلى pending (أي إعادة الطلب للانتظار)
+function updateOrderToPending(reason) {
+    if (!currentRequestId) return;
+    firebase.database().ref(`workRequests/${currentRequestId}`).update({
+        status: "pending",
+        restoredAt: Date.now(),
+        restorationReason: reason
+    })
+    .then(() => {
+        console.log("تم إعادة الطلب إلى pending:", reason);
+        showAcceptButton();
+        removeRouteTextPopup();
+        
+        // إلغاء أي مؤقتات متعلقة بالـ ETA والعد التنازلي
+        orderCanceled = true;
+        if (window.etaIntervalId) {
+            clearInterval(window.etaIntervalId);
+            window.etaIntervalId = null;
+        }
+        if (window.countdownIntervalId) {
+            clearInterval(window.countdownIntervalId);
+            window.countdownIntervalId = null;
+        }
+        // إخفاء لوحات الـ ETA والعد التنازلي
+        const countdownPanel = document.getElementById('countdownPanel');
+        if (countdownPanel) countdownPanel.style.display = 'none';
+        const etaPanel = document.getElementById('etaPanel');
+        if (etaPanel) etaPanel.style.display = 'none';
+
+        // إعادة تهيئة حالة الطلب الحالي ليصبح العامل جاهزاً لقبول طلب جديد
+        currentRequestId = null;
+        activeRequestExists = false; // إذا كنت تستخدم هذا المتغيّر للتحقق من قبول طلب
+    })
+    .catch(error => console.error("خطأ أثناء تحديث حالة الطلب إلى pending:", error));
+}
+
+
+
+// مؤقت دوري لفحص حالة عدم الحركة أو انقطاع الاتصال
+setInterval(() => {
+    const onlineStatus = navigator.onLine;
+    const timeSinceLastMovement = Date.now() - lastMovementTime;
+    
+    // إذا لم يتحرك العامل لمدة 15 دقيقة أو انقطع الاتصال، نفحص حالة الطلب
+    if ((!onlineStatus || timeSinceLastMovement >= cancelDelay) && currentRequestId) {
+        firebase.database().ref(`workRequests/${currentRequestId}`).once("value")
+        .then(snapshot => {
+            const order = snapshot.val();
+            // إذا كان الطلب موجودًا وغير منتهي (ليس finished)
+            if (order && order.status !== "finished") {
+                if (window.currentWorkerLocation && order.location) {
+                    const distanceToJob = calculateDistance(window.currentWorkerLocation, order.location); // بالكيلومتر
+                    console.log("المسافة بين العامل وموقع الطلب:", distanceToJob, "كم");
+                    // إذا كان العامل بعيداً (أكثر من 0.5 كم) يتم إعادة الطلب للانتظار
+                    if (distanceToJob > 0.5) {
+                        updateOrderToPending("تم إعادة الطلب إلى الانتظار بسبب عدم الحركة أو انقطاع الاتصال لمدة 15 دقيقة");
+                    } else {
+                        console.log("العامل قريب من موقع الطلب، لن يتم إعادة الطلب إلى الانتظار.");
+                    }
+                } else {
+                    console.warn("بيانات موقع العامل أو موقع الطلب غير متوفرة.");
+                }
+            }
+        })
+        .catch(error => console.error("خطأ أثناء التحقق من حالة الطلب:", error));
+    }
+}, 60000); // فحص كل 60 ثانية
+
+// دالة إلغاء الطلب وإخفاء المميزات المتعلقة به
+// (في حالة قبول طلب من قبل العامل الآخر، قد تستخدم دالة إلغاء مستقلة)
+function cancelOrder(reason) {
+    if (!currentRequestId) return;
+    
+    firebase.database().ref(`workRequests/${currentRequestId}`).update({
+        status: "canceled",
+        canceledAt: Date.now(),
+        canceledReason: reason
+    })
+    .then(() => {
+        console.log("تم إلغاء الطلب بسبب:", reason);
+        
+        // ضبط العلم لإيقاف مؤقتات التحديث
+        orderCanceled = true;
+        
+        // إلغاء مؤقت تتبع ETA إذا وجد
+        if (window.etaIntervalId) {
+            clearInterval(window.etaIntervalId);
+            window.etaIntervalId = null;
+        }
+        
+        // إلغاء مؤقت العد التنازلي إذا وجد
+        if (window.countdownIntervalId) {
+            clearInterval(window.countdownIntervalId);
+            window.countdownIntervalId = null;
+        }
+        
+        hideCancelButton();
+        
+        // إخفاء لوحات العد والETA وعدم إعادة ظهورها
+        const countdownPanel = document.getElementById('countdownPanel');
+        if (countdownPanel) countdownPanel.style.display = 'none';
+        const etaPanel = document.getElementById('etaPanel');
+        if (etaPanel) etaPanel.style.display = 'none';
+        
+        // إزالة طبقة المسار من الخريطة إن وجدت
+        if (map && map.getLayer('route')) {
+            map.removeLayer('route');
+            map.removeSource('route');
+        }
+        
+        removeRouteTextPopup();
+        showNotification("تم إلغاء الطلب لأنك لم تتحرك لمدة 15 دقيقة");
+    })
+    .catch(error => console.error("خطأ أثناء تحديث حالة الطلب:", error));
+}
+
+
+// دالة لإخفاء زر إلغاء الطلب
+function hideCancelButton() {
+    const cancelButton = document.getElementById('cancelJobButton');
+    if (cancelButton) {
+        cancelButton.style.display = 'none';
+    }
+}
+
+// دالة لإظهار زر قبول الطلب عند إعادة الطلب لحالة pending
+function showAcceptButton() {
+    const acceptButton = document.getElementById('acceptJobButton');
+    if (acceptButton) {
+        acceptButton.style.display = 'block';
+    }
+}
+
+// دالة لإزالة نص التنبيه على الخريطة (إن وجد)
+function removeRouteTextPopup() {
+    if (window.routeTextPopup) {
+        window.routeTextPopup.remove();
+        window.routeTextPopup = null;
+    }
+}
+
+// دالة عرض الإشعار للمستخدم
+function showNotification(message) {
+    const notificationDiv = document.getElementById('workerNotification');
+    if (notificationDiv) {
+        notificationDiv.innerText = message;
+        notificationDiv.style.display = 'block';
+        setTimeout(() => {
+            notificationDiv.style.display = 'none';
+        }, 5000);
+    } else {
+        alert(message);
+    }
+}
+
+
+
 
 // إضافة مستمع لطلبات العمل الموجهة للعامل الحالي
 let initialLoadDone = false;
@@ -2067,25 +2431,71 @@ function handleShowJobDetails(jobData) {
 
 
 document.addEventListener("DOMContentLoaded", function() {
-    // محاولة جلب الموقع الحالي للمستخدم حتى وإن لم يتم تسجيل الدخول
+    // التأكد من دعم المتصفح لميزة Geolocation
     if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-            function(position) {
-                window.currentWorkerLocation = {
-                    lat: position.coords.latitude,
-                    lng: position.coords.longitude
-                };
-                console.log("تم الحصول على الموقع الحالي عند تحميل الصفحة:", window.currentWorkerLocation);
-            },
-            function(error) {
-                console.error("خطأ أثناء جلب الموقع عند تحميل الصفحة:", error);
-            },
-            { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-        );
+        getLocationWithFallback();
     } else {
-        console.error("المتصفح لا يدعم Geolocation.");
+        console.error("227 المتصفح لا يدعم Geolocation.");
     }
 });
+
+function getLocationWithFallback() {
+    // إعدادات الحصول على الموقع بدقة عالية مع مهلة 10 ثوانٍ
+    let highAccuracyOptions = {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+    };
+
+    // إعدادات الحصول على الموقع بدقة منخفضة عند ضعف الاتصال
+    let lowAccuracyOptions = {
+        enableHighAccuracy: false,
+        timeout: 10000,
+        maximumAge: 60000  // السماح باستخدام بيانات موقع قديمة لمدة دقيقة
+    };
+
+    // دالة مساعدة لمحاولة جلب الموقع بالإعدادات المحددة
+    function tryGetLocation(options, onSuccess, onError) {
+        console.log("226 محاولة الحصول على الموقع بالإعدادات:", options);
+        navigator.geolocation.getCurrentPosition(onSuccess, onError, options);
+    }
+
+    // المحاولة الأولى باستخدام إعدادات الدقة العالية
+    tryGetLocation(
+        highAccuracyOptions,
+        function(position) {
+            window.currentWorkerLocation = {
+                lat: position.coords.latitude,
+                lng: position.coords.longitude
+            };
+            console.log("219 تم الحصول على الموقع بدقة عالية:", window.currentWorkerLocation);
+        },
+        function(error) {
+            console.warn("220 فشل الحصول على الموقع بدقة عالية:", error);
+            // في حال فشل الدقة العالية، نجرب إعدادات الدقة المنخفضة
+            tryGetLocation(
+                lowAccuracyOptions,
+                function(position) {
+                    window.currentWorkerLocation = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    };
+                    console.log("221 تم الحصول على الموقع بدقة منخفضة:", window.currentWorkerLocation);
+                    console.info("222 سيتم إعادة المحاولة لاستعادة الدقة العالية بعد 30 ثانية.");
+                    // إعادة المحاولة للحصول على الموقع بدقة عالية بعد فترة انتظار (مثلاً 30 ثانية)
+                    setTimeout(function() {
+                        console.log("224 محاولة إعادة الحصول على الموقع بدقة عالية...");
+                        getLocationWithFallback();
+                    }, 30000);
+                },
+                function(errorLow) {
+                    console.error("225 فشل الحصول على الموقع بالدقة المنخفضة:", errorLow);
+                }
+            );
+        }
+    );
+}
+
 
 // متغيرات لتخزين بيانات الصور ومؤشر الصورة الحالي لمعرض الصور
 let modalMediaArray = [];
@@ -2637,7 +3047,9 @@ if (currentWorkerLocation && jobLocation) {
 // دالة تبديل عرض/إخفاء لوحة الطلبات
 function toggleOrdersPanel() {
   const panel = document.getElementById("ordersPanel");
-
+  // إزالة أي تعديل مباشر على العرض لضمان عمل CSS بشكل صحيح
+  panel.removeAttribute("style");
+  
   if (!panel.classList.contains("show")) {
     panel.classList.add("show");
     console.log("✅ تم فتح لوحة الطلبات.");
@@ -2647,6 +3059,32 @@ function toggleOrdersPanel() {
     console.log("❌ تم إغلاق لوحة الطلبات.");
   }
 }
+
+// دالة لقبول الطلب وتحديث حالته في Firebase
+function acceptOrder(orderId) {
+  // التحقق من عدم وجود طلب نشط سابق غير منتهي
+  if (activeRequestExists) {
+    alert("لقد قمت بقبول طلب مسبقاً. لا يمكن قبول طلب جديد.");
+    return;
+  }
+  
+  firebase.database().ref("workRequests/" + orderId).update({ status: "accepted" })
+    .then(function() {
+      activeRequestExists = true; // تعيين العلم عند قبول الطلب
+      alert("تم قبول الطلب");
+      console.log("Order " + orderId + " accepted.");
+      // إخفاء لوحة الطلبات وتحديث القائمة
+      const panel = document.getElementById("ordersPanel");
+      panel.classList.remove("show");
+      panel.removeAttribute("style");
+      fetchPendingOrders(); 
+    })
+    .catch(function(error) {
+      console.error("Error accepting order:", error);
+    });
+}
+
+
 
 
 
@@ -2872,18 +3310,7 @@ function updateOrdersBadge(count) {
   badge.textContent = count > 0 ? count : "";
 }
 
-// دالة لقبول الطلب وتحديث حالته في Firebase
-function acceptOrder(orderId) {
-  firebase.database().ref("workRequests/" + orderId).update({ status: "accepted" })
-    .then(function() {
-      alert("تم قبول الطلب");
-      console.log("Order " + orderId + " accepted.");
-      fetchPendingOrders(); // تحديث القائمة بعد القبول
-    })
-    .catch(function(error) {
-      console.error("Error accepting order:", error);
-    });
-}
+
 
 
 function openNegotiationForm(requestId) {
@@ -3306,8 +3733,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-
-
 if (!isMapInitialized) {
     console.log(" 146 تهيئة الخريطة لأول مرة.");
     initializeMap();
@@ -3456,13 +3881,35 @@ function addMarkersToMap() {
             // تحديث حجم الدائرة ديناميكيًا
             updateMarkerSize(key);
 
-            firebase.database().ref(`workRequests/${key}/status`).on('value', (snapshot) => {
-              const updatedStatus = snapshot.val();
-              if (window.requestMarkers[key]) {
-                map.setPaintProperty(window.requestMarkers[key].layerId, 'circle-color', hexToRGBA(getMarkerColor(updatedStatus), 0.2));
-                map.setPaintProperty(window.requestMarkers[key].layerId, 'circle-stroke-color', hexToRGBA(getMarkerColor(updatedStatus), 0.5));
-              }
-            });
+// مستمع لتغير حالة الطلب في Firebase
+firebase.database().ref(`workRequests/${key}/status`).on('value', (snapshot) => {
+  const updatedStatus = snapshot.val();
+  if (window.requestMarkers[key]) {
+    // إذا كانت حالة الطلب "timeout" أو "deleted" يتم إزالة المؤشر بالكامل
+    if (updatedStatus === 'timeout' || updatedStatus === 'deleted') {
+      // إزالة طبقة الدائرة من الخريطة إن وجدت
+      if (map.getLayer(window.requestMarkers[key].layerId)) {
+        map.removeLayer(window.requestMarkers[key].layerId);
+      }
+      // إزالة المصدر الخاص بالدائرة من الخريطة إن وجد
+      if (map.getSource(window.requestMarkers[key].sourceId)) {
+        map.removeSource(window.requestMarkers[key].sourceId);
+      }
+      // إزالة مؤشر النبض (pulse marker) إن وجد
+      if (window.requestMarkers[key].pulseMarker) {
+        window.requestMarkers[key].pulseMarker.remove();
+      }
+      // حذف بيانات المؤشر من التخزين المؤقت
+      delete window.requestMarkers[key];
+    } else {
+      // في باقي الحالات، يتم تحديث خصائص الدائرة مثل اللون حسب الحالة
+      map.setPaintProperty(window.requestMarkers[key].layerId, 'circle-color', hexToRGBA(getMarkerColor(updatedStatus), 0.2));
+      map.setPaintProperty(window.requestMarkers[key].layerId, 'circle-stroke-color', hexToRGBA(getMarkerColor(updatedStatus), 0.5));
+    }
+  }
+});
+
+
           } catch (error) {
             console.error('🚨 خطأ أثناء إضافة الدائرة إلى الخريطة:', error);
           }
