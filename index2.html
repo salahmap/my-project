@@ -549,6 +549,9 @@ if (!firebase || !PusherPushNotifications) {
     console.error('🚨 149 فشل تحميل مكتبات Firebase أو Pusher Beams.');
 }
 }
+
+
+
 document.addEventListener('DOMContentLoaded', function() {
   // تهيئة Firebase Auth
   const auth = firebase.auth();
@@ -3748,15 +3751,36 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    styleSelector.addEventListener('change', function () {
-        const selectedStyle = this.value;
-        if (styles[selectedStyle]) {
-            map.setStyle(styles[selectedStyle]);
-            console.log(`✔️ 171 تم تغيير النمط إلى: ${selectedStyle}`);
-        } else {
-            console.error(`⚠️ 172 النمط "${selectedStyle}" غير معروف.`);
-        }
+    document.getElementById('styleSelector').addEventListener('change', function () {
+  const selectedStyle = this.value;
+  
+  if (styles[selectedStyle]) {
+    // التحقق مما إذا كان النمط الحالي مُحمّل بالكامل
+    if (map.isStyleLoaded()) {
+      map.setStyle(styles[selectedStyle]);
+      setCookie("mapStyle_index2", selectedStyle, 30); // حفظ التفضيل في الكوكيز
+      console.log(`✔️ تم تغيير النمط إلى: ${selectedStyle} وحُفظ في كوكيز index2`);
+    } else {
+      console.warn(`⚠️ النمط الحالي لم يتم تحميله بالكامل. انتظر حتى يتم تحميله.`);
+      // في حالة عدم تحميل النمط بالكامل، يتم ضبط النمط مع حفظ الكوكيز
+      map.setStyle(styles[selectedStyle]);
+      setCookie("mapStyle_index2", selectedStyle, 30);
+    }
+
+    // عند تحميل النمط الجديد، إعادة تطبيق تأثير الضباب لإظهار الفضاء والنجوم
+    map.once('style.load', function () {
+      map.setFog({
+        range: [1, 10],
+        color: '#dcdcdc',
+        "horizon-blend": 0.5
+      });
+      console.log(`✔️ إعادة تطبيق تأثير الضباب بعد تحميل النمط: ${selectedStyle}`);
     });
+  } else {
+    console.error(`⚠️ النمط "${selectedStyle}" غير موجود.`);
+  }
+});
+
 
     loginButton.addEventListener('click', () => {
         const workerId = document.getElementById('workerLoginId').value;
@@ -3822,6 +3846,49 @@ function calculatePixelRadius(meters, latitude, zoom) {
   return meters / metersPerPixel;
 }
 
+// دالة مساعدة لإعادة إضافة مؤشرات الطلب عند تحميل النمط
+function readdRequestMarkers() {
+  if (window.requestMarkers) {
+    for (const key in window.requestMarkers) {
+      const markerData = window.requestMarkers[key];
+      // إعادة إضافة المصدر إذا لم يكن موجودًا
+      if (!map.getSource(markerData.sourceId)) {
+        map.addSource(markerData.sourceId, {
+          type: 'geojson',
+          data: markerData.geojson
+        });
+      }
+      // إعادة إضافة الطبقة إذا لم تكن موجودة
+      if (!map.getLayer(markerData.layerId)) {
+        // تعريف دالة getMarkerColor خارج نطاق الحدث لإعادة الاستخدام
+        function getMarkerColor(status) {
+          if (status === 'pending') return '#1E90FF';
+          else if (status === 'accepted' || status === 'in_progress') return '#FFC107';
+          else if (status === 'finished' || status === 'completed') return '#28a745';
+          else if (status === 'error' || status === 'failed') return '#DC3545';
+          return '#1E90FF';
+        }
+        map.addLayer({
+          id: markerData.layerId,
+          type: 'circle',
+          source: markerData.sourceId,
+          paint: {
+            'circle-radius': 0,
+            'circle-color': hexToRGBA(getMarkerColor(markerData.status), 0.2),
+            'circle-stroke-color': hexToRGBA(getMarkerColor(markerData.status), 0.5),
+            'circle-stroke-width': 2
+          }
+        });
+      }
+    }
+  }
+}
+
+// عند تغيير النمط أو تحميله بالكامل، نعيد إضافة مؤشرات الطلب
+map.on('style.load', function() {
+  readdRequestMarkers();
+});
+
 function addMarkersToMap() {
   const requestsRef = database.ref('workRequests');
   let initialLoadCompleted = false;
@@ -3833,6 +3900,7 @@ function addMarkersToMap() {
   });
 
   requestsRef.on('child_added', (data) => {
+    // الانتظار حتى تكون الخريطة جاهزة ومثبت النمط
     waitUntilMapReady()
       .then(() => {
         const request = data.val();
@@ -3840,6 +3908,7 @@ function addMarkersToMap() {
 
         if (request && request.location && request.location.lng && request.location.lat) {
           try {
+            // تعريف دالة الحصول على لون الماركر
             function getMarkerColor(status) {
               if (status === 'pending') return '#1E90FF';
               else if (status === 'accepted' || status === 'in_progress') return '#FFC107';
@@ -3881,7 +3950,7 @@ function addMarkersToMap() {
               });
             }
 
-            // تخزين البيانات مع معلومات إضافية لإعادة الإضافة عند تغيير النمط
+            // تخزين البيانات لإعادة الإضافة عند تغيير النمط
             if (!window.requestMarkers) {
               window.requestMarkers = {};
             }
@@ -3902,14 +3971,21 @@ function addMarkersToMap() {
             pulseEl.style.position = 'absolute';
             pulseEl.style.transform = 'translate(-50%, -50%)';
 
-            const pulseMarker = new mapboxgl.Marker({
-              element: pulseEl,
-              anchor: 'center',
-              interactive: false
-            }).setLngLat(shiftedCoordinates)
-              .addTo(map);
-
-            window.requestMarkers[key].pulseMarker = pulseMarker;
+            // الانتظار حتى تحميل النمط قبل إضافة علامة النبض
+            function addPulseMarker() {
+              const pulseMarker = new mapboxgl.Marker({
+                element: pulseEl,
+                anchor: 'center',
+                interactive: false
+              }).setLngLat(shiftedCoordinates)
+                .addTo(map);
+              window.requestMarkers[key].pulseMarker = pulseMarker;
+            }
+            if (map.isStyleLoaded()) {
+              addPulseMarker();
+            } else {
+              map.once('style.load', addPulseMarker);
+            }
 
             map.on('click', layerId, (e) => {
               if (!initialLoadCompleted) return;
@@ -3928,34 +4004,27 @@ function addMarkersToMap() {
             // تحديث حجم الدائرة ديناميكيًا
             updateMarkerSize(key);
 
-// مستمع لتغير حالة الطلب في Firebase
-firebase.database().ref(`workRequests/${key}/status`).on('value', (snapshot) => {
-  const updatedStatus = snapshot.val();
-  if (window.requestMarkers[key]) {
-    // إذا كانت حالة الطلب "timeout" أو "deleted" يتم إزالة المؤشر بالكامل
-    if (updatedStatus === 'timeout' || updatedStatus === 'deleted') {
-      // إزالة طبقة الدائرة من الخريطة إن وجدت
-      if (map.getLayer(window.requestMarkers[key].layerId)) {
-        map.removeLayer(window.requestMarkers[key].layerId);
-      }
-      // إزالة المصدر الخاص بالدائرة من الخريطة إن وجد
-      if (map.getSource(window.requestMarkers[key].sourceId)) {
-        map.removeSource(window.requestMarkers[key].sourceId);
-      }
-      // إزالة مؤشر النبض (pulse marker) إن وجد
-      if (window.requestMarkers[key].pulseMarker) {
-        window.requestMarkers[key].pulseMarker.remove();
-      }
-      // حذف بيانات المؤشر من التخزين المؤقت
-      delete window.requestMarkers[key];
-    } else {
-      // في باقي الحالات، يتم تحديث خصائص الدائرة مثل اللون حسب الحالة
-      map.setPaintProperty(window.requestMarkers[key].layerId, 'circle-color', hexToRGBA(getMarkerColor(updatedStatus), 0.2));
-      map.setPaintProperty(window.requestMarkers[key].layerId, 'circle-stroke-color', hexToRGBA(getMarkerColor(updatedStatus), 0.5));
-    }
-  }
-});
-
+            // مستمع لتغير حالة الطلب في Firebase
+            firebase.database().ref(`workRequests/${key}/status`).on('value', (snapshot) => {
+              const updatedStatus = snapshot.val();
+              if (window.requestMarkers[key]) {
+                if (updatedStatus === 'timeout' || updatedStatus === 'deleted') {
+                  if (map.getLayer(window.requestMarkers[key].layerId)) {
+                    map.removeLayer(window.requestMarkers[key].layerId);
+                  }
+                  if (map.getSource(window.requestMarkers[key].sourceId)) {
+                    map.removeSource(window.requestMarkers[key].sourceId);
+                  }
+                  if (window.requestMarkers[key].pulseMarker) {
+                    window.requestMarkers[key].pulseMarker.remove();
+                  }
+                  delete window.requestMarkers[key];
+                } else {
+                  map.setPaintProperty(window.requestMarkers[key].layerId, 'circle-color', hexToRGBA(getMarkerColor(updatedStatus), 0.2));
+                  map.setPaintProperty(window.requestMarkers[key].layerId, 'circle-stroke-color', hexToRGBA(getMarkerColor(updatedStatus), 0.5));
+                }
+              }
+            });
 
           } catch (error) {
             console.error('🚨 خطأ أثناء إضافة الدائرة إلى الخريطة:', error);
@@ -3970,6 +4039,7 @@ firebase.database().ref(`workRequests/${key}/status`).on('value', (snapshot) => 
       });
   });
 }
+
 
 function updateMarkerSize(key) {
   const threshold = 12;
@@ -4250,37 +4320,33 @@ function getCookie(name) {
 
 // عند تحميل الصفحة، استرجاع تفضيل النمط من الكوكيز الخاص بـ index2.html
 document.addEventListener("DOMContentLoaded", function () {
-    const savedStyle = getCookie("mapStyle_index2"); // تغيير اسم الكوكيز
+    const savedStyle = getCookie("mapStyle_index2"); // الكوكيز الخاص بالصفحة :contentReference[oaicite:0]{index=0}
+    const selector = document.getElementById('styleSelector');
+
     if (savedStyle && styles[savedStyle]) {
-        document.getElementById('styleSelector').value = savedStyle;
-        if (map.isStyleLoaded()) {
-            map.setStyle(styles[savedStyle]);
-            console.log(`✔️ تم تطبيق تفضيل النمط من الكوكيز (index2): ${savedStyle}`);
-        } else {
-            // إذا لم يكن النمط محملاً بعد، يمكن الانتظار أو استخدام حدث "style.load"
-            map.once("style.load", () => {
+        // حدّد قيمة الـ select دائماً حتى لو كان hybrid
+        selector.value = savedStyle;
+
+        // إذا لم يكن النمط hybrid، نطبّقه على الخريطة
+        if (savedStyle !== 'hybrid') {
+            const applyStyle = () => {
                 map.setStyle(styles[savedStyle]);
-                console.log(`✔️ تم تطبيق تفضيل النمط من الكوكيز بعد تحميل النمط (index2): ${savedStyle}`);
-            });
+                console.log(`✔️ تم تطبيق تفضيل النمط من الكوكيز (index2): ${savedStyle}`);
+            };
+
+            if (map.isStyleLoaded()) {
+                applyStyle();
+            } else {
+                map.once("style.load", applyStyle);
+            }
+        } else {
+            console.log("⚪ النمط المحفوظ هو hybrid، لا تغيير (يُترك النمط الافتراضي).");
         }
     }
 });
 
-// إضافة الأزرار للتبديل بين الأنماط مع حفظ التفضيل في الكوكيز الخاص بـ index2.html
-document.getElementById('styleSelector').addEventListener('change', function () {
-    const selectedStyle = this.value;
-    if (styles[selectedStyle]) {
-        if (map.isStyleLoaded()) {
-            map.setStyle(styles[selectedStyle]);
-            setCookie("mapStyle_index2", selectedStyle, 30); // تغيير اسم الكوكيز
-            console.log(`✔️ تم تغيير النمط إلى: ${selectedStyle} وحُفظ في كوكيز index2`);
-        } else {
-            console.warn(`⚠️ النمط الحالي لم يتم تحميله بالكامل. انتظر حتى يتم تحميله.`);
-        }
-    } else {
-        console.error(`⚠️ النمط "${selectedStyle}" غير موجود.`);
-    }
-});
+
+
 
 
 
