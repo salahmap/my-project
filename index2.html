@@ -181,6 +181,11 @@
   transform: translate(-50%, -50%);
 }
 
+:root {
+  --pulse-bg: rgba(30,144,255,0.2);
+  --pulse-border: 2px solid rgba(30,144,255,0.5);
+}
+
 .pulse-marker::after {
   content: '';
   position: absolute;
@@ -188,8 +193,8 @@
   left: 50%;
   width: 100%;
   height: 100%;
-  background: rgba(30,144,255,0.2);
-  border: 2px solid rgba(30,144,255,0.5);
+  background: var(--pulse-bg);
+  border: var(--pulse-border);
   border-radius: 50%;
   transform: translate(-50%, -50%) scale(1);
   animation: pulse 2s infinite;
@@ -205,6 +210,7 @@
     opacity: 0;
   }
 }
+
 
   /* إضافة بعض التنسيق لنافذة إعلام الكوكيز */
   #cookieConsentPopup {
@@ -3586,7 +3592,7 @@ map = new mapboxgl.Map({
   container: 'map',
   style: 'mapbox://styles/mapbox/satellite-streets-v11',
   center: [0, 0],  // بدء العرض من مركز الأرض
-  zoom: 0.8,       // رؤية الكرة الأرضية من الفضاء البعيد
+  zoom: 0.4,       // رؤية الكرة الأرضية من الفضاء البعيد
   projection: 'globe',
   maxBounds: [[-180, -85], [180, 85]], // منع الخروج من الكرة الأرضية
   interactive: true, // السماح بالتفاعل اللمسي
@@ -3596,10 +3602,12 @@ map = new mapboxgl.Map({
 // تحسين الأداء عند التحميل وجعل الإشعاع أخف
 map.on('style.load', () => {
   map.setFog({
-    range: [1, 8],  // تقليل مدى الضباب حتى يظهر الفضاء بوضوح
-    color: 'rgba(10, 10, 25, 0.5)', // جعل لون الغلاف الجوي داكنًا أكثر ليظهر الفضاء
+    range: [1, 6],
+    color: 'rgba(255, 255, 255, 0.9)',  // هالة بيضاء تقريباً غير شفافة
+    "horizon-blend": 0.1
   });
 });
+
 
 // تنفيذ تأثير التحرك بعد تحميل الخريطة مع تأخير لمحاكاة رؤية الأرض من الفضاء
 map.on('load', () => {
@@ -3753,21 +3761,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('styleSelector').addEventListener('change', function () {
   const selectedStyle = this.value;
-  
-  if (styles[selectedStyle]) {
-    // التحقق مما إذا كان النمط الحالي مُحمّل بالكامل
-    if (map.isStyleLoaded()) {
-      map.setStyle(styles[selectedStyle]);
-      setCookie("mapStyle_index2", selectedStyle, 30); // حفظ التفضيل في الكوكيز
-      console.log(`✔️ تم تغيير النمط إلى: ${selectedStyle} وحُفظ في كوكيز index2`);
-    } else {
-      console.warn(`⚠️ النمط الحالي لم يتم تحميله بالكامل. انتظر حتى يتم تحميله.`);
-      // في حالة عدم تحميل النمط بالكامل، يتم ضبط النمط مع حفظ الكوكيز
-      map.setStyle(styles[selectedStyle]);
-      setCookie("mapStyle_index2", selectedStyle, 30);
-    }
 
-    // عند تحميل النمط الجديد، إعادة تطبيق تأثير الضباب لإظهار الفضاء والنجوم
+  if (styles[selectedStyle]) {
+    // هنا نستخدم رابط النمط من الكائن styles مباشرةً
+    const newStyleUrl = styles[selectedStyle];
+    
+    // إعادة تحميل النمط بالكامل بدون أي تعديل داخلي على خاصية sprite
+    map.setStyle(newStyleUrl);
+    
+    // حفظ التفضيل في الكوكيز
+    setCookie("mapStyle_index2", selectedStyle, 30);
+    console.log(`✔️ تم تغيير النمط إلى: ${selectedStyle} وحُفظ في كوكيز index2`);
+    
+    // عند تحميل النمط الجديد، إعادة تطبيق تأثير الضباب
     map.once('style.load', function () {
       map.setFog({
         range: [1, 10],
@@ -3780,6 +3786,8 @@ document.addEventListener('DOMContentLoaded', () => {
     console.error(`⚠️ النمط "${selectedStyle}" غير موجود.`);
   }
 });
+
+
 
 
     loginButton.addEventListener('click', () => {
@@ -3971,21 +3979,15 @@ function addMarkersToMap() {
             pulseEl.style.position = 'absolute';
             pulseEl.style.transform = 'translate(-50%, -50%)';
 
-            // الانتظار حتى تحميل النمط قبل إضافة علامة النبض
-            function addPulseMarker() {
-              const pulseMarker = new mapboxgl.Marker({
-                element: pulseEl,
-                anchor: 'center',
-                interactive: false
-              }).setLngLat(shiftedCoordinates)
-                .addTo(map);
-              window.requestMarkers[key].pulseMarker = pulseMarker;
-            }
-            if (map.isStyleLoaded()) {
-              addPulseMarker();
-            } else {
-              map.once('style.load', addPulseMarker);
-            }
+            const pulseMarker = new mapboxgl.Marker({
+              element: pulseEl,
+              anchor: 'center',
+              interactive: false
+            }).setLngLat(shiftedCoordinates)
+              .addTo(map);
+
+            window.requestMarkers[key].pulseMarker = pulseMarker;
+
 
             map.on('click', layerId, (e) => {
               if (!initialLoadCompleted) return;
@@ -4073,8 +4075,8 @@ map.on('zoom', function() {
   }
 });
 
-// عند تغيير نمط الخريطة نستخدم حدث "style.load" لإعادة إضافة المصادر والطبقات
-map.on('style.load', function() {
+// عند تغيير نمط الخريطة نستخدم حدث "style.load" مرة واحدة لإعادة إضافة المصادر والطبقات
+map.once('style.load', function() {
   if (window.requestMarkers) {
     Object.keys(window.requestMarkers).forEach(key => {
       const marker = window.requestMarkers[key];
@@ -4114,6 +4116,7 @@ map.on('style.load', function() {
     });
   }
 });
+
 
 
 
