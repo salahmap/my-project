@@ -272,6 +272,55 @@
   transform: translateX(0);
 }
 
+.jobDetailsActions {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: #fff;
+  padding: 10px;
+  border-top: 1px solid #ccc;
+  display: flex;
+  justify-content: center;
+  gap: 10px; /* مسافة متساوية بين الأزرار */
+}
+
+.jobButton {
+  font-size: 16px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+/* زر قبول الطلب */
+.jobButton.accept {
+  background-color: #28a745; /* أخضر */
+  color: #fff;
+}
+.jobButton.accept:hover {
+  background-color: #218838;
+}
+
+/* زر تفاوض */
+.jobButton.negotiate {
+  background-color: #ffc107; /* أصفر */
+  color: #fff;
+}
+.jobButton.negotiate:hover {
+  background-color: #e0a800;
+}
+
+/* زر إغلاق */
+.jobButton.close {
+  background-color: #dc3545; /* أحمر */
+  color: #fff;
+}
+.jobButton.close:hover {
+  background-color: #c82333;
+}
+
     </style>
 </head>
 <body>
@@ -369,12 +418,13 @@
          <div id="miniMap" style="width:100%; height:auto; margin-top:10px;"></div>
      </div>
      
-     <!-- منطقة الأزرار الثابتة -->
-     <div class="jobDetailsActions" style="position:absolute; bottom:0; left:0; width:100%; background:#fff; padding:10px; border-top:1px solid #ccc; text-align:center;">
-         <button id="acceptJobButton" style="margin:0 5px;">قبول الطلب</button>
-         <button class="controlButton negotiateButton" data-request-id="${currentRequestId}" onclick="openNegotiationForm(this.dataset.requestId)" style="margin:0 5px;">تفاوض</button>
-         <button onclick="document.getElementById('jobDetailsPopup').style.display='none'" style="margin:0 5px;">إغلاق</button>
-     </div>
+<!-- منطقة الأزرار الثابتة مع تصميم محسّن -->
+<div class="jobDetailsActions">
+    <button id="acceptJobButton" class="jobButton accept">قبول الطلب</button>
+    <button class="jobButton negotiate" data-request-id="${currentRequestId}" onclick="openNegotiationForm(this.dataset.requestId)">تفاوض</button>
+    <button class="jobButton close" onclick="document.getElementById('jobDetailsPopup').style.display='none'">إغلاق</button>
+  </div>
+  
 </div>
 
 
@@ -4629,3 +4679,4 @@ if (typeof map !== 'undefined' && map instanceof mapboxgl.Map) {
 
 </body>
 </html>
+
