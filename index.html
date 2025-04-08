@@ -228,6 +228,87 @@
   transform: translateX(0);
 }
 
+.request-popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #fff;
+  border-radius: 10px;
+  padding: 20px;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+  direction: rtl;
+  font-family: Arial, sans-serif;
+  z-index: 3;
+}
+
+.request-popup h2 {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: bold;
+}
+
+.form-group input[type="text"],
+.form-group textarea,
+.form-group select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  font-size: 14px;
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.option-description {
+  font-size: 12px;
+  color: #555;
+  margin-top: 5px;
+}
+
+.button-group {
+  text-align: center;
+  margin-top: 20px;
+}
+
+.button-group button {
+  padding: 10px 20px;
+  margin: 0 10px;
+  border: none;
+  border-radius: 5px;
+  background-color: #007bff;
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.3s ease;
+}
+
+.button-group button:hover {
+  background-color: #0056b3;
+}
+
+#mediaPreviewContainer {
+  max-height: 200px; /* يمكنك تعديل القيمة حسب التصميم المطلوب */
+  overflow-y: auto;
+}
+
+
+
+
     </style>
 </head>
 <body>
@@ -343,69 +424,83 @@
 
 
 <!-- نموذج تقديم الطلب بعد التعديل -->
-<div id="requestPopup" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; border-radius:10px; padding:20px; z-index:3;">
-    <h2>إدخال تفاصيل الطلب</h2>
-    <label for="workTypeInput">نوع العمل:</label>
-    <select id="workTypeInput" onchange="updateDescription()">
-        <option value="بناء" data-description="يُستخدم لأعمال الإنشاء والبناء">بناء</option>
-        <option value="سباكة" data-description="لأعمال السباكة وإصلاحات المياه">سباكة</option>
-        <option value="كهرباء" data-description="للأعمال الكهربائية والتركيبات">كهرباء</option>
-        <option value="نقل" data-description="لأعمال النقل والخدمات اللوجستية">نقل</option>
-        <option value="نجارة" data-description="للأعمال الخشبية وصناعة الأثاث">نجارة</option>
-        <option value="دهانات" data-description="للدهانات وتجميل الجدران">دهانات</option>
-        <option value="حدادة" data-description="للأعمال الحديدية والحدادة">حدادة</option>
-        <option value="تكييف وصيانة تبريد" data-description="للأعمال المتعلقة بالتكييف والصيانة">تكييف وصيانة تبريد</option>
-        <option value="تنظيف وصيانة عامة" data-description="للأعمال العامة والتنظيف">تنظيف وصيانة عامة</option>
-        <option value="استشارة" data-description="للحصول على استشارة فنية مختصرة حول المشروع">استشارة</option>
-        <option value="أخرى" data-description="إذا لم يتناسب أي خيار مع طلبك">أخرى</option>
-      </select>
+<div id="requestPopup" class="request-popup" style="display: none;">
+  <h2>إدخال تفاصيل الطلب</h2>
+  
+  <!-- منطقة المحتوى القابلة للتمرير -->
+  <div class="scrollable-container">
+    <form id="requestForm">
+      <div class="form-group">
+        <label for="workTypeInput">نوع العمل:</label>
+        <select id="workTypeInput" onchange="updateDescription()">
+          <option value="بناء" data-description="يُستخدم لأعمال الإنشاء والبناء">بناء</option>
+          <option value="سباكة" data-description="لأعمال السباكة وإصلاحات المياه">سباكة</option>
+          <option value="كهرباء" data-description="للأعمال الكهربائية والتركيبات">كهرباء</option>
+          <option value="نقل" data-description="لأعمال النقل والخدمات اللوجستية">نقل</option>
+          <option value="نجارة" data-description="للأعمال الخشبية وصناعة الأثاث">نجارة</option>
+          <option value="دهانات" data-description="للدهانات وتجميل الجدران">دهانات</option>
+          <option value="حدادة" data-description="للأعمال الحديدية والحدادة">حدادة</option>
+          <option value="تكييف وصيانة تبريد" data-description="للأعمال المتعلقة بالتكييف والصيانة">تكييف وصيانة تبريد</option>
+          <option value="تنظيف وصيانة عامة" data-description="للأعمال العامة والتنظيف">تنظيف وصيانة عامة</option>
+          <option value="استشارة" data-description="للحصول على استشارة فنية مختصرة حول المشروع">استشارة</option>
+          <option value="أخرى" data-description="إذا لم يتناسب أي خيار مع طلبك">أخرى</option>
+        </select>
+        <p id="optionDescription" class="option-description">يرجى اختيار نوع العمل لعرض الشرح.</p>
+      </div>
       
-      <!-- عنصر لعرض وصف الخيار المحدد -->
-      <p id="optionDescription" style="margin-top:10px; font-size:14px; color:#555;">يرجى اختيار نوع العمل لعرض الشرح.</p>
+      <div class="form-group">
+        <label for="budgetInput">الميزانية المتاحة:</label>
+        <input type="text" id="budgetInput" placeholder="أدخل الميزانية">
+      </div>
       
-      <script>
-        function updateDescription() {
-          var select = document.getElementById('workTypeInput');
-          var description = select.options[select.selectedIndex].getAttribute('data-description');
-          document.getElementById('optionDescription').innerText = description;
-        }
-      </script>
+      <div class="form-group">
+        <label for="timeInput">الوقت المطلوب:</label>
+        <input type="text" id="timeInput" placeholder="أدخل الزمن المطلوب">
+      </div>
       
+      <div class="form-group">
+        <label for="descriptionInput">وصف العمل:</label>
+        <textarea id="descriptionInput" placeholder="أدخل وصف العمل"></textarea>
+      </div>
       
+      <div class="form-group">
+        <label for="phoneInputRequest">رقم الهاتف:</label>
+        <input type="text" id="phoneInputRequest" placeholder="أدخل رقم الهاتف">
+      </div>
       
+      <div class="form-group">
+        <label for="mediaInput">إرفاق ملفات (صور/فيديو):</label>
+        <input type="file" id="mediaInput" accept="image/*,video/*" multiple>
+        <div id="mediaPreviewContainer"></div>
+      </div>
+    </form>
+  </div>
+  
+  <!-- مجموعة الأزرار تضع خارج منطقة التمرير -->
+  <div class="button-group">
+    <button type="button" id="submitRequest">إرسال الطلب</button>
+    <button type="button" id="cancelRequest">إلغاء</button>
+  </div>
+  
+  <!-- سكريبت لتحديث وصف نوع العمل ومنع إدخال رقم الهاتف داخل الوصف -->
+  <script>
+    function updateDescription() {
+      var select = document.getElementById('workTypeInput');
+      var description = select.options[select.selectedIndex].getAttribute('data-description');
+      document.getElementById('optionDescription').innerText = description;
+    }
     
-    <label for="budgetInput">الميزانية المتاحة:</label>
-    <input type="text" id="budgetInput" placeholder="أدخل الميزانية">
-    <label for="timeInput">الوقت المطلوب:</label>
-    <input type="text" id="timeInput" placeholder="أدخل الزمن المطلوب">
-    <!-- الحقل الجديد للوصف -->
-    <label for="descriptionInput">وصف العمل:</label>
-    <textarea id="descriptionInput" placeholder="أدخل وصف العمل"></textarea>
-    
-    <script>
-      document.getElementById('descriptionInput').addEventListener('input', function() {
-        // التعبير النمطي الذي يبحث عن رقم يبدأ بـ "09"
-        const regex = /\b09\d+\b/g;
-        if (regex.test(this.value)) {
-          alert("لا يُسمح بإدخال رقم هاتف في وصف العمل.");
-          // إزالة الرقم من النص
-          this.value = this.value.replace(regex, '');
-        }
-      });
-    </script>
-    
-    <!-- تم تغيير معرف رقم الهاتف هنا -->
-    <label for="phoneInputRequest">رقم الهاتف:</label>
-    <input type="text" id="phoneInputRequest" placeholder="أدخل رقم الهاتف">
-    <!-- الحقل الجديد لرفع صورة العمل -->
-    <label for="mediaInput">إرفاق ملفات (صور/فيديو):</label>
-    <input type="file" id="mediaInput" accept="image/*,video/*" multiple>
-    <!-- منطقة عرض المعاينات -->
-    <div id="mediaPreviewContainer"></div>
-      
-    <button id="submitRequest">إرسال الطلب</button>
-    <button id="cancelRequest">إلغاء</button>
+    document.getElementById('descriptionInput').addEventListener('input', function() {
+      const regex = /\b09\d+\b/g;
+      if (regex.test(this.value)) {
+        alert("لا يُسمح بإدخال رقم هاتف في وصف العمل.");
+        this.value = this.value.replace(regex, '');
+      }
+    });
+  </script>
 </div>
+
+  
 
 
 
