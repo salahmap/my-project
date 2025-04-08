@@ -336,6 +336,15 @@
   text-align: center;
 }
 
+@media (max-width: 600px) {
+  #jobDetailsPopup {
+        width: 90%;       /* يجعل العرض نسبة 90% من عرض الشاشة */
+        max-width: 400px; /* يحدد أقصى عرض للنافذة */
+        max-height: 70vh; /* تقليل الارتفاع قليلاً على الشاشات الصغيرة */
+        padding: 15px;    /* تقليل الحشوة لتناسب حجم الشاشة */
+    }
+}
+             
     </style>
 </head>
 <body>
@@ -402,14 +411,7 @@
              <img src="image5.jpg" alt="صورة العمل" style="width:18%; height:auto; margin-right:2%;">
          </div>
          
-         <style>
-             @media (max-width: 600px) {
-               #jobDetailsPopup {
-                 max-height:70vh;  /* تقليل الارتفاع قليلاً على الشاشات الصغيرة */
-                 padding:15px;     /* تقليل الحشوة لتناسب حجم الشاشة */
-               }
-             }
-         </style>
+
          
          <p id="jobDescription"></p>
          <p id="userPhone"></p>
