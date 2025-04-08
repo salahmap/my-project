@@ -58,19 +58,28 @@
   position: absolute;
   top: 60px;
   right: 10%;      /* ترك مسافة من الحافة اليمنى */
-  width: 280px;    /* تقليل العرض لجعل النافذة أصغر */
+  width: 250px;    /* عرض أصغر للوحة */
   max-height: 70vh;
   background-color: rgba(255, 255, 255, 0.95);
   border: 1px solid #ccc;
   border-radius: 8px;
   overflow-y: auto;
   padding: 10px;
-  display: none;
   z-index: 10;
-  transition: transform 0.3s ease, opacity 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);  /* ظل خفيف */
+  /* الحالة الافتراضية: مخفية */
   transform: translateX(100%);
   opacity: 0;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);  /* ظل خفيف لإبراز النافذة */
+  transition: transform 0.3s ease, opacity 0.3s ease;
+  /* عند عرض النافذة، سيتم تغيير الخاصيتين transform و opacity */
+  display: none; /* يُستَخدم display لتحديد عدم عرضها افتراضيًا */
+}
+
+/* فئة لتفعيل عرض النافذة بحركة جميلة */
+#ordersPanel.show {
+  display: block;  /* تغيير العرض ليصبح مرئيًا */
+  transform: translateX(0);
+  opacity: 1;
 }
 
 
