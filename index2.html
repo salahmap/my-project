@@ -306,70 +306,77 @@
 <!-- نافذة عرض الصورة (Modal) العامة -->
 <div id="imageModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); align-items:center; justify-content:center; z-index:9999;">
     <button id="prevBtn" style="position:absolute; left:20px; background:transparent; border:none; font-size:2em; color:#fff; cursor:pointer;">&#10094;</button>
-    <img id="modalImage" src="" alt="عرض الصورة" style="max-width:90%; max-height:90%; border: 5px solid #fff; border-radius:5px;">
+    <img id="modalImage" src="" alt="عرض الصورة" style="max-width:90%; max-height:90%; border:5px solid #fff; border-radius:5px;">
     <button id="nextBtn" style="position:absolute; right:20px; background:transparent; border:none; font-size:2em; color:#fff; cursor:pointer;">&#10095;</button>
 </div>
 
 <div id="cookieConsentPopup" style="display:none;">
     <p>يستخدم هذا الموقع الكوكيز لتحسين تجربتك. هل توافق على استخدامها؟</p>
     <button id="acceptCookie">موافق</button>
-  </div>
+</div>
 
-    <h1 id="title" style="display: none;">تطبيق الخريطة المحسن</h1>
-    <div id="map"></div>
+<h1 id="title" style="display:none;">تطبيق الخريطة المحسن</h1>
+<div id="map"></div>
 
 <!-- نافذة تفاصيل العمل المحدثة مع حدود واضحة -->
 <div id="jobDetailsPopup" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%);
- background:white; border-radius:10px; padding:20px; z-index:1100; 
- border: 3px solid #000000; /* حد أزرق واضح */
- box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2); /* ظل خفيف لإبراز النافذة */">
-    
-    <h2>تفاصيل العمل</h2>
-
-    <!-- عنصر عرض الصورة أصبح الآن في الأعلى -->
-    <div id="jobImagesContainer" style="max-width: 100%; overflow-x: auto; white-space: nowrap; padding: 10px;">
-        <img src="image1.jpg" alt="صورة العمل" style="width: 18%; height: auto; margin-right: 2%;">
-        <img src="image2.jpg" alt="صورة العمل" style="width: 18%; height: auto; margin-right: 2%;">
-        <img src="image3.jpg" alt="صورة العمل" style="width: 18%; height: auto; margin-right: 2%;">
-        <img src="image4.jpg" alt="صورة العمل" style="width: 18%; height: auto; margin-right: 2%;">
-        <img src="image5.jpg" alt="صورة العمل" style="width: 18%; height: auto; margin-right: 2%;">
-    </div>
-    
-    
-    <p id="jobDescription"></p>
-    <p id="userPhone"></p>
-<!-- عنصر عرض الموقع -->
-<p id="jobLocation">الموقع: شعبية الجفارة ليبيا</p>
-    <p id="jobDuration"></p>
-    <p id="jobBudget"></p>
-    <p id="jobDistance"></p>
-    <p id="estimatedArrivalTime"></p>
-    
-
-    <!-- إضافة ملاحظات هامة -->
-    <div id="jobNotes" style="margin-top: 10px; padding: 10px; border-top: 1px solid #ccc; font-size: 14px; color: #555;">
-        <p><strong>ملاحظات هامة:</strong></p>
-        <p>- يتم تسجيل جميع إجراءات القبول والرفض في قاعدة البيانات.</p>
-        <p>- عند الاقتراب إلى أقل من 500 متر من موقع الطلب، لن تتمكن من إلغاء الطلب.</p>
-        <p>- إذا لم يرد العميل عند الاتصال، يرجى إرسال رسالة نصية إلى الشركة تتضمن اسم ورقم المستخدم، أو إبلاغ الفرع عند الحضور بنهاية الشهر.</p>
-        <p>نلتزم بالجودة والاحترافية لضمان سير العمل بكفاءة.</p>
-    </div>
-
-    
-    <!-- قسم جديد لعرض خريطة مصغرة -->
-    <div id="miniMap" style="width:100%; height:auto; margin-top:10px;"></div>
-
-    <button id="acceptJobButton">قبول الطلب</button>
-    <button class="controlButton negotiateButton" 
-        data-request-id="${currentRequestId}" 
-        onclick="openNegotiationForm(this.dataset.requestId)">
-    تفاوض
-    </button>
-    <button onclick="document.getElementById('jobDetailsPopup').style.display='none'">
-    إغلاق
-    </button>
-    
+     background:white; border-radius:10px; padding:20px; z-index:1100; 
+     border:3px solid #000000; /* حد أزرق واضح */
+     box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2); /* ظل خفيف لإبراز النافذة */
+     max-height:80vh; overflow:hidden;"> <!-- تم إخفاء التمرير العام هنا -->
+     
+     <!-- محتوى تفاصيل العمل القابل للتمرير -->
+     <div class="jobDetailsContent" style="max-height:calc(80vh - 70px); overflow-y:auto; padding-bottom:70px;">
+         <h2>تفاصيل العمل</h2>
+         
+         <!-- عرض الصور في الأعلى -->
+         <div id="jobImagesContainer" style="max-width:100%; overflow-x:auto; white-space:nowrap; padding:10px;">
+             <img src="image1.jpg" alt="صورة العمل" style="width:18%; height:auto; margin-right:2%;">
+             <img src="image2.jpg" alt="صورة العمل" style="width:18%; height:auto; margin-right:2%;">
+             <img src="image3.jpg" alt="صورة العمل" style="width:18%; height:auto; margin-right:2%;">
+             <img src="image4.jpg" alt="صورة العمل" style="width:18%; height:auto; margin-right:2%;">
+             <img src="image5.jpg" alt="صورة العمل" style="width:18%; height:auto; margin-right:2%;">
+         </div>
+         
+         <style>
+             @media (max-width: 600px) {
+               #jobDetailsPopup {
+                 max-height:70vh;  /* تقليل الارتفاع قليلاً على الشاشات الصغيرة */
+                 padding:15px;     /* تقليل الحشوة لتناسب حجم الشاشة */
+               }
+             }
+         </style>
+         
+         <p id="jobDescription"></p>
+         <p id="userPhone"></p>
+         <!-- عنصر عرض الموقع -->
+         <p id="jobLocation">الموقع: شعبية الجفارة ليبيا</p>
+         <p id="jobDuration"></p>
+         <p id="jobBudget"></p>
+         <p id="jobDistance"></p>
+         <p id="estimatedArrivalTime"></p>
+         
+         <!-- إضافة ملاحظات هامة -->
+         <div id="jobNotes" style="margin-top:10px; padding:10px; border-top:1px solid #ccc; font-size:14px; color:#555;">
+             <p><strong>ملاحظات هامة:</strong></p>
+             <p>- يتم تسجيل جميع إجراءات القبول والرفض في قاعدة البيانات.</p>
+             <p>- عند الاقتراب إلى أقل من 500 متر من موقع الطلب، لن تتمكن من إلغاء الطلب.</p>
+             <p>- إذا لم يرد العميل عند الاتصال، يرجى إرسال رسالة نصية إلى الشركة تتضمن اسم ورقم المستخدم، أو إبلاغ الفرع عند الحضور بنهاية الشهر.</p>
+             <p>نلتزم بالجودة والاحترافية لضمان سير العمل بكفاءة.</p>
+         </div>
+         
+         <!-- قسم جديد لعرض خريطة مصغرة -->
+         <div id="miniMap" style="width:100%; height:auto; margin-top:10px;"></div>
+     </div>
+     
+     <!-- منطقة الأزرار الثابتة -->
+     <div class="jobDetailsActions" style="position:absolute; bottom:0; left:0; width:100%; background:#fff; padding:10px; border-top:1px solid #ccc; text-align:center;">
+         <button id="acceptJobButton" style="margin:0 5px;">قبول الطلب</button>
+         <button class="controlButton negotiateButton" data-request-id="${currentRequestId}" onclick="openNegotiationForm(this.dataset.requestId)" style="margin:0 5px;">تفاوض</button>
+         <button onclick="document.getElementById('jobDetailsPopup').style.display='none'" style="margin:0 5px;">إغلاق</button>
+     </div>
 </div>
+
 
 
 
