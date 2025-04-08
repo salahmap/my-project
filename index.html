@@ -235,18 +235,22 @@
   transform: translate(-50%, -50%);
   background: #fff;
   border-radius: 10px;
-  padding: 20px;
-  width: 90%;
-  max-width: 500px;
+  padding: 15px;       /* تقليل الحشوة */
+  width: 90%;          /* تقليل النسبة من 95% إلى 90% */
+  max-width: 350px;    /* تقليل الحد الأقصى للعرض من 500px إلى 350px */
   box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
   direction: rtl;
   font-family: Arial, sans-serif;
   z-index: 3;
+  max-height: 90vh;    /* تحديد أقصى ارتفاع */
+  overflow-y: auto;    /* إضافة تمرير عمودي إذا زاد المحتوى عن الحد */
 }
+
 
 .request-popup h2 {
   text-align: center;
   margin-bottom: 20px;
+  font-size: 22px;
 }
 
 .form-group {
@@ -257,6 +261,7 @@
   display: block;
   margin-bottom: 5px;
   font-weight: bold;
+  font-size: 14px;
 }
 
 .form-group input[type="text"],
@@ -300,6 +305,53 @@
 .button-group button:hover {
   background-color: #0056b3;
 }
+
+/* تنسيق منطقة معاينة الصور بحيث تكون بارتفاع ثابت وقابلة للتمرير */
+#mediaPreviewContainer {
+  margin-top: 10px;
+  max-height: 120px;  /* تحديد ارتفاع ثابت */
+  overflow-y: auto;   /* إضافة تمرير عمودي إذا تجاوز المحتوى الارتفاع المحدد */
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+#mediaPreviewContainer img,
+#mediaPreviewContainer video {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}
+
+/* تحسين المظهر على الشاشات الصغيرة */
+@media (max-width: 480px) {
+  .request-popup {
+    width: 95%;
+    padding: 15px;
+  }
+  
+  .request-popup h2 {
+    font-size: 20px;
+    margin-bottom: 15px;
+  }
+
+  .form-group input[type="text"],
+  .form-group textarea,
+  .form-group select {
+    padding: 8px;
+    font-size: 13px;
+  }
+
+  .button-group button {
+    padding: 8px 16px;
+    font-size: 13px;
+    margin: 5px 5px;
+  }
+}
+
+
 
 #mediaPreviewContainer {
   max-height: 200px; /* يمكنك تعديل القيمة حسب التصميم المطلوب */
@@ -425,10 +477,7 @@
 
 <!-- نموذج تقديم الطلب بعد التعديل -->
 <div id="requestPopup" class="request-popup" style="display: none;">
-  <h2>إدخال تفاصيل الطلب</h2>
-  
-  <!-- منطقة المحتوى القابلة للتمرير -->
-  <div class="scrollable-container">
+    <h2>إدخال تفاصيل الطلب</h2>
     <form id="requestForm">
       <div class="form-group">
         <label for="workTypeInput">نوع العمل:</label>
@@ -471,35 +520,35 @@
       <div class="form-group">
         <label for="mediaInput">إرفاق ملفات (صور/فيديو):</label>
         <input type="file" id="mediaInput" accept="image/*,video/*" multiple>
+        <!-- منطقة المعاينة مع ارتفاع ثابت وقابلية التمرير -->
         <div id="mediaPreviewContainer"></div>
       </div>
+      
+      <div class="button-group">
+        <button type="button" id="submitRequest">إرسال الطلب</button>
+        <button type="button" id="cancelRequest">إلغاء</button>
+      </div>
     </form>
-  </div>
-  
-  <!-- مجموعة الأزرار تضع خارج منطقة التمرير -->
-  <div class="button-group">
-    <button type="button" id="submitRequest">إرسال الطلب</button>
-    <button type="button" id="cancelRequest">إلغاء</button>
-  </div>
-  
-  <!-- سكريبت لتحديث وصف نوع العمل ومنع إدخال رقم الهاتف داخل الوصف -->
-  <script>
-    function updateDescription() {
-      var select = document.getElementById('workTypeInput');
-      var description = select.options[select.selectedIndex].getAttribute('data-description');
-      document.getElementById('optionDescription').innerText = description;
-    }
     
-    document.getElementById('descriptionInput').addEventListener('input', function() {
-      const regex = /\b09\d+\b/g;
-      if (regex.test(this.value)) {
-        alert("لا يُسمح بإدخال رقم هاتف في وصف العمل.");
-        this.value = this.value.replace(regex, '');
+    <!-- سكريبت لتحديث وصف نوع العمل ومنع إدخال رقم الهاتف في الوصف -->
+    <script>
+      function updateDescription() {
+        var select = document.getElementById('workTypeInput');
+        var description = select.options[select.selectedIndex].getAttribute('data-description');
+        document.getElementById('optionDescription').innerText = description;
       }
-    });
-  </script>
-</div>
-
+      
+      document.getElementById('descriptionInput').addEventListener('input', function() {
+        const regex = /\b09\d+\b/g;
+        if (regex.test(this.value)) {
+          alert("لا يُسمح بإدخال رقم هاتف في وصف العمل.");
+          this.value = this.value.replace(regex, '');
+        }
+      });
+    </script>
+  </div>
+  
+  
   
 
 
