@@ -57,8 +57,8 @@
 #ordersPanel {
   position: absolute;
   top: 60px;
-  right: 10px;
-  width: 300px;
+  right: 10%;      /* ترك مسافة من الحافة اليمنى */
+  width: 280px;    /* تقليل العرض لجعل النافذة أصغر */
   max-height: 70vh;
   background-color: rgba(255, 255, 255, 0.95);
   border: 1px solid #ccc;
@@ -70,16 +70,7 @@
   transition: transform 0.3s ease, opacity 0.3s ease;
   transform: translateX(100%);
   opacity: 0;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-/* تخصيص التصميم للأجهزة ذات الشاشات الصغيرة */
-@media (max-width: 600px) {
-  #ordersPanel {
-    width: 70%;     /* تقليل عرض النافذة */
-    right: 15%;     /* ترك مسافة مناسبة من الحافة اليمنى */
-    max-height: 80vh;
-  }
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);  /* ظل خفيف لإبراز النافذة */
 }
 
 
