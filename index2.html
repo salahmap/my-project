@@ -297,6 +297,20 @@
   white-space: nowrap;
 }
 
+@media (max-width: 600px) {
+  .jobDetailsActions {
+    padding: 8px;
+    gap: 8px;
+    /* إذا دعت الحاجة يمكن التحكم بمحاذاة المزيد */
+    justify-content: center;
+  }
+  
+  .jobButton {
+    font-size: 14px;      /* تقليل حجم الخط */
+    padding: 8px 12px;    /* تقليل الحشوة */
+  }
+}
+
 /* ألوان مخصصة للأزرار */
 .jobButton.accept {
   background-color: #28a745;
