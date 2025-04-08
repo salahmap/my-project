@@ -70,15 +70,15 @@
   transition: transform 0.3s ease, opacity 0.3s ease;
   transform: translateX(100%);
   opacity: 0;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* ظل خفيف */
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 /* تخصيص التصميم للأجهزة ذات الشاشات الصغيرة */
 @media (max-width: 600px) {
   #ordersPanel {
-    width: 90%;      
-    right: 5%;       
-    max-height: 80vh; 
+    width: 70%;     /* تقليل عرض النافذة */
+    right: 15%;     /* ترك مسافة مناسبة من الحافة اليمنى */
+    max-height: 80vh;
   }
 }
 
