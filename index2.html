@@ -70,7 +70,18 @@
   transition: transform 0.3s ease, opacity 0.3s ease;
   transform: translateX(100%);
   opacity: 0;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* ظل خفيف */
 }
+
+/* تخصيص التصميم للأجهزة ذات الشاشات الصغيرة */
+@media (max-width: 600px) {
+  #ordersPanel {
+    width: 90%;      
+    right: 5%;       
+    max-height: 80vh; 
+  }
+}
+
 
 /* 🔥 الفئة التي ستُضاف عند إظهار اللوحة */
 #ordersPanel.show {
