@@ -228,6 +228,7 @@
   transform: translateX(0);
 }
 
+
 .request-popup {
   position: fixed;
   top: 50%;
@@ -245,6 +246,7 @@
   max-height: 90vh;    /* تحديد أقصى ارتفاع */
   overflow-y: auto;    /* إضافة تمرير عمودي إذا زاد المحتوى عن الحد */
 }
+
 
 
 .request-popup h2 {
@@ -568,11 +570,13 @@
     <button id="submitRating">إرسال التقييم</button>
 </div>
 
-<!-- نافذة مراجعة وتعديل الطلب -->
-<div id="reviewPopup" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; border-radius:10px; padding:20px; z-index:3;">
-    <h2>تفاصيل الطلب</h2>
-    <label for="reviewWorkType">نوع العمل:</label>
-    <select id="reviewWorkType">
+<!-- نافذة مراجعة وتعديل الطلب بعد التعديل -->
+<div id="reviewPopup" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:white; border-radius:10px; padding:15px; width:90%; max-width:350px; max-height:90vh; overflow-y:auto; direction:rtl; font-family:Arial, sans-serif; box-shadow:0 0 15px rgba(0,0,0,0.3);">
+    <h2 style="text-align:center; margin-bottom:20px;">تفاصيل الطلب</h2>
+    
+    <div class="form-group" style="margin-bottom:15px;">
+      <label for="reviewWorkType" style="display:block; margin-bottom:5px; font-weight:bold;">نوع العمل:</label>
+      <select id="reviewWorkType" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:5px; font-size:14px;">
         <option value="بناء">بناء</option>
         <option value="سباكة">سباكة</option>
         <option value="كهرباء">كهرباء</option>
@@ -583,31 +587,47 @@
         <option value="تكييف وصيانة تبريد">تكييف وصيانة تبريد</option>
         <option value="تنظيف وصيانة عامة">تنظيف وصيانة عامة</option>
         <option value="أخرى">أخرى</option>
-    </select>
+      </select>
+    </div>
     
-    <label for="reviewBudget">الميزانية:</label>
-    <input type="text" id="reviewBudget" placeholder="أدخل الميزانية">
-    <label for="reviewTime">الوقت المطلوب:</label>
-    <input type="text" id="reviewTime" placeholder="أدخل الوقت المطلوب">
-    <label for="reviewDescription">وصف العمل:</label>
-    <textarea id="reviewDescription" placeholder="أدخل وصف العمل"></textarea>
-    <label for="reviewPhone">رقم الهاتف:</label>
-    <input type="text" id="reviewPhone" placeholder="أدخل رقم الهاتف">
+    <div class="form-group" style="margin-bottom:15px;">
+      <label for="reviewBudget" style="display:block; margin-bottom:5px; font-weight:bold;">الميزانية:</label>
+      <input type="text" id="reviewBudget" placeholder="أدخل الميزانية" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:5px; font-size:14px;">
+    </div>
     
-    <!-- ✅ إضافة زر رفع الصورة داخل نافذة مراجعة الطلب -->
-    <label for="reviewImageInput">إرفاق صورة العمل:</label>
-    <input type="file" id="reviewImageInput">
-    <button id="reviewUploadButton">رفع الصورة</button>
-
-      <!-- مكون عرض معاينة الصور المرفقة -->
-  <label>معاينة الصور المرفقة:</label>
-  <div id="reviewMediaPreviewContainer"></div>
+    <div class="form-group" style="margin-bottom:15px;">
+      <label for="reviewTime" style="display:block; margin-bottom:5px; font-weight:bold;">الوقت المطلوب:</label>
+      <input type="text" id="reviewTime" placeholder="أدخل الوقت المطلوب" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:5px; font-size:14px;">
+    </div>
+    
+    <div class="form-group" style="margin-bottom:15px;">
+      <label for="reviewDescription" style="display:block; margin-bottom:5px; font-weight:bold;">وصف العمل:</label>
+      <textarea id="reviewDescription" placeholder="أدخل وصف العمل" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:5px; font-size:14px; resize:vertical; min-height:80px;"></textarea>
+    </div>
+    
+    <div class="form-group" style="margin-bottom:15px;">
+      <label for="reviewPhone" style="display:block; margin-bottom:5px; font-weight:bold;">رقم الهاتف:</label>
+      <input type="text" id="reviewPhone" placeholder="أدخل رقم الهاتف" style="width:100%; padding:10px; border:1px solid #ccc; border-radius:5px; font-size:14px;">
+    </div>
+    
+    <div class="form-group" style="margin-bottom:15px;">
+      <label for="reviewImageInput" style="display:block; margin-bottom:5px; font-weight:bold;">إرفاق صورة العمل:</label>
+      <input type="file" id="reviewImageInput" style="width:100%; margin-bottom:5px;">
+      <button id="reviewUploadButton" style="display:block; margin-bottom:10px; padding:10px 20px; background-color:#007bff; color:white; border:none; border-radius:5px; cursor:pointer;">رفع الصورة</button>
+    </div>
+    
+    <div class="form-group" style="margin-bottom:15px;">
+      <label style="display:block; margin-bottom:5px; font-weight:bold;">معاينة الصور المرفقة:</label>
+      <div id="reviewMediaPreviewContainer" style="width:100%; max-height:120px; overflow-y:auto; border:1px solid #ccc; padding:5px; border-radius:5px;"></div>
+    </div>
+    
+    <div class="button-group" style="text-align:center; margin-top:20px;">
+      <button id="updateRequestButton" style="padding:10px 20px; margin:0 10px; background-color:#007bff; color:white; border:none; border-radius:5px; cursor:pointer;">تحديث الطلب</button>
+      <button id="deleteRequestButton" style="padding:10px 20px; margin:0 10px; background-color:#d9534f; color:white; border:none; border-radius:5px; cursor:pointer;">حذف الطلب</button>
+      <button id="closeReviewPopup" style="padding:10px 20px; margin:0 10px; background-color:#6c757d; color:white; border:none; border-radius:5px; cursor:pointer;">إغلاق</button>
+    </div>
+  </div>
   
-    <br><br>
-    <button id="updateRequestButton">تحديث الطلب</button>
-    <button id="deleteRequestButton">حذف الطلب</button>
-    <button id="closeReviewPopup">إغلاق</button>
-</div>
 
 
 
@@ -2979,7 +2999,7 @@ function openWorkerRequestPopup(workerId) {
       console.log("اسم العامل المُسترجَع:", workerName); // سجل للتصحيح
       const displayName = workerName ? workerName : "العامل";
       if (popupTitle) {
-        popupTitle.innerHTML = "طلب مباشر لـ " + displayName;
+        popupTitle.innerHTML = "تقديم طلب مباشر لـ " + displayName;
       }
       document.getElementById('requestPopup').style.display = 'block';
     })
